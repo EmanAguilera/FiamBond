@@ -1,4 +1,4 @@
-// src/Pages/layout.jsx
+
 import { useContext } from "react";
 import{ Link, Outlet, useNavigate } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
@@ -54,7 +54,7 @@ export default function Layout(){
         <>
         <header className="app-header">
             <nav className="top-nav">
-                <Link to="/" className="logo">Cointrack</Link>
+                <Link to="/" className="logo">Cointrak</Link>
                 {user ? (
                     <div className="user-info">
                         <p className="text-slate-500 text-sm"> Welcome back, <strong>{user.
