@@ -1,6 +1,6 @@
-/* src/App.css */
+/* src/index.css */
 
-@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Prompt:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -9,41 +9,45 @@
 @layer base {
     body {
         font-family: "Poppins", sans-serif;
-        @apply bg-gray-50 text-gray-900;
+        @apply bg-white text-gray-800;
     }
 }
 
 @layer components {
-    input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    input[type="search"],
-    input[type="tel"],
-    input[type="url"], textarea {
-        @apply block w-full rounded-md border-0 p-3 text-slate-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm bg-white transition duration-200 ease-in-out;
-    }
-    input:focus {
-        @apply ring-indigo-600 shadow-md;
-    }
-    label {
-        @apply block text-sm font-medium leading-6 text-gray-700 first-letter:capitalize mb-1;
-    }
-    /* Modified header and nav for top bar */
+    /* --- GENERAL COMPONENTS --- */
     .app-header {
-        @apply bg-white shadow-sm border-b border-gray-100 sticky top-0 z-10; /* Make header sticky */
+        @apply sticky top-0 z-10 bg-white shadow-sm border-b border-gray-100; /* Make header sticky */
     }
     .top-nav { /* Renamed from nav for clarity with sidebar nav */
-        @apply p-4 max-w-screen-2xl mx-auto flex items-center justify-between h-16; /* Fixed height for header */
+        @apply flex items-center justify-between h-16 max-w-screen-2xl p-4 mx-auto; /* Fixed height for header */
+    }
+    .logo { /* Style for app logo */
+        @apply text-3xl font-extrabold tracking-tight text-indigo-600;
+    }
+    .title {
+        @apply mb-8 text-3xl font-extrabold leading-9 text-center text-gray-900;
+    }
+    .error {
+        @apply mt-2 text-sm text-red-600;
+    }
+    .avatar {
+        @apply object-cover object-center w-8 h-8 overflow-hidden rounded-full;
     }
 
+    /* --- BUTTONS & LINKS --- */
     .primary-btn {
-        @apply flex w-full justify-center rounded-md bg-indigo-600 px-4 py-2.5 text-base font-semibold leading-6 text-white shadow-md hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-200 ease-in-out;
+        @apply flex justify-center w-full px-8 py-3 text-base font-semibold leading-6 text-white bg-[#6D28D9] rounded-lg shadow-lg disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-[#5B21B6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 transition-all duration-300 ease-in-out transform hover:scale-105;
     }
     .text-link {
-        @apply font-medium text-indigo-600 hover:text-indigo-700 transition duration-200 ease-in-out;
+        @apply font-semibold text-[#6D28D9] hover:text-[#5B21B6] transition duration-200 ease-in-out;
     }
+    .round-btn {
+        @apply w-8 h-8 overflow-auto bg-slate-100 rounded-full focus:outline-none focus:ring-1 focus:ring-slate-100 focus:ring-offset-2 focus:ring-offset-slate-800;
+    }
+
+    /* --- NAVIGATION --- */
     .nav-link {
-        @apply text-gray-600 hover:bg-gray-100 hover:text-indigo-600 rounded-md px-3 py-2 text-sm font-medium transition duration-200 ease-in-out flex items-center; /* Added flex and items-center */
+        @apply flex items-center px-3 py-2 text-sm font-medium text-gray-600 transition duration-200 ease-in-out rounded-md hover:bg-gray-100 hover:text-indigo-600; /* Added flex and items-center */
     }
     .nav-link.active {
         @apply bg-indigo-50 text-indigo-700;
@@ -51,20 +55,36 @@
     .logout-link { /* Style for logout button */
         @apply text-red-600 hover:bg-red-50 hover:text-red-700;
     }
-    .title {
-        @apply mb-8 text-center text-3xl font-extrabold leading-9 text-gray-900;
+
+    /* --- FORMS --- */
+    .form-group {
+        @apply mb-5;
     }
-    .error {
-        @apply text-sm text-red-600 mt-2;
+    label {
+        @apply block mb-2 text-sm font-medium leading-6 text-gray-700; /* Added more bottom margin */
     }
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"], 
+    textarea {
+        @apply block w-full p-3.5 bg-white rounded-lg border-0 text-slate-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:text-sm transition duration-200 ease-in-out;
+    }
+    input:focus {
+        @apply ring-violet-600;
+    }
+
+    /* --- TABLES --- */
     table {
-        @apply w-full text-sm text-left rounded-md shadow-lg overflow-hidden mb-6 table-auto bg-white;
+        @apply w-full mb-6 overflow-hidden text-sm text-left bg-white rounded-md shadow-lg table-auto;
     }
     thead {
-        @apply text-xs uppercase font-medium border-b border-slate-100 text-slate-600;
+        @apply text-xs font-medium uppercase border-b text-slate-600 border-slate-100;
     }
     tbody tr {
-        @apply hover:bg-slate-100 w-full p-0;
+        @apply w-full p-0 hover:bg-slate-100;
     }
     th {
         @apply px-6 py-4;
@@ -72,76 +92,95 @@
     td {
         @apply px-6 py-4 border-b border-slate-100;
     }
-    .avatar {
-        @apply w-8 h-8 rounded-full overflow-hidden object-center object-cover;
+
+    /* --- SIDEBAR --- */
+    .sidebar { 
+        @apply hidden md:flex flex-col w-64 min-h-[calc(100vh-80px)] p-5 bg-white border-r border-gray-100 shadow-sm; 
     }
-    .round-btn {
-        @apply w-8 h-8 overflow-auto rounded-full bg-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-100 focus:ring-offset-2 focus:ring-offset-slate-800;
+    .sidebar-nav ul { 
+        @apply pt-6 space-y-2; 
+    }
+    .sidebar-nav-link { 
+        @apply flex items-center px-4 py-2 font-medium text-gray-700 transition duration-200 ease-in-out rounded-md hover:bg-violet-50 hover:text-violet-700; 
+    }
+    .sidebar-nav-link.active { 
+        @apply bg-violet-100 text-violet-800; 
     }
 
-    /* Updated styles for the login container, adjusted for full page layout */
+    /* --- MAIN CONTENT AREA --- */
+    .main-content-with-sidebar { 
+        @apply max-w-screen-xl p-10 mx-auto; 
+    }
+
+    /* --- AUTHENTICATION PAGES --- */
+    .auth-wrapper {
+        @apply flex flex-col items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12 bg-slate-50 sm:px-6 lg:px-8;
+    }
+    .auth-card {
+        @apply w-full max-w-3xl p-8 bg-white rounded-xl shadow-lg md:p-12; /* Wider card, more padding, larger shadow/border-radius */
+    }
+    .auth-title {
+        @apply mb-10 text-3xl font-extrabold text-center text-gray-900; /* More bottom margin */
+    }
     .login-wrapper {
         @apply flex items-center justify-center min-h-[calc(100vh-64px)]; /* Corrected height calculation */
     }
     .login-card {
-        @apply bg-white p-10 rounded-lg shadow-xl max-w-md w-full;
-    }
-    .form-group {
-        @apply mb-5;
-    }
-    .logo { /* Style for app logo */
-        @apply text-3xl font-extrabold text-indigo-600 tracking-tight;
+        @apply w-full max-w-md p-10 bg-white rounded-lg shadow-xl;
     }
     .user-info { /* New style for user info block in header */
         @apply flex items-center space-x-4;
     }
 
-    /* --- NEW/MODIFIED DASHBOARD STYLES --- */
-    .dashboard-section {
-        @apply mb-12;
+    /* --- HERO SECTION --- */
+    .hero-section { 
+        @apply flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-20 bg-gradient-to-br from-violet-50 to-white sm:px-6 lg:px-8; 
     }
-    .dashboard-header {
-        @apply flex justify-between items-center mb-8;
+    .hero-content { 
+        @apply grid grid-cols-1 md:grid-cols-2 gap-24 items-center max-w-screen-xl mx-auto; 
     }
-    .dashboard-title {
-        @apply text-3xl font-extrabold text-gray-900;
+    .hero-text { 
+        @apply text-left; 
     }
-    .dashboard-card {
-        @apply bg-white p-6 rounded-lg shadow-md mb-4 border border-gray-100; /* Subtle border for definition */
+    .hero-headline { 
+        @apply mb-6 text-5xl font-black leading-tight text-gray-900 lg:text-7xl; 
     }
-    .balance-amount {
-        @apply text-5xl font-extrabold; /* Larger and bolder balance */
+    .hero-subheadline { 
+        @apply max-w-lg mb-10 text-xl text-gray-600; 
     }
-    .transaction-item {
-        @apply p-4 rounded-md flex justify-between items-center transition duration-200 ease-in-out hover:bg-gray-50; /* Add hover effect */
+    .hero-cta { 
+        @apply flex items-center gap-6; 
     }
-    .transaction-description {
-        @apply font-semibold text-lg; /* Slightly larger description */
-    }
-    .transaction-date {
-        @apply text-xs text-gray-500 mt-1;
-    }
-    .transaction-amount {
-        @apply font-bold text-lg; /* Consistent font size */
-    }
-    .dashboard-divider {
-        @apply my-10 border-t border-gray-200; /* Lighter, more modern divider */
+    .hero-visual img { 
+        @apply rounded-xl shadow-2xl; 
     }
 
-    /* --- NEW SIDEBAR STYLES --- */
-    .sidebar {
-        @apply w-64 bg-white border-r border-gray-100 p-5 flex flex-col min-h-[calc(100vh-64px)] shadow-md; /* Fixed width, background, border, padding, full height */
+    /* --- DASHBOARD --- */
+    .dashboard-section { 
+        @apply mb-12; 
     }
-    .sidebar-nav ul {
-        @apply space-y-2 pt-6; /* Space between nav items and added top padding */
+    .dashboard-header { 
+        @apply flex items-center justify-between mb-8; 
     }
-    .sidebar-nav-link {
-        @apply flex items-center px-4 py-2 rounded-md text-gray-700 font-medium hover:bg-indigo-50 hover:text-indigo-700 transition duration-200 ease-in-out;
+    .dashboard-title { 
+        @apply text-3xl font-extrabold text-gray-900; 
     }
-    .sidebar-nav-link.active {
-        @apply bg-indigo-100 text-indigo-800; /* Active state for sidebar links */
+    .dashboard-card { 
+        @apply p-6 mb-4 bg-white border border-gray-100 rounded-lg shadow-md; 
     }
-    .main-content-with-sidebar {
-        @apply p-10 max-w-screen-xl mx-auto; /* Padding for main content */
+    .balance-amount { 
+        @apply text-5xl font-extrabold; 
+    }
+    .transaction-item { 
+        @apply flex items-center justify-between p-4 transition duration-200 ease-in-out rounded-md hover:bg-gray-50; 
+    }
+    .transaction-description { 
+        @apply text-lg font-semibold; 
+    }
+    .transaction-date { 
+        @apply mt-1 text-xs text-gray-500; 
+    }
+    .transaction-amount { 
+        @apply text-lg font-bold; 
     }
 }
