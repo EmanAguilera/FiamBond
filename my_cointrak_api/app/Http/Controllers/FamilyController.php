@@ -6,6 +6,7 @@ use App\Models\Family;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Carbon;
 
 class FamilyController extends Controller
 {
@@ -85,5 +86,35 @@ class FamilyController extends Controller
 
         // Return the updated family with all members
         return $family->load('members');
+    }
+
+    public function monthlyReport(Request $request, Family $family)
+    {
+        // Authorization: Ensure the current user is a member of this family
+        if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        $targetMonth = Carbon::parse($request->query('month', 'now'))->startOfMonth();
+        $startDate = $targetMonth->copy()->startOfMonth();
+        $endDate = $targetMonth->copy()->endOfMonth();
+
+        // Fetch transactions belonging ONLY to this family for the target month
+        $transactions = $family->transactions()
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->get();
+
+        $inflow = $transactions->where('type', 'income')->sum('amount');
+        $outflow = $transactions->where('type', 'expense')->sum('amount');
+
+        return response([
+            'monthName' => $targetMonth->format('F Y'),
+            'familyName' => $family->first_name,
+            'totalInflow' => $inflow,
+            'totalOutflow' => $outflow,
+            'netPosition' => $inflow - $outflow,
+            'transactionCount' => $transactions->count(),
+            'transactions' => $transactions, // Send the transactions to display them
+        ]);
     }
 }
