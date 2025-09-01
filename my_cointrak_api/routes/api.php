@@ -36,4 +36,5 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::apiResource('transactions', TransactionController::class);
      Route::apiResource('goals', GoalController::class)->except(['show', 'update']);
      Route::get('/reports/monthly', [ReportController::class, 'monthly']);
+     Route::get('/families/{family}/report', [FamilyController::class, 'monthlyReport']);
 });
