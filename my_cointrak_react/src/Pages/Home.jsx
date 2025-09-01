@@ -115,25 +115,31 @@ export default function Home() {
               <p className="text-center text-gray-500 mb-12">You have no personal transactions yet.</p>
             )}
 
+            {/* --- UPDATED LATEST POSTS SECTION --- */}
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Latest Posts</h3>
             {posts.length > 0 ? (
-              posts.map((post) => (
-                <div key={post.id} className="mb-4 p-4 border rounded-md border-dashed border-slate-400">
-                  <div className="mb-2 flex items-start justify-between">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {posts.map((post) => (
+                  <div key={post.id} className="bg-white border border-gray-200 rounded-lg shadow-md p-6 flex flex-col justify-between">
                     <div>
-                      <h2 className="font-bold text-2xl">{post.title}</h2>
-                      <small className="text-xs text-slate-600">
+                      <h2 className="font-bold text-2xl mb-2">{post.title}</h2>
+                      <small className="text-sm text-gray-500 mb-4 block">
                         Created by {post.user.name} on{" "}
                         {new Date(post.created_at).toLocaleDateString()}
                       </small>
+                      <p className="text-gray-700">
+                        {/* Truncate post body to show a preview */}
+                        {post.body.substring(0, 120)}...
+                      </p>
                     </div>
-                    <Link to={`/posts/${post.id}`} className="primary-btn text-sm">
-                      Read more
-                    </Link>
+                    <div className="mt-6">
+                      <Link to={`/posts/${post.id}`} className="text-link font-bold">
+                        Read more &rarr;
+                      </Link>
+                    </div>
                   </div>
-                  <p>{post.body}</p>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
               <p className="text-center text-gray-500">There are no posts to display.</p>
             )}
