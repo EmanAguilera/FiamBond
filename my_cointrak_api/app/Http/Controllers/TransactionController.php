@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Transaction;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
+use Illuminate\Validation\Rule; // <-- Add this import
 
 class TransactionController extends Controller
 {
@@ -12,8 +14,9 @@ class TransactionController extends Controller
      */
     public function index(Request $request)
     {
-        // Return only the transactions belonging to the authenticated user
-        return $request->user()->transactions()->latest()->get();
+        // --- MODIFICATION ---
+        // This now only returns PERSONAL transactions (where family_id is null)
+        return $request->user()->transactions()->whereNull('family_id')->latest()->get();
     }
 
     /**
@@ -21,27 +24,35 @@ class TransactionController extends Controller
      */
     public function store(Request $request)
     {
-        // The 'force_creation' flag will be sent by the frontend after the user makes a choice.
+        $user = $request->user();
         $forceCreation = $request->input('force_creation', false);
 
         $fields = $request->validate([
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
-            'type' => 'required|in:income,expense'
+            'type' => 'required|in:income,expense',
+            // --- START OF FIX ---
+            // Add validation for family_id. It's optional ('nullable').
+            // It must be a valid ID from the families table.
+            // We also check that the user is actually a member of the selected family for security.
+            'family_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('families', 'id'),
+                Rule::exists('family_user', 'family_id')->where('user_id', $user->id),
+            ]
+            // --- END OF FIX ---
         ]);
         
-        $user = $request->user();
-        $activeGoal = $user->goals()->first(); // Check for any active goal
+        $activeGoal = $user->goals()->first();
 
-        // The "Coin Toss" logic
         if ($fields['type'] === 'expense' && $activeGoal && !$forceCreation) {
             return response([
                 'message' => 'This action conflicts with your goal.',
                 'goal' => $activeGoal,
-            ], 409); // 409 Conflict
+            ], 409);
         }
 
-        // If the choice was made to proceed, add the consequence note to the goal.
         if ($fields['type'] === 'expense' && $activeGoal && $forceCreation) {
             $date = Carbon::now()->toFormattedDateString();
             $newNote = "On {$date}, the integrity of this goal was compromised by an expense of {$fields['amount']}.";
@@ -55,7 +66,7 @@ class TransactionController extends Controller
         return response($transaction, 201);
     }
 
-    // You can leave the other methods empty for now
+    // Other methods remain unchanged
     public function show(Transaction $transaction) {}
     public function update(Request $request, Transaction $transaction) {}
     public function destroy(Transaction $transaction) {}
