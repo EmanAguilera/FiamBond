@@ -16,12 +16,12 @@
 @layer components {
     /* --- GENERAL COMPONENTS --- */
     .app-header {
-        @apply sticky top-0 z-10 bg-white shadow-sm border-b border-gray-100; /* Make header sticky */
+        @apply sticky top-0 z-10 bg-white shadow-sm border-b border-gray-100;
     }
-    .top-nav { /* Renamed from nav for clarity with sidebar nav */
-        @apply flex items-center justify-between h-16 max-w-screen-2xl p-4 mx-auto; /* Fixed height for header */
+    .top-nav {
+        @apply flex items-center justify-between h-16 max-w-screen-2xl p-4 mx-auto;
     }
-    .logo { /* Style for app logo */
+    .logo {
         @apply text-3xl font-extrabold tracking-tight text-indigo-600;
     }
     .title {
@@ -36,10 +36,11 @@
 
     /* --- BUTTONS & LINKS --- */
     .primary-btn {
-        @apply flex justify-center w-full px-8 py-3 text-base font-semibold leading-6 text-white bg-[#6D28D9] rounded-lg shadow-lg disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-[#5B21B6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700 transition-all duration-300 ease-in-out transform hover:scale-105;
+        /* Changed w-full to w-auto and added whitespace-nowrap */
+        @apply flex justify-center w-auto px-8 py-3 text-base font-semibold leading-6 text-white bg-indigo-600 rounded-lg shadow-lg whitespace-nowrap disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-105;
     }
     .text-link {
-        @apply font-semibold text-[#6D28D9] hover:text-[#5B21B6] transition duration-200 ease-in-out;
+        @apply font-semibold text-indigo-600 hover:text-indigo-500 transition duration-200 ease-in-out;
     }
     .round-btn {
         @apply w-8 h-8 overflow-auto bg-slate-100 rounded-full focus:outline-none focus:ring-1 focus:ring-slate-100 focus:ring-offset-2 focus:ring-offset-slate-800;
@@ -47,29 +48,32 @@
 
     /* --- NAVIGATION --- */
     .nav-link {
-        @apply flex items-center px-3 py-2 text-sm font-medium text-gray-600 transition duration-200 ease-in-out rounded-md hover:bg-gray-100 hover:text-indigo-600; /* Added flex and items-center */
+        @apply flex items-center px-3 py-2 text-sm font-medium text-gray-600 transition duration-200 ease-in-out rounded-md hover:bg-gray-100 hover:text-indigo-600;
     }
     .nav-link.active {
         @apply bg-indigo-50 text-indigo-700;
     }
-    .logout-link { /* Style for logout button */
+    .logout-link {
         @apply text-red-600 hover:bg-red-50 hover:text-red-700;
     }
 
-    /* --- FORMS --- */
+    /* --- GENERAL FORMS (Non-Login) --- */
     .form-group {
         @apply mb-5;
     }
     label {
-        @apply block mb-2 text-sm font-medium leading-6 text-gray-700; /* Added more bottom margin */
+        @apply block mb-2 text-sm font-medium leading-6 text-gray-700;
     }
     input[type="text"],
-    input[type="email"],
-    input[type="password"],
     input[type="search"],
     input[type="tel"],
-    input[type="url"], 
+    input[type="url"],
     textarea {
+        @apply block w-full p-3.5 bg-white rounded-lg border-0 text-slate-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:text-sm transition duration-200 ease-in-out;
+    }
+    /* General inputs not inside login-card */
+    input[type="email"],
+    input[type="password"] {
         @apply block w-full p-3.5 bg-white rounded-lg border-0 text-slate-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-violet-600 sm:text-sm transition duration-200 ease-in-out;
     }
     input:focus {
@@ -86,101 +90,103 @@
     tbody tr {
         @apply w-full p-0 hover:bg-slate-100;
     }
-    th {
-        @apply px-6 py-4;
-    }
-    td {
+    th, td {
         @apply px-6 py-4 border-b border-slate-100;
     }
 
     /* --- SIDEBAR --- */
-    .sidebar { 
-        @apply hidden md:flex flex-col w-64 min-h-[calc(100vh-80px)] p-5 bg-white border-r border-gray-100 shadow-sm; 
+    .sidebar {
+        @apply hidden md:flex flex-col w-64 min-h-[calc(100vh-80px)] p-5 bg-white border-r border-gray-100 shadow-sm;
     }
-    .sidebar-nav ul { 
-        @apply pt-6 space-y-2; 
+    .sidebar-nav ul {
+        @apply pt-6 space-y-2;
     }
-    .sidebar-nav-link { 
-        @apply flex items-center px-4 py-2 font-medium text-gray-700 transition duration-200 ease-in-out rounded-md hover:bg-violet-50 hover:text-violet-700; 
+    .sidebar-nav-link {
+        @apply flex items-center px-4 py-2 font-medium text-gray-700 transition duration-200 ease-in-out rounded-md hover:bg-violet-50 hover:text-violet-700;
     }
-    .sidebar-nav-link.active { 
-        @apply bg-violet-100 text-violet-800; 
+    .sidebar-nav-link.active {
+        @apply bg-violet-100 text-violet-800;
     }
 
     /* --- MAIN CONTENT AREA --- */
-    .main-content-with-sidebar { 
-        @apply max-w-screen-xl p-10 mx-auto; 
+    .main-content-with-sidebar {
+        @apply max-w-screen-xl p-10 mx-auto;
     }
 
     /* --- AUTHENTICATION PAGES --- */
-    .auth-wrapper {
-        @apply flex flex-col items-center justify-center min-h-[calc(100vh-80px)] px-4 py-12 bg-slate-50 sm:px-6 lg:px-8;
-    }
-    .auth-card {
-        @apply w-full max-w-3xl p-8 bg-white rounded-xl shadow-lg md:p-12; /* Wider card, more padding, larger shadow/border-radius */
-    }
-    .auth-title {
-        @apply mb-10 text-3xl font-extrabold text-center text-gray-900; /* More bottom margin */
-    }
     .login-wrapper {
-        @apply flex items-center justify-center min-h-[calc(100vh-64px)]; /* Corrected height calculation */
+        /* Changed from gradient to a soft gray */
+        @apply flex items-center justify-center min-h-screen bg-gray-100;
     }
     .login-card {
-        @apply w-full max-w-md p-10 bg-white rounded-lg shadow-xl;
+        @apply w-full max-w-md p-10 bg-white rounded-2xl shadow-xl;
     }
-    .user-info { /* New style for user info block in header */
+    /* Target only form groups within the login card */
+    .login-card .form-group {
+        @apply relative mb-6;
+    }
+    /* Target only specific inputs within the login card */
+    .login-card input[type="email"],
+    .login-card input[type="password"] {
+        @apply block w-full px-4 py-3 text-gray-900 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300;
+    }
+    /* Target only labels within the login card's form group */
+    .login-card .form-group label {
+        @apply absolute left-4 -top-3 text-sm text-gray-600 bg-white px-1 transition-all duration-300;
+    }
+    .user-info {
         @apply flex items-center space-x-4;
     }
 
     /* --- HERO SECTION --- */
-    .hero-section { 
-        @apply flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-20 bg-gradient-to-br from-violet-50 to-white sm:px-6 lg:px-8; 
+    .hero-section {
+        @apply flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-20 bg-gradient-to-br from-violet-50 to-white sm:px-6 lg:px-8;
     }
-    .hero-content { 
-        @apply grid grid-cols-1 md:grid-cols-2 gap-24 items-center max-w-screen-xl mx-auto; 
+    .hero-content {
+        @apply grid grid-cols-1 md:grid-cols-2 gap-24 items-center max-w-screen-xl mx-auto;
     }
-    .hero-text { 
-        @apply text-left; 
+    .hero-text {
+        @apply text-left;
     }
-    .hero-headline { 
-        @apply mb-6 text-5xl font-black leading-tight text-gray-900 lg:text-7xl; 
+    .hero-headline {
+        @apply mb-6 text-5xl font-black leading-tight text-gray-900 lg:text-7xl;
     }
-    .hero-subheadline { 
-        @apply max-w-lg mb-10 text-xl text-gray-600; 
+    .hero-subheadline {
+        @apply max-w-lg mb-10 text-xl text-gray-600;
     }
-    .hero-cta { 
-        @apply flex items-center gap-6; 
+    .hero-cta {
+        @apply flex items-center gap-6;
     }
-    .hero-visual img { 
-        @apply rounded-xl shadow-2xl; 
+    .hero-visual img {
+        @apply rounded-xl shadow-2xl;
     }
 
     /* --- DASHBOARD --- */
-    .dashboard-section { 
-        @apply mb-12; 
+    .dashboard-section {
+        @apply mb-12;
     }
-    .dashboard-header { 
-        @apply flex items-center justify-between mb-8; 
+    .dashboard-header {
+        @apply flex items-center justify-between mb-8;
     }
-    .dashboard-title { 
-        @apply text-3xl font-extrabold text-gray-900; 
+    .dashboard-title {
+        @apply text-3xl font-extrabold text-gray-900;
     }
-    .dashboard-card { 
-        @apply p-6 mb-4 bg-white border border-gray-100 rounded-lg shadow-md; 
+    .dashboard-card {
+        @apply p-6 mb-4 bg-white border border-gray-100 rounded-lg shadow-md;
     }
-    .balance-amount { 
-        @apply text-5xl font-extrabold; 
+    .balance-amount {
+        @apply text-5xl font-extrabold;
     }
-    .transaction-item { 
-        @apply flex items-center justify-between p-4 transition duration-200 ease-in-out rounded-md hover:bg-gray-50; 
+    .transaction-item {
+        @apply flex items-center justify-between p-4 transition duration-200 ease-in-out rounded-md hover:bg-gray-50;
     }
-    .transaction-description { 
-        @apply text-lg font-semibold; 
+    .transaction-description {
+        @apply text-lg font-semibold;
     }
-    .transaction-date { 
-        @apply mt-1 text-xs text-gray-500; 
+    .transaction-date {
+        @apply mt-1 text-xs text-gray-500;
     }
-    .transaction-amount { 
-        @apply text-lg font-bold; 
+    .transaction-amount {
+        @apply text-lg font-bold;
     }
 }
