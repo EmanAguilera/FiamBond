@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
 
@@ -30,17 +30,50 @@ export default function CreateTransaction() {
   const navigate = useNavigate();
   const { token } = useContext(AppContext);
 
-  const [formData, setFormData] = useState({ description: "", amount: "", type: "expense" });
+  const [formData, setFormData] = useState({ 
+    description: "", 
+    amount: "", 
+    type: "expense",
+    family_id: "" // <-- Add family_id to state, empty string for "Personal"
+  });
   const [errors, setErrors] = useState({});
-  
   const [conflict, setConflict] = useState(null);
+
+  // --- START OF FIX ---
+  // State to hold the user's families for the dropdown
+  const [families, setFamilies] = useState([]);
+
+  // Function to fetch the families the user belongs to
+  const getFamilies = useCallback(async () => {
+    const res = await fetch("/api/families", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setFamilies(data);
+    }
+  }, [token]);
+
+  // Fetch families when the component mounts
+  useEffect(() => {
+    if (token) {
+      getFamilies();
+    }
+  }, [token, getFamilies]);
+  // --- END OF FIX ---
+
 
   async function handleCreateTransaction(e, force = false) {
     if (e) e.preventDefault();
-
+    
+    // Make sure we send a clean payload
     const bodyPayload = { ...formData };
     if (force) {
       bodyPayload.force_creation = true;
+    }
+    // If 'family_id' is an empty string, remove it so the backend sees it as null
+    if (bodyPayload.family_id === "") {
+        delete bodyPayload.family_id;
     }
 
     const res = await fetch("/api/transactions", {
@@ -118,7 +151,23 @@ export default function CreateTransaction() {
             </label>
           </div>
 
-          {/* Form Inputs */}
+            <div>
+            <select
+                value={formData.family_id}
+                onChange={(e) => setFormData({ ...formData, family_id: e.target.value })}
+                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+                <option value="">-- Personal Transaction --</option>
+                {families.map((family) => (
+                    <option key={family.id} value={family.id}>
+                        For Family: {family.first_name}
+                    </option>
+                ))}
+            </select>
+            {errors.family_id && <p className="error">{errors.family_id[0]}</p>}
+          </div>
+          {/* --- END OF FIX --- */}
+          
           <div>
             <input
               type="text"
