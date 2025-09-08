@@ -9,20 +9,25 @@ export default function Families() {
   const [errors, setErrors] = useState({});
 
   const getFamilies = useCallback(async () => {
-    const res = await fetch("/api/families", {
+    // --- FIX IS HERE #1 ---
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
-    const data = await res.json();
+    // --- END OF FIX ---
+
     if (res.ok) {
-      setFamilies(data);
+        const data = await res.json();
+        setFamilies(data);
     }
   }, [token]);
 
   async function handleCreateFamily(e) {
     e.preventDefault();
-    const res = await fetch("/api/families", {
+
+    // --- FIX IS HERE #2 ---
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
       method: "post",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -31,6 +36,7 @@ export default function Families() {
       },
       body: JSON.stringify({ first_name: familyName }),
     });
+    // --- END OF FIX ---
 
     const data = await res.json();
     if (res.status === 422) {

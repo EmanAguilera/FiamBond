@@ -3,7 +3,6 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
 
 export default function Login() {
-  // CORRECT: Destructure the handleLogin function from the context
   const { handleLogin } = useContext(AppContext);
   const navigate = useNavigate();
 
@@ -14,10 +13,13 @@ export default function Login() {
 
   const [errors, setErrors] = useState({});
 
-  async function handleLoginSubmit(e) { // Renamed to avoid confusion
+  async function handleLoginSubmit(e) {
     e.preventDefault();
+    setErrors({}); // Clear previous errors
 
-    const res = await fetch("/api/login", {
+    // --- FIX IS HERE ---
+    // Use the full API URL from the environment variable.
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
       method: "post",
       headers: {
         "Content-Type": "application/json",
@@ -25,16 +27,23 @@ export default function Login() {
       },
       body: JSON.stringify(formData),
     });
+    // --- END OF FIX ---
+
+    // Check if the request itself failed (e.g., 404, 500 error)
+    if (!res.ok) {
+        setErrors({ general: ['The server could not be reached. Please try again later.'] });
+        return;
+    }
 
     const data = await res.json();
 
     if (data.errors) {
       setErrors(data.errors);
     } else if (data.token && data.user) {
-      // CORRECT: Call handleLogin with the user and token data from the API
       handleLogin(data.user, data.token);
       navigate("/");
     } else {
+      // Handle incorrect credentials specifically
       setErrors({ general: ['The provided credentials are incorrect.'] });
     }
   }
@@ -44,7 +53,6 @@ export default function Login() {
       <div className="login-card">
         <h1 className="title">Sign in to your account</h1>
         <form onSubmit={handleLoginSubmit} className="space-y-6">
-          {/* ... rest of your form ... */}
           <div className="form-group">
             <label htmlFor="email">Email address</label>
             <input

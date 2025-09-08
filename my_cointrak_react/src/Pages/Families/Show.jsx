@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom"; // <-- Make sure Link is imported
+import { useParams, Link } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext";
 
 export default function Show() {
@@ -11,13 +11,16 @@ export default function Show() {
     const [message, setMessage] = useState("");
 
     const getFamily = useCallback(async () => {
-        const res = await fetch(`/api/families/${id}`, {
+        // --- FIX IS HERE #1 ---
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
         });
-        const data = await res.json();
+        // --- END OF FIX ---
+
         if (res.ok) {
+            const data = await res.json();
             setFamily(data);
         }
     }, [token, id]);
@@ -27,7 +30,8 @@ export default function Show() {
         setMessage("");
         setErrors({});
 
-        const res = await fetch(`/api/families/${id}/members`, {
+        // --- FIX IS HERE #2 ---
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/members`, {
             method: "post",
             headers: {
                 Authorization: `Bearer ${token}`,
@@ -36,6 +40,7 @@ export default function Show() {
             },
             body: JSON.stringify({ email: newMemberEmail }),
         });
+        // --- END OF FIX ---
 
         const data = await res.json();
 
@@ -49,6 +54,9 @@ export default function Show() {
             setFamily(data);
             setNewMemberEmail("");
             setMessage("Member added successfully!");
+        } else {
+            // Handle other non-ok responses
+            setMessage(data.message || "Failed to add member.");
         }
     }
 
@@ -110,7 +118,6 @@ export default function Show() {
                             <p className="text-gray-600 italic">No members have been added to this family yet.</p>
                         )}
 
-                        {/* --- START OF FIX --- */}
                         <div className="mt-6 text-center">
                             <Link
                                 to={`/families/${family.id}/ledger`}
@@ -119,7 +126,6 @@ export default function Show() {
                                 View Family Ledger &rarr;
                             </Link>
                         </div>
-                        {/* --- END OF FIX --- */}
                     </div>
                 </>
             ) : (

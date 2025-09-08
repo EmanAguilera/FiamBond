@@ -10,14 +10,15 @@ export default function Goals() {
     name: "",
     target_amount: "",
     target_date: "",
-    family_id: "", // Default to "" for "Personal"
+    family_id: "",
   });
   
   const [families, setFamilies] = useState([]);
   const [errors, setErrors] = useState({});
 
   const getFamilies = useCallback(async () => {
-    const res = await fetch("/api/families", {
+    // --- FIX IS HERE #1 ---
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
@@ -27,7 +28,8 @@ export default function Goals() {
   }, [token]);
 
   const getGoals = useCallback(async () => {
-    const res = await fetch("/api/goals", {
+    // --- FIX IS HERE #2 ---
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
@@ -41,10 +43,11 @@ export default function Goals() {
     e.preventDefault();
     const bodyPayload = { ...formData };
     if (bodyPayload.family_id === "") {
-      delete bodyPayload.family_id; // Send null to backend if "Personal" is selected
+      delete bodyPayload.family_id;
     }
 
-    const res = await fetch("/api/goals", {
+    // --- FIX IS HERE #3 ---
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals`, {
       method: "post",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -65,7 +68,8 @@ export default function Goals() {
   }
 
   async function handleMarkAsComplete(goalId) {
-    const res = await fetch(`/api/goals/${goalId}/complete`, {
+    // --- FIX IS HERE #4 ---
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/${goalId}/complete`, {
       method: "put",
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });

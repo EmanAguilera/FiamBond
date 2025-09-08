@@ -2,7 +2,6 @@ import { useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
 
-// The modal component remains unchanged as its styling is already self-contained and effective.
 function CoinTossModal({ goal, onAbandon, onAcknowledge }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -43,7 +42,8 @@ export default function CreateTransaction() {
   const [families, setFamilies] = useState([]);
 
   const getFamilies = useCallback(async () => {
-    const res = await fetch("/api/families", {
+    // --- FIX IS HERE #1 ---
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
@@ -82,7 +82,8 @@ export default function CreateTransaction() {
         bodyPayload.deduct_immediately = true;
     }
 
-    const res = await fetch("/api/transactions", {
+    // --- FIX IS HERE #2 ---
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
       method: "post",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -105,7 +106,8 @@ export default function CreateTransaction() {
   }
 
   async function handleAbandon() {
-    await fetch(`/api/goals/${conflict.id}`, {
+    // --- FIX IS HERE #3 ---
+    await fetch(`${import.meta.env.VITE_API_URL}/api/goals/${conflict.id}`, {
         method: 'delete',
         headers: { Authorization: `Bearer ${token}` }
     });
@@ -193,7 +195,6 @@ export default function CreateTransaction() {
             {errors.amount && <p className="error">{errors.amount[0]}</p>}
           </div>
 
-          {/* --- UPDATED JSX WITH CORRECT TEXT --- */}
           {showDeductCheckbox && (
             <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-md transition-all">
               <label className="flex items-center space-x-3 cursor-pointer">
@@ -210,7 +211,6 @@ export default function CreateTransaction() {
               </label>
             </div>
           )}
-          {/* --- END OF UPDATED JSX --- */}
 
           <button type="submit" className="primary-btn">
             Save Transaction

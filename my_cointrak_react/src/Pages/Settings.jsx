@@ -4,7 +4,6 @@ import { AppContext } from "../Context/AppContext.jsx";
 export default function Settings() {
   const { user, token, setUser } = useContext(AppContext);
 
-  // State to manage the form's input fields
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -13,12 +12,10 @@ export default function Settings() {
     new_password_confirmation: '',
   });
 
-  // States for handling UI feedback (messages, errors, and loading)
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // This crucial effect synchronizes the form's local state with the global user object.
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
@@ -30,12 +27,10 @@ export default function Settings() {
     }
   }, [user]);
 
-  // Generic handler to update the formData state when a user types in an input.
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Handler for submitting the profile information form.
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -43,7 +38,8 @@ export default function Settings() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/user", {
+      // --- FIX IS HERE #1 ---
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -66,14 +62,13 @@ export default function Settings() {
       } else {
         setError(data.message || 'Failed to update profile.');
       }
-    } catch { // FIX: Removed the unused 'err' variable here
+    } catch {
       setError('A network error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handler for submitting the password change form.
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -87,7 +82,8 @@ export default function Settings() {
     setIsSubmitting(true);
 
     try {
-        const res = await fetch("/api/user", {
+        // --- FIX IS HERE #2 ---
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -109,7 +105,7 @@ export default function Settings() {
         } else {
             setError(data.message || 'Failed to update password.');
         }
-    } catch { // FIX: Removed the unused 'err' variable here as well
+    } catch {
         setError('A network error occurred. Please try again.');
     } finally {
         setIsSubmitting(false);
@@ -127,7 +123,6 @@ export default function Settings() {
       {message && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">{message}</div>}
       {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
 
-      {/* Profile Information Form */}
       <div className="dashboard-card mb-10">
         <h3 className="font-bold text-xl mb-6">Profile Information</h3>
         <form onSubmit={handleProfileUpdate} className="space-y-6">
@@ -153,7 +148,6 @@ export default function Settings() {
         </form>
       </div>
 
-      {/* Change Password Form */}
       <div className="dashboard-card">
         <h3 className="font-bold text-xl mb-6">Change Password</h3>
         <form onSubmit={handlePasswordUpdate} className="space-y-6">

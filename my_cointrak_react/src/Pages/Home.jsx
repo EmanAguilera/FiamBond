@@ -11,7 +11,8 @@ export default function Home() {
   const getTransactions = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/transactions", {
+      // --- FIX IS HERE #1 ---
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -35,7 +36,8 @@ export default function Home() {
     }
 
     try {
-      const res = await fetch("/api/families/summaries", {
+      // --- FIX IS HERE #2 ---
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

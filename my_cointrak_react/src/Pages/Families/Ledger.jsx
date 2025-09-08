@@ -2,8 +2,6 @@ import { useContext, useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
 import { Bar } from 'react-chartjs-2';
-// We don't need to re-register ChartJS here as it's already done in the other report file
-// and is globally available, but it's good practice for component independence.
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -13,15 +11,18 @@ export default function FamilyLedger() {
   const { id } = useParams();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
-  // --- NEW: State for the time period ---
   const [period, setPeriod] = useState('monthly');
 
   const getReport = useCallback(async () => {
     setLoading(true);
-    // --- UPDATED: Add period to the API call ---
-    const res = await fetch(`/api/families/${id}/report?period=${period}`, {
+
+    // --- FIX IS HERE ---
+    // Use the full API URL from the environment variable.
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/report?period=${period}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    // --- END OF FIX ---
+
     if (res.ok) {
       const data = await res.json();
       setReport(data);
@@ -29,7 +30,7 @@ export default function FamilyLedger() {
       setReport(null);
     }
     setLoading(false);
-  }, [token, id, period]); // <-- Add period as a dependency
+  }, [token, id, period]);
 
   useEffect(() => {
     if (token) getReport();
@@ -46,9 +47,8 @@ export default function FamilyLedger() {
 
   return (
     <div className="w-full max-w-4xl mx-auto font-mono text-slate-800">
-      <h1 className="title">Family Family Ledger</h1>
+      <h1 className="title">Family Ledger</h1> {/* Corrected title */}
       
-      {/* --- NEW: Period Selection Buttons --- */}
       <div className="w-full mx-auto flex justify-center gap-4 mb-6">
         <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
         <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
@@ -60,7 +60,6 @@ export default function FamilyLedger() {
           <p className="text-center">Generating Family Ledger...</p>
         ) : report ? (
           <>
-            {/* --- NEW: Bar Chart Display --- */}
             <div className="mb-8 relative" style={{ height: '400px' }}>
               {report.chartData && report.chartData.datasets ? (
                 <Bar options={chartOptions} data={report.chartData} />

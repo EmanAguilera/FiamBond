@@ -13,10 +13,11 @@ export default function AppProvider({ children }) {
   useEffect(() => {
     if (token) {
       async function fetchUser() {
-        const res = await fetch("/api/user", {
+        // --- FIX IS HERE #1 ---
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user`, {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Accept': 'application/json', // Good practice to include
+            'Accept': 'application/json',
           },
         });
 
@@ -41,13 +42,14 @@ export default function AppProvider({ children }) {
     setUser(userData);
     localStorage.setItem("token", userToken);
     setToken(userToken);
-    navigate("/"); // Redirect to dashboard after login
+    navigate("/");
   };
 
   const handleLogout = useCallback(async () => {
     if (token) {
         try {
-            await fetch('/api/logout', {
+            // --- FIX IS HERE #2 ---
+            await fetch(`${import.meta.env.VITE_API_URL}/api/logout`, {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -65,18 +67,14 @@ export default function AppProvider({ children }) {
     navigate("/login");
   }, [token, navigate]);
 
-  // --- START OF FIX ---
-  // The context value now includes `setUser`. This allows any child
-  // component to update the application's global user state.
   const contextValue = {
     token,
     user,
-    setUser, // <-- EXPOSE THE SETTER FUNCTION
+    setUser,
     loading,
     handleLogin,
     handleLogout,
   };
-  // --- END OF FIX ---
 
   return (
     <AppContext.Provider value={contextValue}>

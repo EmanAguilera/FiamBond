@@ -4,8 +4,6 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
 
 export default function Register() {
-  // CORRECT: Destructure handleLogin from the context.
-  // setToken is not available here, so we remove it.
   const { handleLogin } = useContext(AppContext);
   const navigate = useNavigate();
 
@@ -20,12 +18,14 @@ export default function Register() {
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState(null);
 
-  async function handleRegisterSubmit(e) { // Renamed function for clarity
+  async function handleRegisterSubmit(e) {
     e.preventDefault();
     setErrors({});
     setGeneralError(null);
 
-    const res = await fetch("/api/register", {
+    // --- FIX IS HERE ---
+    // Use the full API URL from the environment variable.
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
       method: "post",
       headers: {
         "Content-Type": "application/json",
@@ -33,21 +33,24 @@ export default function Register() {
       },
       body: JSON.stringify(formData),
     });
+    // --- END OF FIX ---
+
+    // The JSON error happens because a 404 page (HTML) is returned instead of JSON.
+    // We need to check if the response is OK before trying to parse it as JSON.
+    if (!res.ok) {
+        setGeneralError('Registration failed. The server could not be reached.');
+        return; // Stop execution if the request failed
+    }
 
     const data = await res.json();
 
     if (data.errors) {
       setErrors(data.errors);
     } else if (data.token && data.user) {
-      // --- FIX IS HERE ---
-      // Instead of manually setting localStorage and state, call the centralized handleLogin function.
-      // This function will set the user, set the token, store it in localStorage,
-      // and trigger any necessary re-renders throughout the app.
       handleLogin(data.user, data.token);
       navigate("/"); // Redirect to the dashboard or home page.
-      // --- END OF FIX ---
     } else {
-      setGeneralError('Registration failed. Please try again.');
+      setGeneralError('An unknown error occurred during registration.');
     }
   }
 
@@ -114,7 +117,6 @@ export default function Register() {
               value={formData.password_confirmation}
               onChange={(e) => setFormData({ ...formData, password_confirmation: e.target.value })}
             />
-            {/* The error key from Laravel might be 'password' for a confirmation mismatch */}
             {errors.password_confirmation && <p className="error">{errors.password_confirmation[0]}</p>}
           </div>
 

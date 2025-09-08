@@ -11,7 +11,6 @@ import {
   Legend,
 } from 'chart.js';
 
-// This registration is essential and must happen before any chart is used.
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -28,16 +27,19 @@ export default function Reports() {
   const [period, setPeriod] = useState('monthly');
 
   const getReport = useCallback(async () => {
-    // Set loading to true at the beginning of the fetch
     setLoading(true);
-    const res = await fetch(`/api/reports/monthly?period=${period}`, {
+
+    // --- FIX IS HERE ---
+    // Use the full API URL from the environment variable.
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reports/monthly?period=${period}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    // --- END OF FIX ---
+
     if (res.ok) {
       const data = await res.json();
       setReport(data);
     } else {
-      // If the API call fails, set the report to null
       setReport(null);
     }
     setLoading(false);
@@ -75,9 +77,6 @@ export default function Reports() {
           <p>Generating Ledger...</p>
         ) : report ? (
           <>
-            {/* --- THE FIX IS HERE --- */}
-            {/* We now explicitly check that the 'datasets' array exists before rendering the chart. */}
-            {/* This is the most important condition to prevent the hook error. */}
             <div className="mb-8">
               {report.chartData && report.chartData.datasets ? (
                 <Bar options={chartOptions} data={report.chartData} />
@@ -86,7 +85,6 @@ export default function Reports() {
               )}
             </div>
             
-            {/* Summary Section (this part is unchanged) */}
             <div className="space-y-3 text-sm">
               <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
               <hr className="border-dashed" />
