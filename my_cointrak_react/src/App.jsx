@@ -10,7 +10,7 @@ import FamilyLedger from "./Pages/Families/Ledger.jsx";
 import TransactionsCreate from "./Pages/Transactions/Create.jsx";
 import ReportsIndex from "./Pages/Reports/Index.jsx";
 import Settings from "./Pages/Settings.jsx"; // Import the new Settings component
-import PrivateRoutes from "./utils/PrivateRoutes"; // Import a guard for authenticated routes
+import PrivateRoutes from "./Utils/PrivateRoutes"; // Import a guard for authenticated routes
 
 export default function App() {
   return (
