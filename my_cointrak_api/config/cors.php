@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://guileless-torrone-15339e.netlify.appc'],
+    'allowed_origins' => ['https://guileless-torrone-15339e.netlify.app'],
 
     'allowed_origins_patterns' => [],
 
