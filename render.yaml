@@ -4,7 +4,7 @@ services:
   # This is the Laravel API Web Service
   - type: web
     name: cointrak-api
-    runtime: php      # FIX: The correct key is 'runtime', not 'env'
+    env: php      # <-- FIX: The correct key for PHP is 'env', not 'runtime'.
     plan: free
     rootDir: my_cointrak_api
     buildCommand: |
@@ -12,10 +12,10 @@ services:
       php artisan migrate --force
     startCommand: php artisan serve --host 0.0.0.0 --port $PORT
     envVars:
-      # Tell Render to generate a secure, random value for the APP_KEY.
+      # Automatically generate a secure application key.
       - key: APP_KEY
         generateValue: true
-      # Connect to the database using the details from the 'databases' block.
+      # Connect to the database defined in the 'databases' block below.
       - key: DATABASE_URL
         fromDatabase:
           name: cointrak-db
