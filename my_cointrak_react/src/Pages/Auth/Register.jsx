@@ -1,6 +1,5 @@
 import { useContext, useState } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
-// Import the centralized context functions
 import { AppContext } from "../../Context/AppContext.jsx";
 
 export default function Register() {
@@ -23,8 +22,6 @@ export default function Register() {
     setErrors({});
     setGeneralError(null);
 
-    // --- FIX IS HERE ---
-    // Use the full API URL from the environment variable.
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
       method: "post",
       headers: {
@@ -33,22 +30,26 @@ export default function Register() {
       },
       body: JSON.stringify(formData),
     });
-    // --- END OF FIX ---
 
-    // The JSON error happens because a 404 page (HTML) is returned instead of JSON.
-    // We need to check if the response is OK before trying to parse it as JSON.
+    // --- IMPROVED ERROR HANDLING ---
+    // First, check if the response status is a server error (like 500)
     if (!res.ok) {
-        setGeneralError('Registration failed. The server could not be reached.');
-        return; // Stop execution if the request failed
+        // Try to get a specific error message from the server if possible
+        const errorData = await res.json().catch(() => null); // Use .catch in case the error page is not JSON
+        const message = errorData?.message || 'Registration failed. Please check your details and try again.';
+        setGeneralError(message);
+        return; // Stop execution
     }
+    // --- END OF IMPROVEMENT ---
 
     const data = await res.json();
 
+    // This part remains the same
     if (data.errors) {
       setErrors(data.errors);
     } else if (data.token && data.user) {
       handleLogin(data.user, data.token);
-      navigate("/"); // Redirect to the dashboard or home page.
+      navigate("/");
     } else {
       setGeneralError('An unknown error occurred during registration.');
     }
