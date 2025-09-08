@@ -1,0 +1,11 @@
+# Netlify build settings for the React application
+[build]
+  base    = "my_cointrak_react"
+  publish = "my_cointrak_react/dist"
+  command = "npm run build"
+
+# The redirect rule to make React Router work
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
