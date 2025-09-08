@@ -16,13 +16,16 @@ WORKDIR /app
 # Copy the composer files from your local machine to the container
 COPY my_cointrak_api/composer.json my_cointrak_api/composer.lock ./
 
+# FIX: Tell Composer to run without a memory limit.
+ENV COMPOSER_MEMORY_LIMIT=-1
+
 # Install your project's PHP dependencies
 RUN composer install --no-interaction --no-dev --prefer-dist
 
 # Copy the rest of your Laravel application code into the container
 COPY ./my_cointrak_api .
 
-# FIX: Set the correct permissions for the storage and cache folders.
+# Set the correct permissions for the storage and cache folders.
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Expose the port that Render will use to talk to your app
