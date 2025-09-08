@@ -1,11 +1,15 @@
 # Use an official PHP 8.2 image as a base
 FROM php:8.2-cli
 
-# Install system libraries needed for the PostgreSQL database connection
-RUN apt-get update && apt-get install -y libpq-dev && rm -rf /var/lib/apt/lists/*
+# Install system libraries needed for Composer packages and database connection
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    libzip-dev \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install the PHP extension for PostgreSQL
-RUN docker-php-ext-install pdo pdo_pgsql
+# Install the required PHP extensions (PostgreSQL and Zip)
+RUN docker-php-ext-install pdo pdo_pgsql zip
 
 # Install Composer (PHP's package manager)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -16,7 +20,7 @@ WORKDIR /app
 # Copy the composer files from your local machine to the container
 COPY my_cointrak_api/composer.json my_cointrak_api/composer.lock ./
 
-# FIX: Tell Composer to run without a memory limit.
+# Tell Composer to run without a memory limit.
 ENV COMPOSER_MEMORY_LIMIT=-1
 
 # Install your project's PHP dependencies
