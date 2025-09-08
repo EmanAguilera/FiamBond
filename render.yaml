@@ -1,0 +1,26 @@
+services:
+  # This is your Laravel API Service
+  - type: web
+    name: cointrak-api
+    env: php  # <-- This forces Render to use the PHP environment
+    rootDir: my_cointrak_api
+    buildCommand: |
+      composer install --no-dev --optimize-autoloader
+      php artisan key:generate --force
+      php artisan migrate --force
+    startCommand: php artisan serve --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: APP_URL
+        value: https://cointrak-api.onrender.com # Change this if you get a different URL
+      - key: APP_KEY # This will be set automatically by the build command
+      - key: DB_CONNECTION
+        fromService:
+          type: psql
+          name: cointrak-db
+          property: connectionString
+
+  # This is your PostgreSQL Database
+  - type: psql
+    name: cointrak-db
+    plan: free
