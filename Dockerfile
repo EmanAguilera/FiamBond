@@ -17,17 +17,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy the composer files from your local machine to the container
-COPY my_cointrak_api/composer.json my_cointrak_api/composer.lock ./
+# FIX: Copy the entire application code FIRST.
+# This ensures the 'artisan' file is present before composer runs its scripts.
+COPY ./my_cointrak_api .
 
 # Tell Composer to run without a memory limit.
 ENV COMPOSER_MEMORY_LIMIT=-1
 
-# Install your project's PHP dependencies
+# FIX: NOW run composer install.
+# The post-install scripts (like 'artisan config:clear') will now work.
 RUN composer install --no-interaction --no-dev --prefer-dist
-
-# Copy the rest of your Laravel application code into the container
-COPY ./my_cointrak_api .
 
 # Set the correct permissions for the storage and cache folders.
 RUN chown -R www-data:www-data storage bootstrap/cache
