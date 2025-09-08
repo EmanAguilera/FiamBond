@@ -1,35 +1,27 @@
-# This file is the blueprint for deploying your application on Render.
+# Blueprint for deploying the CoinTrak application on Render
 
 services:
-  # This defines your Laravel API Web Service.
+  # This is the Laravel API Web Service
   - type: web
     name: cointrak-api
-    # Specify both the environment AND a version. Laravel needs PHP 8.1+.
-    env: php:8.2
-    rootDir: my_cointrak_api
+    runtime: php      # FIX: The correct key is 'runtime', not 'env'
     plan: free
+    rootDir: my_cointrak_api
     buildCommand: |
       composer install --no-dev --optimize-autoloader
-      # Run database migrations automatically on deploy.
       php artisan migrate --force
     startCommand: php artisan serve --host 0.0.0.0 --port $PORT
     envVars:
-      # Let Render automatically provide the live URL for your app.
-      - key: APP_URL
-        fromService:
-          type: web
-          name: cointrak-api
-          property: url
-      # FIX: Tell Render to generate a secure, random value for the APP_KEY.
+      # Tell Render to generate a secure, random value for the APP_KEY.
       - key: APP_KEY
         generateValue: true
-      # Connect to the database using the details from the 'databases' block below.
+      # Connect to the database using the details from the 'databases' block.
       - key: DATABASE_URL
         fromDatabase:
           name: cointrak-db
           property: connectionString
 
-# This defines your PostgreSQL database.
+# This is the PostgreSQL Database
 databases:
   - name: cointrak-db
     plan: free
