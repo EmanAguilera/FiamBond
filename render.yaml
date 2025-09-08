@@ -4,10 +4,6 @@ services:
     plan: free
     runtime: docker
     dockerfilePath: ./Dockerfile
-    # Add a health check to ensure the app starts correctly
-    healthCheck:
-      path: /api/health
-      initialDelaySecs: 20
     envVars:
       - key: APP_KEY
         generateValue: true
