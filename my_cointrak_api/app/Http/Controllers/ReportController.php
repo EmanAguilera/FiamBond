@@ -2,105 +2,126 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Transaction; // <-- 1. Add this import
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
-    public function monthly(Request $request)
+    /**
+     * Generate a financial report for the authenticated user.
+     */
+    public function generateMonthlyReport(Request $request)
     {
         $user = $request->user();
-        $targetMonth = Carbon::parse($request->query('month', 'now'))->startOfMonth();
+        $period = $request->query('period', 'monthly');
+        if (!in_array($period, ['weekly', 'monthly', 'yearly'])) {
+            $period = 'monthly';
+        }
 
-        // Data for the current report month
-        $reportMonthData = $this->getMonthlyData($user, $targetMonth);
-
-        // Data for trend analysis
-        $prevMonth1 = $this->getMonthlyData($user, $targetMonth->copy()->subMonth());
-        $prevMonth2 = $this->getMonthlyData($user, $targetMonth->copy()->subMonths(2));
-        
-        $consecutiveDecline = 0;
-        if ($reportMonthData['netPosition'] < $prevMonth1['netPosition']) $consecutiveDecline++;
-        if ($prevMonth1['netPosition'] < $prevMonth2['netPosition']) $consecutiveDecline++;
-
-        return response([
-            'monthName' => $targetMonth->format('F Y'),
-            'totalInflow' => $reportMonthData['inflow'],
-            'totalOutflow' => $reportMonthData['outflow'],
-            'netPosition' => $reportMonthData['netPosition'],
-            'transactionCount' => $reportMonthData['count'],
-            'spendingHabit' => $reportMonthData['spendingHabit'],
-            'consecutiveDecline' => $consecutiveDecline,
-        ]);
-    }
-
-    private function getMonthlyData($user, Carbon $month)
-    {
-        $startDate = $month->copy()->startOfMonth();
-        $endDate = $month->copy()->endOfMonth();
+        $now = Carbon::now();
+        if ($period === 'weekly') {
+            $startDate = $now->copy()->startOfWeek();
+            $endDate = $now->copy()->endOfWeek();
+            $title = 'This Week (' . $startDate->format('M d') . ' - ' . $endDate->format('M d') . ')';
+        } elseif ($period === 'yearly') {
+            $startDate = $now->copy()->startOfYear();
+            $endDate = $now->copy()->endOfYear();
+            $title = 'This Year (' . $now->format('Y') . ')';
+        } else { // 'monthly' is the default
+            $startDate = $now->copy()->startOfMonth();
+            $endDate = $now->copy()->endOfMonth();
+            $title = $now->format('F Y');
+        }
 
         // --- START OF FIX ---
-        // 2. Get the IDs of all families the user is a member of.
-        $familyIds = $user->families()->pluck('id')->toArray();
-
-        // 3. Build a new query to get ALL relevant transactions.
-        $transactions = Transaction::query() // Use the Transaction model to start a new query
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->where(function ($query) use ($user, $familyIds) {
-                // Condition 1: Get their personal transactions (user_id matches, but no family_id)
-                $query->where('user_id', $user->id)
-                      ->whereNull('family_id');
-                
-                // Condition 2: OR get any transactions from their families
-                $query->orWhereIn('family_id', $familyIds);
-            })
-            ->get();
+        // Fetch ALL transactions belonging to the user for the target period,
+        // including both personal (family_id is null) and family transactions.
+        $transactions = $user->transactions()
+        ->whereNull('family_id') // Add this line
+        ->whereBetween('created_at', [$startDate, $endDate])
+        ->get();
         // --- END OF FIX ---
-
 
         $inflow = $transactions->where('type', 'income')->sum('amount');
         $outflow = $transactions->where('type', 'expense')->sum('amount');
 
-        // The rest of this function (spending habit logic) remains the same
-        $spendingHabits = [];
-        $expenseTransactions = $transactions->where('type', 'expense');
+        // Prepare data for the bar chart
+        $chartData = $this->prepareChartData($transactions, $period, $startDate);
 
-        if ($expenseTransactions->isNotEmpty()) {
-            foreach ($expenseTransactions as $transaction) {
-                $date = Carbon::parse($transaction->created_at);
-                $day = $date->format('l');
-                $hour = $date->hour;
+        return response([
+            'reportTitle' => $title,
+            'totalInflow' => $inflow,
+            'totalOutflow' => $outflow,
+            'netPosition' => $inflow - $outflow,
+            'transactionCount' => $transactions->count(),
+            'chartData' => $chartData,
+            'transactions' => $transactions, // For potential detailed views
+        ]);
+    }
 
-                if ($hour >= 5 && $hour <= 11) $timeOfDay = 'Morning';
-                elseif ($hour >= 12 && $hour <= 17) $timeOfDay = 'Afternoon';
-                elseif ($hour >= 18 && $hour <= 22) $timeOfDay = 'Evening';
-                else $timeOfDay = 'Night';
+    /**
+     * Helper function to format transaction data for chart.js.
+     * This is the same helper from FamilyController for consistency.
+     */
+    private function prepareChartData($transactions, $period, Carbon $startDate)
+    {
+        $labels = [];
+        $inflowData = [];
+        $outflowData = [];
 
-                $key = "{$day}-{$timeOfDay}";
-                if (!isset($spendingHabits[$key])) {
-                    $spendingHabits[$key] = 0;
-                }
-                $spendingHabits[$key]++;
-            }
+        if ($period === 'weekly') {
+            $labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            $inflowData = array_fill(0, 7, 0);
+            $outflowData = array_fill(0, 7, 0);
             
-            arsort($spendingHabits);
-            $mostCommonHabit = key($spendingHabits);
-            list($habitDay, $habitTime) = explode('-', $mostCommonHabit);
-            $spendingHabitMessage = "The highest frequency of spending occurred on {$habitDay}s during the {$habitTime}.";
-
+            foreach ($transactions as $transaction) {
+                $dayIndex = Carbon::parse($transaction->created_at)->dayOfWeek;
+                if ($transaction->type === 'income') {
+                    $inflowData[$dayIndex] += $transaction->amount;
+                } else {
+                    $outflowData[$dayIndex] += $transaction->amount;
+                }
+            }
         } else {
-            $spendingHabitMessage = "Insufficient data for spending habit analysis.";
+            $daysInMonth = $startDate->daysInMonth;
+            $groupFormat = ($period === 'yearly') ? 'n' : 'j';
+
+            if ($period === 'yearly') {
+                $labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                $labelCount = 12;
+            } else {
+                $labels = range(1, $daysInMonth);
+                $labelCount = $daysInMonth;
+            }
+
+            $inflowByGroup = $transactions->where('type', 'income')->groupBy(function($date) use ($groupFormat) {
+                return Carbon::parse($date->created_at)->format($groupFormat);
+            })->map->sum('amount');
+
+            $outflowByGroup = $transactions->where('type', 'expense')->groupBy(function($date) use ($groupFormat) {
+                return Carbon::parse($date->created_at)->format($groupFormat);
+            })->map->sum('amount');
+
+            $inflowData = array_fill(0, $labelCount, 0);
+            $outflowData = array_fill(0, $labelCount, 0);
+
+            for ($i = 0; $i < $labelCount; $i++) {
+                $groupKey = (string)($i + 1);
+                if (isset($inflowByGroup[$groupKey])) {
+                    $inflowData[$i] = $inflowByGroup[$groupKey];
+                }
+                if (isset($outflowByGroup[$groupKey])) {
+                    $outflowData[$i] = $outflowByGroup[$groupKey];
+                }
+            }
         }
 
-
         return [
-            'inflow' => $inflow,
-            'outflow' => $outflow,
-            'netPosition' => $inflow - $outflow,
-            'count' => $transactions->count(),
-            'spendingHabit' => $spendingHabitMessage,
+            'labels' => $labels,
+            'datasets' => [
+                ['label' => 'Inflow', 'data' => $inflowData, 'backgroundColor' => 'rgba(75, 192, 192, 0.6)'],
+                ['label' => 'Outflow', 'data' => $outflowData, 'backgroundColor' => 'rgba(255, 99, 132, 0.6)']
+            ]
         ];
     }
 }

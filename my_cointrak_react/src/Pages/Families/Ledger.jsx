@@ -1,79 +1,112 @@
 import { useContext, useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
+import { Bar } from 'react-chartjs-2';
+// We don't need to re-register ChartJS here as it's already done in the other report file
+// and is globally available, but it's good practice for component independence.
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function FamilyLedger() {
   const { token } = useContext(AppContext);
-  const { id } = useParams(); // Get family ID from URL
+  const { id } = useParams();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  // --- NEW: State for the time period ---
+  const [period, setPeriod] = useState('monthly');
 
   const getReport = useCallback(async () => {
     setLoading(true);
-    // Fetch from the new family report endpoint
-    const res = await fetch(`/api/families/${id}/report`, {
+    // --- UPDATED: Add period to the API call ---
+    const res = await fetch(`/api/families/${id}/report?period=${period}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
       const data = await res.json();
       setReport(data);
+    } else {
+      setReport(null);
     }
     setLoading(false);
-  }, [token, id]);
+  }, [token, id, period]); // <-- Add period as a dependency
 
   useEffect(() => {
     if (token) getReport();
   }, [token, getReport]);
 
-  if (loading) {
-    return <h1 className="title">Generating Family Ledger...</h1>;
-  }
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+      title: { display: true, text: 'Family Inflow vs. Outflow' },
+    },
+  };
 
   return (
-    <div className="w-2/3 mx-auto font-mono text-slate-800">
-      <h1 className="text-2xl font-bold mb-4 border-b-2 border-slate-800 pb-2">Family Monthly Ledger</h1>
-      {report ? (
-        <>
+    <div className="w-full max-w-4xl mx-auto font-mono text-slate-800">
+      <h1 className="title">Family Family Ledger</h1>
+      
+      {/* --- NEW: Period Selection Buttons --- */}
+      <div className="w-full mx-auto flex justify-center gap-4 mb-6">
+        <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
+        <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
+        <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        {loading ? (
+          <p className="text-center">Generating Family Ledger...</p>
+        ) : report ? (
+          <>
+            {/* --- NEW: Bar Chart Display --- */}
+            <div className="mb-8 relative" style={{ height: '400px' }}>
+              {report.chartData && report.chartData.datasets ? (
+                <Bar options={chartOptions} data={report.chartData} />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p>Not enough data to display a chart for this period.</p>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-3 text-sm mb-8">
-                <p><span className="font-bold">Family:</span> {report.familyName}</p>
-                <p><span className="font-bold">Summary for:</span> {report.monthName}</p>
-                <hr className="border-dashed" />
-                <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
-                <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
-                <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}
-                </p>
-                <hr className="border-dashed" />
-                <p className="font-bold">Analysis:</p>
-                <ul className="list-disc pl-6">
-                    <li>{report.transactionCount} individual transactions were logged.</li>
-                </ul>
-                <hr className="border-dashed mt-4"/>
+              <p><span className="font-bold">Family:</span> {report.familyName}</p>
+              <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
+              <hr className="border-dashed" />
+              <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
+              <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
+              <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}
+              </p>
+              <hr className="border-dashed" />
+              <p className="font-bold">Analysis:</p>
+              <ul className="list-disc pl-6">
+                <li>{report.transactionCount} individual transactions were logged in this period.</li>
+              </ul>
+              <hr className="border-dashed mt-4"/>
             </div>
             
-            <h3 className="font-bold text-xl mb-4">Transactions for {report.monthName}</h3>
+            <h3 className="font-bold text-xl mb-4">Transactions for {report.reportTitle}</h3>
             <div className="dashboard-card p-0">
-                {report.transactions.length > 0 ? report.transactions.map((transaction) => (
-                    <div
-                        key={transaction.id}
-                        className="transaction-item border-b last:border-b-0 border-gray-100"
-                    >
-                        <div>
-                            <p className="transaction-description">{transaction.description}</p>
-                            <small className="transaction-date">
-                                {new Date(transaction.created_at).toLocaleDateString()}
-                            </small>
-                        </div>
-                        <p className={`transaction-amount ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>
-                            {transaction.type === 'income' ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                    </div>
-                )) : <p className="p-4">No transactions for this family this month.</p>}
+              {report.transactions.length > 0 ? report.transactions.map((transaction) => (
+                <div key={transaction.id} className="transaction-item border-b last:border-b-0 border-gray-100">
+                  <div>
+                    <p className="transaction-description">{transaction.description}</p>
+                    <small className="transaction-date">{new Date(transaction.created_at).toLocaleDateString()}</small>
+                  </div>
+                  <p className={`transaction-amount ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>
+                    {transaction.type === 'income' ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              )) : <p className="p-4">No transactions for this family in this period.</p>}
             </div>
-        </>
-      ) : (
-        <p>Could not generate the family report.</p>
-      )}
+          </>
+        ) : (
+          <p className="text-center">Could not generate the family report.</p>
+        )}
+      </div>
     </div>
   );
 }

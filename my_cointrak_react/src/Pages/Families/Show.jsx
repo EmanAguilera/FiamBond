@@ -116,7 +116,7 @@ export default function Show() {
                                 to={`/families/${family.id}/ledger`}
                                 className="text-link font-bold"
                             >
-                                View Monthly Ledger &rarr;
+                                View Family Ledger &rarr;
                             </Link>
                         </div>
                         {/* --- END OF FIX --- */}

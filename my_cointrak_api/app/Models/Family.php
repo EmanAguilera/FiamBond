@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Family extends Model
 {
@@ -14,17 +17,27 @@ class Family extends Model
         'owner_id',
     ];
 
-    public function owner()
+    /**
+     * The user who owns the family.
+     */
+    public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
     }
 
-    public function members()
+    /**
+     * The members of the family.
+     * --- FIX: Explicitly define the pivot table name 'family_user'. ---
+     */
+    public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class);
+        return $this->belongsToMany(User::class, 'family_user');
     }
 
-    public function transactions()
+    /**
+     * The transactions associated with the family.
+     */
+    public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
     }

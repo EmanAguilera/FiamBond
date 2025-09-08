@@ -34,16 +34,14 @@ export default function CreateTransaction() {
     description: "", 
     amount: "", 
     type: "expense",
-    family_id: "" // <-- Add family_id to state, empty string for "Personal"
+    family_id: ""
   });
+  
+  const [deductImmediately, setDeductImmediately] = useState(false);
   const [errors, setErrors] = useState({});
   const [conflict, setConflict] = useState(null);
-
-  // --- START OF FIX ---
-  // State to hold the user's families for the dropdown
   const [families, setFamilies] = useState([]);
 
-  // Function to fetch the families the user belongs to
   const getFamilies = useCallback(async () => {
     const res = await fetch("/api/families", {
       headers: { Authorization: `Bearer ${token}` },
@@ -54,26 +52,34 @@ export default function CreateTransaction() {
     }
   }, [token]);
 
-  // Fetch families when the component mounts
   useEffect(() => {
     if (token) {
       getFamilies();
     }
   }, [token, getFamilies]);
-  // --- END OF FIX ---
+  
+  const showDeductCheckbox = formData.type === 'income' && formData.family_id !== '';
+
+  useEffect(() => {
+    if (!showDeductCheckbox) {
+      setDeductImmediately(false);
+    }
+  }, [showDeductCheckbox]);
 
 
   async function handleCreateTransaction(e, force = false) {
     if (e) e.preventDefault();
     
-    // Make sure we send a clean payload
     const bodyPayload = { ...formData };
     if (force) {
       bodyPayload.force_creation = true;
     }
-    // If 'family_id' is an empty string, remove it so the backend sees it as null
     if (bodyPayload.family_id === "") {
         delete bodyPayload.family_id;
+    }
+
+    if (showDeductCheckbox && deductImmediately) {
+        bodyPayload.deduct_immediately = true;
     }
 
     const res = await fetch("/api/transactions", {
@@ -122,10 +128,8 @@ export default function CreateTransaction() {
 
       <h1 className="title">Add a New Transaction</h1>
 
-      {/* The main card container, styled like the other pages */}
       <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
         <form onSubmit={handleCreateTransaction} className="space-y-6">
-          {/* Radio buttons for transaction type */}
           <div className="flex justify-center gap-8 text-gray-700">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -166,7 +170,6 @@ export default function CreateTransaction() {
             </select>
             {errors.family_id && <p className="error">{errors.family_id[0]}</p>}
           </div>
-          {/* --- END OF FIX --- */}
           
           <div>
             <input
@@ -189,6 +192,26 @@ export default function CreateTransaction() {
             />
             {errors.amount && <p className="error">{errors.amount[0]}</p>}
           </div>
+
+          {/* --- UPDATED JSX WITH CORRECT TEXT --- */}
+          {showDeductCheckbox && (
+            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-md transition-all">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={deductImmediately} 
+                  onChange={(e) => setDeductImmediately(e.target.checked)} 
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-gray-800">
+                  Deduct this amount from your personal balance.
+                  <p className="text-xs text-gray-500 mt-1">This will add income to the family and create a matching 'expense' in your personal ledger.</p>
+                </span>
+              </label>
+            </div>
+          )}
+          {/* --- END OF UPDATED JSX --- */}
+
           <button type="submit" className="primary-btn">
             Save Transaction
           </button>

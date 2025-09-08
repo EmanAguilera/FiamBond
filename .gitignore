@@ -1,0 +1,21 @@
+# Laravel Specific
+/my_cointrak_api/bootstrap/cache/*.php
+/my_cointrak_api/public/build
+/my_cointrak_api/public/hot
+/my_cointrak_api/public/storage
+/my_cointrak_api/storage/*.key
+/my_cointrak_api/vendor/
+/my_cointrak_api/.env
+
+# React / Node Specific
+/my_cointrak_api/node_modules/
+/my_cointrak_react/node_modules/
+/my_cointrak_react/build/
+/my_cointrak_react/.env.local
+
+# Root Level Node Modules (to be ignored)
+/node_modules/
+
+# General
+.DS_Store
+npm-debug.log

@@ -70,10 +70,11 @@ class User extends Authenticatable
 
     /**
      * The families that the user belongs to.
+     * --- FIX: Explicitly define the pivot table name 'family_user'. ---
      */
     public function families(): BelongsToMany
     {
-        return $this->belongsToMany(Family::class);
+        return $this->belongsToMany(Family::class, 'family_user');
     }
 
     /**
@@ -84,13 +85,7 @@ class User extends Authenticatable
         return $this->hasMany(Family::class, 'owner_id');
     }
 
-    /**
-     * The posts created by the user.
-     */
-    public function posts(): HasMany
-    {
-        return $this->hasMany(Post::class);
-    }
+ 
 
     /**
      * The transactions created by the user.
@@ -100,6 +95,9 @@ class User extends Authenticatable
         return $this->hasMany(Transaction::class);
     }
 
+    /**
+     * The goals created by the user.
+     */
     public function goals(): HasMany
     {
         return $this->hasMany(Goal::class);

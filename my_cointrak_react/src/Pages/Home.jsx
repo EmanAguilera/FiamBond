@@ -1,5 +1,3 @@
-// src/Pages/Home.jsx
-
 import { useContext, useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
@@ -7,74 +5,68 @@ import { AppContext } from "../Context/AppContext.jsx";
 export default function Home() {
   const [transactions, setTransactions] = useState([]);
   const [balance, setBalance] = useState(0);
-  const [posts, setPosts] = useState([]);
+  const [familySummaries, setFamilySummaries] = useState([]);
   const { user, token } = useContext(AppContext);
-
-  // Function to fetch the latest posts
-  const getPosts = useCallback(async () => {
-    if (!token) return;
-
-    try {
-      const res = await fetch("/api/posts", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPosts(data);
-      } else {
-        console.error("Failed to fetch posts");
-      }
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-    }
-  }, [token]);
 
   const getTransactions = useCallback(async () => {
     if (!token) return;
-
     try {
       const res = await fetch("/api/transactions", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-
       if (res.ok) {
-        setTransactions(data);
-        const total = data.reduce((acc, transaction) => {
-          if (transaction.type === 'income') {
-            return acc + parseFloat(transaction.amount);
-          }
-          return acc - parseFloat(transaction.amount);
+        const data = await res.json();
+        const personalTransactions = data.filter(tx => tx.family_id === null || tx.family_id === undefined);
+        setTransactions(personalTransactions);
+        const total = personalTransactions.reduce((acc, transaction) => {
+          return transaction.type === 'income' ? acc + parseFloat(transaction.amount) : acc - parseFloat(transaction.amount);
         }, 0);
         setBalance(total);
-      } else {
-        console.error("Failed to fetch transactions");
       }
     } catch (error) {
       console.error("Error fetching transactions:", error);
     }
   }, [token]);
 
+  const getFamilySummaries = useCallback(async () => {
+    if (!token) {
+      console.log("Attempted to fetch family summaries, but no token was available yet.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/families/summaries", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setFamilySummaries(data);
+      } else {
+        console.error(`Failed to fetch family summaries. Server responded with status: ${res.status}`);
+        setFamilySummaries([]);
+      }
+    } catch (error) {
+      console.error("A network or other error occurred while fetching family summaries:", error);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (token) {
       getTransactions();
-      getPosts();
+      getFamilySummaries();
     } else {
       setTransactions([]);
       setBalance(0);
-      setPosts([]);
+      setFamilySummaries([]);
     }
-  }, [token, getTransactions, getPosts]);
+  }, [token, getTransactions, getFamilySummaries]);
 
   return (
     <>
       {user ? (
-        // --- FINANCIAL DASHBOARD SECTION (For Logged-in Users) ---
-        // This is now inside the <main> tag which has its own padding
         <div className="p-10">
           <div className="dashboard-section">
             <div className="dashboard-header">
@@ -85,13 +77,50 @@ export default function Home() {
             </div>
             
             <div className="dashboard-card text-center mb-8">
-              <p className="text-lg text-slate-600 mb-2">Current Balance</p>
+              <p className="text-lg text-slate-600 mb-2">Current Personal Balance</p>
               <p className={`balance-amount ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   ₱{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
 
-            <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Recent Transactions</h3>
+            <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Family Ledgers</h3>
+            {familySummaries.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                {familySummaries.map((summary) => (
+                  <div key={summary.id} className="dashboard-card p-6 flex flex-col justify-between">
+                    <div>
+                        <h4 className="font-bold text-xl mb-4">{summary.first_name}</h4>
+                        <div className="space-y-2 text-sm">
+                        <p className="flex justify-between">
+                            <span>Total Inflow:</span>
+                            <span className="font-semibold text-green-600">+₱{parseFloat(summary.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </p>
+                        <p className="flex justify-between">
+                            <span>Total Outflow:</span>
+                            <span className="font-semibold text-red-500">-₱{parseFloat(summary.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </p>
+                        <hr className="border-dashed my-2"/>
+                        <p className={`flex justify-between font-bold text-base ${summary.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            <span>Net Position:</span>
+                            <span>₱{parseFloat(summary.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </p>
+                        </div>
+                    </div>
+                    <div className="mt-6">
+                      <Link to={`/families/${summary.id}/ledger`} className="text-link font-bold">
+                        View Full Ledger &rarr;
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="dashboard-card text-center mb-12">
+                <p className="text-gray-500">You are not a member of any families yet. Create or join one to see its ledger here.</p>
+              </div>
+            )}
+
+            <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Recent Personal Transactions</h3>
             {transactions.length > 0 ? (
               <div className="dashboard-card p-0 mb-12">
                   {transactions.slice(0, 5).map((transaction) => (
@@ -114,39 +143,9 @@ export default function Home() {
             ) : (
               <p className="text-center text-gray-500 mb-12">You have no personal transactions yet.</p>
             )}
-
-            {/* --- UPDATED LATEST POSTS SECTION --- */}
-            <h3 className="font-bold text-2xl text-gray-800 mb-6">Latest Posts</h3>
-            {posts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {posts.map((post) => (
-                  <div key={post.id} className="bg-white border border-gray-200 rounded-lg shadow-md p-6 flex flex-col justify-between">
-                    <div>
-                      <h2 className="font-bold text-2xl mb-2">{post.title}</h2>
-                      <small className="text-sm text-gray-500 mb-4 block">
-                        Created by {post.user.name} on{" "}
-                        {new Date(post.created_at).toLocaleDateString()}
-                      </small>
-                      <p className="text-gray-700">
-                        {/* Truncate post body to show a preview */}
-                        {post.body.substring(0, 120)}...
-                      </p>
-                    </div>
-                    <div className="mt-6">
-                      <Link to={`/posts/${post.id}`} className="text-link font-bold">
-                        Read more &rarr;
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-gray-500">There are no posts to display.</p>
-            )}
           </div>
         </div>
       ) : (
-        // --- ENHANCED INTRODUCTION / HERO SECTION (For Logged-out Visitors) ---
         <div className="hero-section">
           <div className="hero-content">
             <div className="hero-text">
