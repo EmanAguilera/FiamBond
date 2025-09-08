@@ -2,23 +2,19 @@ services:
   - type: web
     name: cointrak-api
     plan: free
-    # Tell Render to use Docker for the environment
     runtime: docker
-    # Specify the path to the Dockerfile
     dockerfilePath: ./Dockerfile
+    # Add a health check to ensure the app starts correctly
+    healthCheck:
+      path: /api/health
+      initialDelaySecs: 20
     envVars:
-      - key: APP_URL
-        fromService:
-          type: web
-          name: cointrak-api
-          property: url
       - key: APP_KEY
         generateValue: true
       - key: DATABASE_URL
         fromDatabase:
           name: cointrak-db
           property: connectionString
-      # Tell Laravel to use the port we exposed in the Dockerfile
       - key: PORT
         value: 10000
 
