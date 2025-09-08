@@ -58,8 +58,4 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // --- END OF FIX ---
     Route::get('/user/balance', [ReportController::class, 'getUserBalance']);
 
-    Route::get('/health', function () {
-    return response()->json(['status' => 'ok']);
-});
-
 });
