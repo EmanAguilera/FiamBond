@@ -1,26 +1,28 @@
+# Top-level key for all runnable services
 services:
   # This is your Laravel API Service
   - type: web
     name: cointrak-api
     env: php
     rootDir: my_cointrak_api
+    plan: free
     buildCommand: |
       composer install --no-dev --optimize-autoloader
       php artisan key:generate --force
       php artisan migrate --force
     startCommand: php artisan serve --host 0.0.0.0 --port $PORT
-    plan: free
     envVars:
       - key: APP_URL
-        value: https://cointrak-api.onrender.com # Change this if you get a different URL
-      - key: APP_KEY # This will be set automatically by the build command
-      - key: DB_CONNECTION
-        fromService:
-          type: postgres # <-- FIX: Was psql, now postgres
+        # This will be automatically set by Render to your service's URL
+        value: https://cointrak-api.onrender.com
+      - key: APP_KEY # This is set automatically by the build command
+      - key: DATABASE_URL # Laravel will use this to connect to the DB
+        fromDatabase:
           name: cointrak-db
           property: connectionString
 
+# Top-level key for all databases
+databases:
   # This is your PostgreSQL Database
-  - type: postgres # <-- FIX: Was psql, now postgres
-    name: cointrak-db
+  - name: cointrak-db
     plan: free
