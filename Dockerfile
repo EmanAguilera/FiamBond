@@ -22,6 +22,9 @@ RUN composer install --no-interaction --no-dev --prefer-dist
 # Copy the rest of your Laravel application code into the container
 COPY ./my_cointrak_api .
 
+# FIX: Set the correct permissions for the storage and cache folders.
+RUN chown -R www-data:www-data storage bootstrap/cache
+
 # Expose the port that Render will use to talk to your app
 EXPOSE 10000
 
