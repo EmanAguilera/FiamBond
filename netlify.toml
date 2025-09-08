@@ -6,6 +6,7 @@
   
   # This section defines the environment variables needed during the build.
   [build.environment]
+    NODE_VERSION = "18" # Specify a modern, stable Node.js version
     VITE_API_URL = "https://cointrak-api.onrender.com"
 
 # This rule is essential for single-page applications like React.
