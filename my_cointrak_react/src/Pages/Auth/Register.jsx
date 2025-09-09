@@ -22,36 +22,38 @@ export default function Register() {
     setErrors({});
     setGeneralError(null);
 
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
-      method: "post",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(formData),
-    });
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
+        method: "post",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
 
-    // --- IMPROVED ERROR HANDLING ---
-    // First, check if the response status is a server error (like 500)
-    if (!res.ok) {
-        // Try to get a specific error message from the server if possible
-        const errorData = await res.json().catch(() => null); // Use .catch in case the error page is not JSON
-        const message = errorData?.message || 'Registration failed. Please check your details and try again.';
-        setGeneralError(message);
-        return; // Stop execution
-    }
-    // --- END OF IMPROVEMENT ---
+      const data = await res.json();
 
-    const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 422) {
+          // Handle validation errors
+          setErrors(data.errors);
+        } else {
+          // Handle other server errors
+          const message = data.message || 'Registration failed. Please try again later.';
+          setGeneralError(message);
+        }
+        return;
+      }
 
-    // This part remains the same
-    if (data.errors) {
-      setErrors(data.errors);
-    } else if (data.token && data.user) {
-      handleLogin(data.user, data.token);
-      navigate("/");
-    } else {
-      setGeneralError('An unknown error occurred during registration.');
+      if (data.token && data.user) {
+        handleLogin(data.user, data.token);
+        navigate("/");
+      } else {
+        setGeneralError('An unknown error occurred during registration.');
+      }
+    } catch (error) {
+      setGeneralError('A network error occurred. Please check your connection and try again.');
     }
   }
 

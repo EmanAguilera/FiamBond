@@ -19,7 +19,13 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://guileless-torrone-15339e.netlify.app'],
+    'allowed_origins' => [
+        'https://guileless-torrone-15339e.netlify.app',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5173', // A common port for Vite React apps
+        'http://127.0.0.1:5173',
+    ],
 
     'allowed_origins_patterns' => [],
 
@@ -29,6 +35,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true, // It's often necessary to enable this for authentication
 
 ];
