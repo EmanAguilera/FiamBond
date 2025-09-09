@@ -12,39 +12,48 @@ export default function Login() {
   });
 
   const [errors, setErrors] = useState({});
+  const [generalError, setGeneralError] = useState(null);
 
   async function handleLoginSubmit(e) {
     e.preventDefault();
-    setErrors({}); // Clear previous errors
+    setErrors({});
+    setGeneralError(null);
 
-    // --- FIX IS HERE ---
-    // Use the full API URL from the environment variable.
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
-      method: "post",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(formData),
-    });
-    // --- END OF FIX ---
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
+        method: "post",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
 
-    // Check if the request itself failed (e.g., 404, 500 error)
-    if (!res.ok) {
-        setErrors({ general: ['The server could not be reached. Please try again later.'] });
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (res.status === 422) {
+          setErrors(errorData.errors);
+        } else {
+          const message = errorData.message || 'Login failed. Please check your credentials and try again.';
+          setGeneralError(message);
+        }
         return;
-    }
+      }
 
-    const data = await res.json();
+      const data = await res.json();
+      if (data.token && data.user) {
+        handleLogin(data.user, data.token);
+        navigate("/");
+      } else {
+        setGeneralError('An unexpected error occurred during login.');
+      }
 
-    if (data.errors) {
-      setErrors(data.errors);
-    } else if (data.token && data.user) {
-      handleLogin(data.user, data.token);
-      navigate("/");
-    } else {
-      // Handle incorrect credentials specifically
-      setErrors({ general: ['The provided credentials are incorrect.'] });
+    } catch (error) {
+      // --- THIS IS THE FIX ---
+      // Log the actual error to the console for debugging.
+      console.error('Login network error:', error);
+      // --- END OF FIX ---
+      setGeneralError('A network error occurred. Please check your connection and try again.');
     }
   }
 
@@ -77,7 +86,7 @@ export default function Login() {
             {errors.password && <p className="error">{errors.password[0]}</p>}
           </div>
 
-          {errors.general && <p className="error">{errors.general[0]}</p>}
+          {generalError && <p className="error">{generalError}</p>}
 
           <button className="primary-btn" type="submit"> Sign In </button>
 

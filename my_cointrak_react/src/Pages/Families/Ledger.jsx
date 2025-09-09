@@ -11,24 +11,38 @@ export default function FamilyLedger() {
   const { id } = useParams();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); // New state for handling errors
   const [period, setPeriod] = useState('monthly');
 
   const getReport = useCallback(async () => {
     setLoading(true);
+    setError(null); // Clear previous errors on a new request
 
-    // --- FIX IS HERE ---
-    // Use the full API URL from the environment variable.
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/report?period=${period}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    // --- END OF FIX ---
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/report?period=${period}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (res.ok) {
+      if (!res.ok) {
+        // Handle server errors (e.g., 404, 500)
+        const errorData = await res.json().catch(() => null);
+        const message = errorData?.message || "The server could not process the report request.";
+        setError(message);
+        setReport(null); // Ensure no old data is displayed
+        setLoading(false);
+        return; // Stop execution
+      }
+
       const data = await res.json();
       setReport(data);
-    } else {
+
+    } catch (err) {
+      // Handle network errors
+      console.error('Failed to fetch family report:', err);
+      setError('A network error occurred. Please check your connection and try again.');
       setReport(null);
     }
+
     setLoading(false);
   }, [token, id, period]);
 
@@ -47,7 +61,7 @@ export default function FamilyLedger() {
 
   return (
     <div className="w-full max-w-4xl mx-auto font-mono text-slate-800">
-      <h1 className="title">Family Ledger</h1> {/* Corrected title */}
+      <h1 className="title">Family Ledger</h1>
       
       <div className="w-full mx-auto flex justify-center gap-4 mb-6">
         <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
@@ -58,10 +72,12 @@ export default function FamilyLedger() {
       <div className="bg-white p-6 rounded-lg shadow-md">
         {loading ? (
           <p className="text-center">Generating Family Ledger...</p>
+        ) : error ? (
+          <p className="error text-center">{error}</p> // Display the specific error message
         ) : report ? (
           <>
             <div className="mb-8 relative" style={{ height: '400px' }}>
-              {report.chartData && report.chartData.datasets ? (
+              {report.chartData && report.chartData.datasets && report.chartData.datasets.length > 0 ? (
                 <Bar options={chartOptions} data={report.chartData} />
               ) : (
                 <div className="flex items-center justify-center h-full">
@@ -103,7 +119,7 @@ export default function FamilyLedger() {
             </div>
           </>
         ) : (
-          <p className="text-center">Could not generate the family report.</p>
+          <p className="text-center">No report data available for this period.</p>
         )}
       </div>
     </div>

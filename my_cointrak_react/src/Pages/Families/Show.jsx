@@ -6,57 +6,75 @@ export default function Show() {
     const { token } = useContext(AppContext);
     const { id } = useParams();
     const [family, setFamily] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [loadingError, setLoadingError] = useState(null); // For fetching the family
     const [newMemberEmail, setNewMemberEmail] = useState("");
-    const [errors, setErrors] = useState({});
-    const [message, setMessage] = useState("");
+    const [formErrors, setFormErrors] = useState({}); // For validation errors
+    const [formMessage, setFormMessage] = useState({ type: '', text: '' }); // For success/general error messages
 
     const getFamily = useCallback(async () => {
-        // --- FIX IS HERE #1 ---
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
-        // --- END OF FIX ---
+        setLoading(true);
+        setLoadingError(null);
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
 
-        if (res.ok) {
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => null);
+                const message = errorData?.message || "Could not load family details.";
+                setLoadingError(message);
+                setLoading(false);
+                return;
+            }
+
             const data = await res.json();
             setFamily(data);
+        } catch (err) {
+            console.error('Failed to fetch family:', err);
+            setLoadingError("A network error occurred. Please try again later.");
         }
+        setLoading(false);
     }, [token, id]);
 
     async function handleAddMember(e) {
         e.preventDefault();
-        setMessage("");
-        setErrors({});
+        setFormMessage({ type: '', text: '' });
+        setFormErrors({});
 
-        // --- FIX IS HERE #2 ---
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/members`, {
-            method: "post",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-                Accept: "application/json",
-            },
-            body: JSON.stringify({ email: newMemberEmail }),
-        });
-        // --- END OF FIX ---
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/members`, {
+                method: "post",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                body: JSON.stringify({ email: newMemberEmail }),
+            });
 
-        const data = await res.json();
+            const data = await res.json();
 
-        if (res.status === 422) {
-            if (data.errors) {
-                setErrors(data.errors);
-            } else {
-                setMessage(data.message || "An error occurred.");
+            if (!res.ok) {
+                if (res.status === 422) {
+                    setFormErrors(data.errors);
+                } else {
+                    // For other errors like user not found (404) or server error (500)
+                    setFormMessage({ type: 'error', text: data.message || "Failed to add member." });
+                }
+                return;
             }
-        } else if (res.ok) {
-            setFamily(data);
+
+            // On success
+            setFamily(data); // The API returns the updated family object
             setNewMemberEmail("");
-            setMessage("Member added successfully!");
-        } else {
-            // Handle other non-ok responses
-            setMessage(data.message || "Failed to add member.");
+            setFormMessage({ type: 'success', text: "Member added successfully!" });
+
+        } catch (err) {
+            console.error('Failed to add member:', err);
+            setFormMessage({ type: 'error', text: 'A network error occurred. Please check your connection.' });
         }
     }
 
@@ -66,13 +84,19 @@ export default function Show() {
         }
     }, [getFamily, token, id]);
 
-    const isSuccessMessage = message === "Member added successfully!";
+    if (loading) {
+        return <p className="text-center">Loading family details...</p>;
+    }
+
+    if (loadingError) {
+        return <p className="error text-center">{loadingError}</p>;
+    }
 
     return (
         <>
             <h1 className="title">Family Details</h1>
 
-            {family ? (
+            {family && (
                 <>
                     {/* Add Member Card */}
                     <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8">
@@ -86,10 +110,10 @@ export default function Show() {
                                     onChange={(e) => setNewMemberEmail(e.target.value)}
                                     className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
-                                {errors.email && <p className="error">{errors.email[0]}</p>}
-                                {message && (
-                                    <p className={`mt-2 text-sm ${isSuccessMessage ? 'text-green-600' : 'text-red-600'}`}>
-                                        {message}
+                                {formErrors.email && <p className="error">{formErrors.email[0]}</p>}
+                                {formMessage.text && (
+                                    <p className={`mt-2 text-sm ${formMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formMessage.text}
                                     </p>
                                 )}
                             </div>
@@ -128,8 +152,6 @@ export default function Show() {
                         </div>
                     </div>
                 </>
-            ) : (
-                <p className="text-center">Loading family details...</p>
             )}
         </>
     );

@@ -32,20 +32,22 @@ export default function Register() {
         body: JSON.stringify(formData),
       });
 
+      // It's better to parse the JSON body regardless of the response status
       const data = await res.json();
 
       if (!res.ok) {
         if (res.status === 422) {
-          // Handle validation errors
+          // Handle validation errors from the parsed data
           setErrors(data.errors);
         } else {
-          // Handle other server errors
+          // Handle other server errors (e.g., 500)
           const message = data.message || 'Registration failed. Please try again later.';
           setGeneralError(message);
         }
-        return;
+        return; // Stop execution after handling the error
       }
 
+      // Handle the successful registration case
       if (data.token && data.user) {
         handleLogin(data.user, data.token);
         navigate("/");
@@ -53,6 +55,10 @@ export default function Register() {
         setGeneralError('An unknown error occurred during registration.');
       }
     } catch (error) {
+      // --- THIS IS THE FIX ---
+      // Log the actual network error to the console for debugging.
+      console.error('Registration network error:', error);
+      // --- END OF FIX ---
       setGeneralError('A network error occurred. Please check your connection and try again.');
     }
   }

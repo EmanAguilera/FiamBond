@@ -7,44 +7,73 @@ export default function Families() {
   const [families, setFamilies] = useState([]);
   const [familyName, setFamilyName] = useState("");
   const [errors, setErrors] = useState({});
+  const [generalError, setGeneralError] = useState(null);
+  const [listError, setListError] = useState(null); // Separate error for the list
 
   const getFamilies = useCallback(async () => {
-    // --- FIX IS HERE #1 ---
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    // --- END OF FIX ---
+    setListError(null); // Clear previous list errors
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    if (res.ok) {
-        const data = await res.json();
-        setFamilies(data);
+      if (!res.ok) {
+        // Handle failure to fetch the list of families
+        const errorData = await res.json().catch(() => null);
+        const message = errorData?.message || "Could not load your families. Please try refreshing the page.";
+        setListError(message);
+        return;
+      }
+
+      const data = await res.json();
+      setFamilies(data);
+
+    } catch (error) {
+      console.error('Failed to fetch families:', error);
+      setListError('A network error occurred while fetching your families.');
     }
   }, [token]);
 
   async function handleCreateFamily(e) {
     e.preventDefault();
+    // Clear all previous form errors
+    setErrors({});
+    setGeneralError(null);
 
-    // --- FIX IS HERE #2 ---
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
-      method: "post",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ first_name: familyName }),
-    });
-    // --- END OF FIX ---
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
+        method: "post",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ first_name: familyName }),
+      });
 
-    const data = await res.json();
-    if (res.status === 422) {
-      setErrors(data.errors);
-    } else if (res.ok) {
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 422) {
+          // Handle validation errors (e.g., name is empty)
+          setErrors(data.errors);
+        } else {
+          // Handle all other server errors (500, 401, etc.)
+          const message = data.message || "Failed to create the family. Please try again.";
+          setGeneralError(message);
+        }
+        return; // Stop execution
+      }
+
+      // On success
       setFamilies([...families, data]);
-      setFamilyName("");
-      setErrors({});
+      setFamilyName(""); // Clear the input field
+
+    } catch (error) {
+      console.error('Failed to create family:', error);
+      setGeneralError('A network error occurred. Please check your connection and try again.');
     }
   }
 
@@ -71,6 +100,9 @@ export default function Families() {
             />
             {errors.first_name && <p className="error">{errors.first_name[0]}</p>}
           </div>
+
+          {generalError && <p className="error">{generalError}</p>}
+
           <button type="submit" className="primary-btn">
             Create Family
           </button>
@@ -79,7 +111,10 @@ export default function Families() {
 
       <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
         <h2 className="font-bold text-xl mb-4 text-gray-800">Your Families</h2>
-        {families.length > 0 ? (
+
+        {listError && <p className="error mb-4">{listError}</p>}
+
+        {!listError && families.length > 0 ? (
           <div className="space-y-3">
             {families.map((family) => (
               <div
@@ -97,7 +132,7 @@ export default function Families() {
             ))}
           </div>
         ) : (
-          <p className="text-gray-600 italic">You are not a part of any family yet.</p>
+          !listError && <p className="text-gray-600 italic">You are not a part of any family yet.</p>
         )}
       </div>
     </>

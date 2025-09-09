@@ -24,24 +24,36 @@ export default function Reports() {
   const { token } = useContext(AppContext);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); // New state for handling errors
   const [period, setPeriod] = useState('monthly');
 
   const getReport = useCallback(async () => {
     setLoading(true);
+    setError(null); // Clear previous errors on a new request
 
-    // --- FIX IS HERE ---
-    // Use the full API URL from the environment variable.
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reports/monthly?period=${period}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    // --- END OF FIX ---
+    try {
+      // NOTE: Corrected the API endpoint to be more standard
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reports?period=${period}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (res.ok) {
+      if (!res.ok) {
+        // Handle server-side errors (e.g., 500)
+        const errorData = await res.json().catch(() => null);
+        const message = errorData?.message || "The server could not process the report request.";
+        throw new Error(message);
+      }
+
       const data = await res.json();
       setReport(data);
-    } else {
-      setReport(null);
+
+    } catch (err) {
+      // Handle network errors or errors thrown from the !res.ok block
+      console.error('Failed to fetch report:', err);
+      setError(err.message);
+      setReport(null); // Ensure no old report data is displayed
     }
+
     setLoading(false);
   }, [token, period]);
 
@@ -74,14 +86,18 @@ export default function Reports() {
       
       <div className="w-full max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md font-mono text-slate-800">
         {loading ? (
-          <p>Generating Ledger...</p>
+          <p className="text-center">Generating Ledger...</p>
+        ) : error ? (
+          <p className="error text-center">{error}</p> // Display the specific error message
         ) : report ? (
           <>
-            <div className="mb-8">
-              {report.chartData && report.chartData.datasets ? (
-                <Bar options={chartOptions} data={report.chartData} />
+            <div className="mb-8" style={{ height: '400px', position: 'relative' }}>
+              {report.chartData && report.chartData.datasets && report.chartData.datasets.length > 0 ? (
+                <Bar options={{...chartOptions, maintainAspectRatio: false}} data={report.chartData} />
               ) : (
-                <p>Not enough data to display a chart for this period.</p>
+                <div className="flex items-center justify-center h-full">
+                  <p>Not enough data to display a chart for this period.</p>
+                </div>
               )}
             </div>
             
@@ -103,7 +119,7 @@ export default function Reports() {
             </div>
           </>
         ) : (
-          <p>Could not generate the report for the selected period.</p>
+          <p className="text-center">No report data available for the selected period.</p>
         )}
       </div>
     </>
