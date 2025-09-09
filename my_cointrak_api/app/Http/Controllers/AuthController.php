@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password; // Import the Password rule
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -15,20 +17,24 @@ class AuthController extends Controller
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => ['required', 'confirmed', Password::defaults()], // Use a stronger password rule
+            'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        // Automatically hash the password upon creation
-        $user = User::create($fields);
+        // --- THE FIX ---
+        // We will explicitly hash the password here to guarantee it's done correctly.
+        $user = User::create([
+            'first_name' => $fields['first_name'],
+            'last_name' => $fields['last_name'],
+            'email' => $fields['email'],
+            'password' => Hash::make($fields['password']),
+        ]);
 
-        // --- FIX WAS HERE ---
-        // Create a token named 'auth-token'. We no longer use 'name'.
-        $token = $user->createToken('auth-token');
+        $token = $user->createToken('auth-token')->plainTextToken;
 
         return response([
             'user' => $user,
-            'token' => $token->plainTextToken
-        ], 201); // Return a proper 201 Created status
+            'token' => $token
+        ], 201);
     }
 
     public function login(Request $request)
@@ -38,23 +44,22 @@ class AuthController extends Controller
             'password' => 'required|string'
         ]);
 
-        // Check email
-        $user = User::where('email', $fields['email'])->first();
-
-        // Check password
-        if (!$user || !Hash::check($fields['password'], $user->password)) {
-            return response([
-                'message' => 'The provided credentials are incorrect.'
-            ], 401); // Return a proper 401 Unauthorized status
+        // --- THE FIX ---
+        // Use Laravel's built-in Auth::attempt(). It automatically finds the user
+        // and securely checks the hashed password in one step. This is the standard.
+        if (!Auth::attempt($fields)) {
+            // This will automatically return a 422 response with the correct error message.
+            throw ValidationException::withMessages([
+                'email' => ['The provided credentials do not match our records.'],
+            ]);
         }
 
-        // --- FIX WAS HERE ---
-        // Create a token named 'auth-token'. We no longer use 'name'.
-        $token = $user->createToken('auth-token');
+        $user = $request->user();
+        $token = $user->createToken('auth-token')->plainTextToken;
 
         return response([
             'user' => $user,
-            'token' => $token->plainTextToken
+            'token' => $token
         ]);
     }
 
