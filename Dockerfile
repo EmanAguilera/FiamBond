@@ -17,15 +17,15 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set the working directory inside the container
 WORKDIR /app
 
-# FIX: Copy the entire application code FIRST.
-# This ensures the 'artisan' file is present before composer runs its scripts.
-COPY ./my_cointrak_api .
+# CORRECTED: Copy the entire application code from the build context.
+# Because Render's root directory is set to 'my_cointrak_api',
+# we just need to copy the current directory ('.').
+COPY . .
 
 # Tell Composer to run without a memory limit.
 ENV COMPOSER_MEMORY_LIMIT=-1
 
-# FIX: NOW run composer install.
-# The post-install scripts (like 'artisan config:clear') will now work.
+# Run composer install.
 RUN composer install --no-interaction --no-dev --prefer-dist
 
 # Set the correct permissions for the storage and cache folders.
@@ -34,5 +34,6 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 # Expose the port that Render will use to talk to your app
 EXPOSE 10000
 
-# The final command to run your application
-CMD php artisan serve --host=0.0.0.0 --port=10000
+# THE FIX: This command now runs migrations first, then starts the server.
+# The 'exec' command ensures the server runs as the main process.
+CMD sh -c "php artisan migrate --force && exec php artisan serve --host=0.0.0.0 --port=10000"
