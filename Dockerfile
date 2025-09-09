@@ -17,7 +17,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set the working directory inside the container
 WORKDIR /app
 
-# THE FIX: Copy the Laravel app from the subfolder into the container's working directory
+# Copy the Laravel app from the subfolder into the container's working directory
 COPY ./my_cointrak_api .
 
 # Tell Composer to run without a memory limit.
@@ -32,5 +32,5 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 # Expose the port that Render will use to talk to your app
 EXPOSE 10000
 
-# This command runs migrations first, then starts the server.
-CMD sh -c "php artisan migrate --force && exec php artisan serve --host=0.0.0.0 --port=10000"
+# THE FINAL FIX: This command now clears config, runs migrations, then starts the server.
+CMD sh -c "php artisan config:clear && php artisan migrate --force && exec php artisan serve --host=0.0.0.0 --port=10000"
