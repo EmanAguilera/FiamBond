@@ -85,7 +85,7 @@ return [
         'pgsql' => [
             'driver' => 'pgsql',
             // --- THIS IS THE FIX ---
-            // We change DB_URL to DATABASE_URL to match what Render provides.
+            // We change DB_URL to DATABASE_URL to match what Render provides
             'url' => env('DATABASE_URL'),
             // --- END OF FIX ---
             'host' => env('DB_HOST', '127.0.0.1'),
