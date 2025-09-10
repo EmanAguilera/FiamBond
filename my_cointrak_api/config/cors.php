@@ -20,7 +20,7 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'https://cointrak.netlify.app',
+        'https://714f6080.cointrak.pages.dev',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
         'http://localhost:5173', // A common port for Vite React apps
