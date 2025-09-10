@@ -1,5 +1,5 @@
-import { useContext } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { useContext, useState } from "react"; // --- FIX: Import useState ---
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
 import {
     HomeIcon,
@@ -7,65 +7,125 @@ import {
     ArrowLeftOnRectangleIcon,
     UserGroupIcon,
     CalendarDaysIcon,
-    Cog6ToothIcon // --- ADDED: Import the settings icon ---
+    Cog6ToothIcon,
+    Bars3Icon, // --- NEW: Import hamburger menu icon ---
+    XMarkIcon,  // --- NEW: Import close icon ---
 } from '@heroicons/react/24/outline';
 
 export default function Layout() {
     const { user, handleLogout } = useContext(AppContext);
+    // --- NEW: State to manage the mobile menu's visibility ---
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    // --- UPDATED: Add the "Settings" link to the navigation for logged-in users ---
+    // Navigation items for the sidebar and mobile menu
     const navItems = user ? [
         { name: "Dashboard", href: "/", icon: HomeIcon },
         { name: "Families", href: "/families", icon: UserGroupIcon },
         { name: "Goals", href: "/goals", icon: CalendarDaysIcon },
         { name: "Ledger", href: "/reports", icon: BookOpenIcon },
-        { name: "Settings", href: "/settings", icon: Cog6ToothIcon }, // Added settings link
+        { name: "Settings", href: "/settings", icon: Cog6ToothIcon },
     ] : [
-        { name: "Register", href: "/register" },
-        { name: "Login", href: "/login" },
+        // Logged out items are handled directly in the header for simplicity
     ];
 
     return (
-        <>
+        <div className="min-h-screen bg-gray-50">
             <header className="app-header">
                 <nav className="top-nav">
                     <Link to="/" className="logo">Cointrak</Link>
+                    
                     {user ? (
-                        <div className="user-info">
-                            <p className="text-slate-500 text-sm"> Welcome back, <strong>{user.first_name} {user.last_name}</strong> </p>
-                            
-                            <button onClick={handleLogout} className="nav-link logout-link">
-                                <ArrowLeftOnRectangleIcon className="h-5 w-5 mr-1" />
-                                Logout
+                        <div className="flex items-center space-x-4">
+                            {/* --- FIX: Desktop-only user info. Hidden on mobile --- */}
+                            <div className="hidden md:flex items-center space-x-4">
+                                <p className="text-slate-500 text-sm">
+                                    Welcome, <strong>{user.first_name}</strong>
+                                </p>
+                                <button onClick={handleLogout} className="nav-link logout-link" title="Logout">
+                                    <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            {/* --- NEW: Hamburger menu button for mobile. Hidden on medium screens and up --- */}
+                            <button
+                                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                                className="md:hidden p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none"
+                                aria-label="Toggle menu"
+                            >
+                                {isMobileMenuOpen ? (
+                                    <XMarkIcon className="h-6 w-6" />
+                                ) : (
+                                    <Bars3Icon className="h-6 w-6" />
+                                )}
                             </button>
                         </div>
                     ) : (
                         <div className="flex items-center space-x-2">
-                            <Link to="/register" className="nav-link">
+                            <NavLink to="/register" className="nav-link">
                                 Register
-                            </Link>
-                            <Link to="/login" className="nav-link">
+                            </NavLink>
+                            <NavLink to="/login" className="nav-link">
                                 Login
-                            </Link>
+                            </NavLink>
                         </div>
                     )}
                 </nav>
+
+                {/* --- NEW: Mobile navigation menu --- */}
+                {isMobileMenuOpen && user && (
+                    <div className="md:hidden bg-white border-b border-gray-100">
+                        <ul className="px-4 pt-2 pb-4 space-y-1">
+                            {navItems.map((item) => (
+                                <li key={item.name}>
+                                    <NavLink
+                                        to={item.href}
+                                        onClick={() => setIsMobileMenuOpen(false)} // Close menu on click
+                                        className={({ isActive }) =>
+                                            `sidebar-nav-link ${isActive ? 'active' : ''}`
+                                        }
+                                    >
+                                        {item.icon && <item.icon className="h-5 w-5" />}
+                                        <span className="ml-3">{item.name}</span>
+                                    </NavLink>
+                                </li>
+                            ))}
+                            <li>
+                                <hr className="my-2 border-gray-200" />
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => {
+                                        handleLogout();
+                                        setIsMobileMenuOpen(false);
+                                    }}
+                                    className="sidebar-nav-link w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                                >
+                                    <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+                                    <span className="ml-3">Logout</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                )}
             </header>
 
             <div className="flex">
                 {user && (
+                    // --- FIX: The .sidebar class from App.css already hides this on mobile (hidden md:flex) ---
                     <aside className="sidebar">
                         <nav className="sidebar-nav">
                             <ul>
                                 {navItems.map((item) => (
                                     <li key={item.name}>
-                                        <Link
+                                        <NavLink
                                             to={item.href}
-                                            className="sidebar-nav-link group"
+                                            className={({ isActive }) =>
+                                                `sidebar-nav-link group ${isActive ? 'active' : ''}`
+                                            }
                                         >
                                             {item.icon && <item.icon className="h-5 w-5 text-gray-400 group-hover:text-indigo-600 transition duration-200 ease-in-out" />}
                                             <span className="ml-3">{item.name}</span>
-                                        </Link>
+                                        </NavLink>
                                     </li>
                                 ))}
                             </ul>
@@ -73,10 +133,10 @@ export default function Layout() {
                     </aside>
                 )}
 
-                <main className={`flex-1 ${user ? 'main-content-with-sidebar' : ''}`}>
+                <main className={`w-full ${user ? 'main-content-with-sidebar' : 'p-4 md:p-10'}`}>
                     <Outlet />
                 </main>
             </div>
-        </>
+        </div>
     );
 }
