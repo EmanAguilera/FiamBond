@@ -11,7 +11,6 @@ export default function Home() {
   const getTransactions = useCallback(async () => {
     if (!token) return;
     try {
-      // --- FIX IS HERE #1 ---
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -36,7 +35,6 @@ export default function Home() {
     }
 
     try {
-      // --- FIX IS HERE #2 ---
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -50,7 +48,8 @@ export default function Home() {
         console.error(`Failed to fetch family summaries. Server responded with status: ${res.status}`);
         setFamilySummaries([]);
       }
-    } catch (error) {
+    } catch (error)
+    {
       console.error("A network or other error occurred while fetching family summaries:", error);
     }
   }, [token]);
@@ -69,11 +68,14 @@ export default function Home() {
   return (
     <>
       {user ? (
-        <div className="p-10">
+        // FIX: Reduced padding for mobile (p-4) and kept larger padding for medium screens and up (md:p-10)
+        <div className="p-4 md:p-10">
           <div className="dashboard-section">
+            {/* The dashboard-header class now handles responsiveness from the CSS file */}
             <div className="dashboard-header">
               <h2 className="dashboard-title">Welcome back, {user.first_name}!</h2>
-              <Link to="/transactions/create" className="primary-btn max-w-[200px]">
+              {/* FIX: Set max-width on mobile to prevent button from being too wide if text is long */}
+              <Link to="/transactions/create" className="primary-btn max-w-xs sm:max-w-[200px]">
                 + Add Transaction
               </Link>
             </div>
@@ -87,6 +89,7 @@ export default function Home() {
 
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Family Ledgers</h3>
             {familySummaries.length > 0 ? (
+              // FIX: This grid layout is already responsive, perfect for mobile.
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
                 {familySummaries.map((summary) => (
                   <div key={summary.id} className="dashboard-card p-6 flex flex-col justify-between">
@@ -157,8 +160,9 @@ export default function Home() {
               <p className="hero-subheadline">
                 Cointrak is the simplest way to manage your personal and family finances. Track your income, monitor expenses, and achieve your financial goals with ease.
               </p>
+              {/* The hero-cta class now handles responsiveness from the CSS file */}
               <div className="hero-cta">
-                <Link to="/register" className="primary-btn w-auto text-lg">
+                <Link to="/register" className="primary-btn text-lg">
                   Get Started for Free
                 </Link>
                 <Link to="/login" className="text-link text-lg">

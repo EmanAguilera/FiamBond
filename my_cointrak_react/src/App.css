@@ -1,5 +1,3 @@
-/* src/index.css */
-
 @import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 
 @tailwind base;
@@ -36,8 +34,8 @@
 
     /* --- BUTTONS & LINKS --- */
     .primary-btn {
-        /* Changed w-full to w-auto and added whitespace-nowrap */
-        @apply flex justify-center w-auto px-8 py-3 text-base font-semibold leading-6 text-white bg-indigo-600 rounded-lg shadow-lg whitespace-nowrap disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-105;
+        /* Set to full-width by default for mobile, and auto-width on larger screens (sm and up) */
+        @apply flex justify-center w-full sm:w-auto px-8 py-3 text-base font-semibold leading-6 text-white bg-indigo-600 rounded-lg shadow-lg whitespace-nowrap disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-105;
     }
     .text-link {
         @apply font-semibold text-indigo-600 hover:text-indigo-500 transition duration-200 ease-in-out;
@@ -110,16 +108,16 @@
 
     /* --- MAIN CONTENT AREA --- */
     .main-content-with-sidebar {
-        @apply max-w-screen-xl p-10 mx-auto;
+        /* Reduced padding for mobile */
+        @apply max-w-screen-xl p-4 md:p-10 mx-auto;
     }
 
     /* --- AUTHENTICATION PAGES --- */
     .login-wrapper {
-        /* Changed from gradient to a soft gray */
-        @apply flex items-center justify-center min-h-screen bg-gray-100;
+        @apply flex items-center justify-center min-h-screen bg-gray-100 p-4; /* Added padding for small screens */
     }
     .login-card {
-        @apply w-full max-w-md p-10 bg-white rounded-2xl shadow-xl;
+        @apply w-full max-w-md p-8 sm:p-10 bg-white rounded-2xl shadow-xl; /* Reduced padding on mobile */
     }
     /* Target only form groups within the login card */
     .login-card .form-group {
@@ -140,22 +138,28 @@
 
     /* --- HERO SECTION --- */
     .hero-section {
-        @apply flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-20 bg-gradient-to-br from-violet-50 to-white sm:px-6 lg:px-8;
+        /* Reduced vertical padding on mobile */
+        @apply flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-16 bg-gradient-to-br from-violet-50 to-white sm:px-6 lg:px-8 md:py-20;
     }
     .hero-content {
-        @apply grid grid-cols-1 md:grid-cols-2 gap-24 items-center max-w-screen-xl mx-auto;
+        /* Reduced gap on mobile */
+        @apply grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 items-center max-w-screen-xl mx-auto;
     }
     .hero-text {
-        @apply text-left;
+        /* Center text on mobile, left-align on medium screens and up */
+        @apply text-center md:text-left;
     }
     .hero-headline {
-        @apply mb-6 text-5xl font-black leading-tight text-gray-900 lg:text-7xl;
+        /* Reduced font size on mobile */
+        @apply mb-6 text-4xl font-black leading-tight text-gray-900 sm:text-5xl lg:text-7xl;
     }
     .hero-subheadline {
-        @apply max-w-lg mb-10 text-xl text-gray-600;
+        /* Reduced font size on mobile */
+        @apply max-w-lg mb-10 text-lg sm:text-xl text-gray-600 mx-auto md:mx-0; /* Center text on mobile */
     }
     .hero-cta {
-        @apply flex items-center gap-6;
+        /* Stack vertically on mobile, row on larger screens. Justify center on mobile */
+        @apply flex flex-col sm:flex-row items-center justify-center md:justify-start gap-6;
     }
     .hero-visual img {
         @apply rounded-xl shadow-2xl;
@@ -166,16 +170,19 @@
         @apply mb-12;
     }
     .dashboard-header {
-        @apply flex items-center justify-between mb-8;
+        /* Stack vertically and align left on mobile, switch to row on medium screens */
+        @apply flex flex-col items-start md:flex-row md:items-center md:justify-between mb-8 gap-4;
     }
     .dashboard-title {
-        @apply text-3xl font-extrabold text-gray-900;
+        /* Reduced font size for mobile */
+        @apply text-2xl sm:text-3xl font-extrabold text-gray-900;
     }
     .dashboard-card {
         @apply p-6 mb-4 bg-white border border-gray-100 rounded-lg shadow-md;
     }
     .balance-amount {
-        @apply text-5xl font-extrabold;
+        /* Reduced font size for mobile */
+        @apply text-4xl sm:text-5xl font-extrabold;
     }
     .transaction-item {
         @apply flex items-center justify-between p-4 transition duration-200 ease-in-out rounded-md hover:bg-gray-50;
@@ -191,11 +198,10 @@
     }
 
     .period-btn {
-  @apply px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
-}
+        @apply px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
+    }
 
-.active-period-btn {
-  @apply px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
+    .active-period-btn {
+        @apply px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
+    }
 }
-}
-
