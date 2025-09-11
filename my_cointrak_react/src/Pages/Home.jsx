@@ -152,37 +152,26 @@ export default function Home() {
         </div>
       ) : (
         <div className="hero-section">
-          {/* FIX: Added responsive flex-direction and alignment */}
-          <div className="hero-content flex-col lg:flex-row">
-            {/* FIX: Added responsive text alignment and width */}
-            <div className="hero-text w-full lg:w-1/2 text-center lg:text-left">
+          <div className="hero-content">
+            <div className="hero-text">
               <h1 className="hero-headline">
                 Take Control of Your Finances
               </h1>
               <p className="hero-subheadline">
                 Cointrak is the simplest way to manage your personal and family finances. Track your income, monitor expenses, and achieve your financial goals with ease.
               </p>
-              {/* FIX: This container now handles responsive button layout and alignment */}
+              {/* The hero-cta class now handles responsiveness from the CSS file */}
               <div className="hero-cta">
-                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-                  <Link to="/register" className="primary-btn text-lg w-full sm:w-auto">
-                    Get Started for Free
-                  </Link>
-                  <Link to="/login" className="text-link text-lg">
-                    Login to your account
-                  </Link>
-                </div>
-                {/* FIX: The disclaimer is now centered on mobile and left-aligned on larger screens */}
-                <div className="mt-6 text-center lg:text-left">
-                    <p className="text-xs text-slate-500 max-w-md mx-auto lg:mx-0">
-                        <strong>Disclaimer:</strong> Cointrak is for financial tracking and planning purposes only. It does not handle real money and is not a bank, wallet, or blockchain-based service.
-                    </p>
-                </div>
+                <Link to="/register" className="primary-btn text-lg">
+                  Get Started for Free
+                </Link>
+                <Link to="/login" className="text-link text-lg">
+                  Login to your account
+                </Link>
               </div>
             </div>
 
-            {/* FIX: Added margin-top for spacing on mobile and responsive width */}
-            <div className="hero-visual w-full lg:w-1/2 mt-10 lg:mt-0">
+            <div className="hero-visual">
               <img 
                 src="/CoinTrak_Image.png" 
                 alt="A family happily managing their finances on a tablet with an overlay of financial charts"
