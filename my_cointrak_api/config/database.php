@@ -16,7 +16,12 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    // --- THIS IS THE FIX ---
+    // We change the default connection from 'sqlite' to 'pgsql'.
+    // Since Render provides a PostgreSQL database, our application must use
+    // the 'pgsql' connection settings by default in production.
+    'default' => env('DB_CONNECTION', 'pgsql'),
+    // --- END OF FIX ---
 
     /*
     |--------------------------------------------------------------------------
@@ -84,10 +89,9 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            // --- THIS IS THE FIX ---
-            // We change DB_URL to DATABASE_URL to match what Render provides
+            // This line correctly tells Laravel to use the connection URL
+            // provided by Render's environment variables.
             'url' => env('DATABASE_URL'),
-            // --- END OF FIX ---
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'laravel'),
@@ -121,11 +125,6 @@ return [
     |--------------------------------------------------------------------------
     | Migration Repository Table
     |--------------------------------------------------------------------------
-    |
-    | This table keeps track of all the migrations that have already run for
-    | your application. Using this information, we can determine which of
-    | the migrations on disk haven't actually been run on the database.
-    |
     */
 
     'migrations' => [
@@ -137,11 +136,6 @@ return [
     |--------------------------------------------------------------------------
     | Redis Databases
     |--------------------------------------------------------------------------
-    |
-    | Redis is an open source, fast, and advanced key-value store that also
-    | provides a richer body of commands than a typical key-value system
-    | such as Memcached. You may define your connection settings here.
-    |
     */
 
     'redis' => [
