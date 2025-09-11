@@ -169,6 +169,13 @@ export default function Home() {
                   Login to your account
                 </Link>
               </div>
+              
+              {/* New Disclaimer Section */}
+              <div className="mt-8 p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-700 rounded-r-lg">
+                <p className="font-bold">Disclaimer:</p>
+                <p className="text-sm">This is a demo application. It does not involve real money, monetary transactions, or any blockchain technology.</p>
+              </div>
+
             </div>
 
             <div className="hero-visual">
