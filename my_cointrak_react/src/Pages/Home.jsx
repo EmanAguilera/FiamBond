@@ -68,13 +68,10 @@ export default function Home() {
   return (
     <>
       {user ? (
-        // FIX: Reduced padding for mobile (p-4) and kept larger padding for medium screens and up (md:p-10)
         <div className="p-4 md:p-10">
           <div className="dashboard-section">
-            {/* The dashboard-header class now handles responsiveness from the CSS file */}
             <div className="dashboard-header">
               <h2 className="dashboard-title">Welcome back, {user.first_name}!</h2>
-              {/* FIX: Set max-width on mobile to prevent button from being too wide if text is long */}
               <Link to="/transactions/create" className="primary-btn max-w-xs sm:max-w-[200px]">
                 + Add Transaction
               </Link>
@@ -89,7 +86,6 @@ export default function Home() {
 
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Family Ledgers</h3>
             {familySummaries.length > 0 ? (
-              // FIX: This grid layout is already responsive, perfect for mobile.
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
                 {familySummaries.map((summary) => (
                   <div key={summary.id} className="dashboard-card p-6 flex flex-col justify-between">
@@ -160,14 +156,22 @@ export default function Home() {
               <p className="hero-subheadline">
                 Cointrak is the simplest way to manage your personal and family finances. Track your income, monitor expenses, and achieve your financial goals with ease.
               </p>
-              {/* The hero-cta class now handles responsiveness from the CSS file */}
               <div className="hero-cta">
-                <Link to="/register" className="primary-btn text-lg">
-                  Get Started for Free
-                </Link>
-                <Link to="/login" className="text-link text-lg">
-                  Login to your account
-                </Link>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <Link to="/register" className="primary-btn text-lg w-full sm:w-auto">
+                        Get Started for Free
+                    </Link>
+                    <Link to="/login" className="text-link text-lg">
+                        Login to your account
+                    </Link>
+                </div>
+                {/* START: Added Disclaimer */}
+                <div className="mt-4 text-center sm:text-left">
+                  <p className="text-xs text-slate-500 max-w-md mx-auto sm:mx-0">
+                    <strong>Disclaimer:</strong> Cointrak is for financial tracking and planning purposes only. It does not handle real money and is not a bank, wallet, or blockchain-based service.
+                  </p>
+                </div>
+                {/* END: Added Disclaimer */}
               </div>
             </div>
 
