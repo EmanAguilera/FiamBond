@@ -15,7 +15,7 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         // E.g., paginate by 10 transactions per page.
-    return $request->user()->transactions()->whereNull('family_id')->latest()->paginate(10);
+    return $request->user()->transactions()->whereNull('family_id')->latest()->paginate(5);
     }
 
     /**
