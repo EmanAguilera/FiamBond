@@ -6,18 +6,28 @@ export default function Home() {
   const [transactions, setTransactions] = useState([]);
   const [balance, setBalance] = useState(0);
   const [familySummaries, setFamilySummaries] = useState([]);
+  const [pagination, setPagination] = useState(null); 
   const { user, token } = useContext(AppContext);
 
-  const getTransactions = useCallback(async () => {
+  const getTransactions = useCallback(async (page = 1) => { // <-- Accept a page number
     if (!token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions?page=${page}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
+        //The transactions are now inside the 'data' key
         const data = await res.json();
         const personalTransactions = data.filter(tx => tx.family_id === null || tx.family_id === undefined);
         setTransactions(personalTransactions);
+
+        //Store the pagination metadata
+
+        const {data: _, ...paginationData} = data; //Extracts all keys except 'data'
+        setPagination(paginationData);
+
+        //Balance calculation remains the same, but should ideally be done on the server in a future update
+
         const total = personalTransactions.reduce((acc, transaction) => {
           return transaction.type === 'income' ? acc + parseFloat(transaction.amount) : acc - parseFloat(transaction.amount);
         }, 0);
@@ -56,12 +66,13 @@ export default function Home() {
 
   useEffect(() => {
     if (token) {
-      getTransactions();
+      getTransactions(); // <-- This will fetch page 1 by default
       getFamilySummaries();
     } else {
       setTransactions([]);
       setBalance(0);
       setFamilySummaries([]);
+      setPagination(null); // <-- Reset pagination on logout
     }
   }, [token, getTransactions, getFamilySummaries]);
 
@@ -127,8 +138,8 @@ export default function Home() {
 
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Recent Personal Transactions</h3>
             {transactions.length > 0 ? (
-              <div className="dashboard-card p-0 mb-12">
-                  {transactions.slice(0, 5).map((transaction) => (
+              <div className="dashboard-card p-0 mb-4">
+                  {transactions.map((transaction) => (
                   <div
                       key={transaction.id}
                       className="transaction-item border-b last:border-b-0 border-gray-100"
@@ -148,6 +159,30 @@ export default function Home() {
             ) : (
               <p className="text-center text-gray-500 mb-12">You have no personal transactions yet.</p>
             )}
+
+            {/* --- NEW PAGINATION CONTROLS ---*/}
+             {pagination && pagination.last_page > 1 && (
+              <div className="flex justify-between items-center mt-4 mb-12">
+                <button
+                  onClick={() => getTransactions(pagination.current_page - 1)}
+                  disabled={pagination.current_page === 1}
+                  className="secondary-btn disabled:opacity-50"
+                >
+                  &larr; Previous
+                </button>
+                <span className="text-sm text-gray-600">
+                  Page {pagination.current_page} of {pagination.last_page}
+                </span>
+                <button
+                  onClick={() => getTransactions(pagination.current_page + 1)}
+                  disabled={pagination.current_page === pagination.last_page}
+                  className="secondary-btn disabled:opacity-50"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            )}
+            {/* --- END OF NEW PAGINATION CONTROLS --- */}
           </div>
         </div>
       ) : (
