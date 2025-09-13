@@ -7,6 +7,7 @@ export default function Home() {
   const [balance, setBalance] = useState(0);
   const [familySummaries, setFamilySummaries] = useState([]);
   const [pagination, setPagination] = useState(null);
+  const [familyPagination, setFamilyPagination] = useState(null);
   const { user, token } = useContext(AppContext);
 
   // This function's ONLY job is to fetch a page of transactions.
@@ -47,20 +48,22 @@ export default function Home() {
   }, [token]);
 
   // This function fetches the summaries for the family cards.
-  const getFamilySummaries = useCallback(async () => {
-    if (!token) {
-      return;
-    }
+  const getFamilySummaries = useCallback(async (page = 1) => {
+    if (!token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries?page=${page}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
         const data = await res.json();
-        setFamilySummaries(data);
+        
+        // The summaries are now in the 'data' key
+        setFamilySummaries(Array.isArray(data.data) ? data.data : []);
+
+        // Store the family pagination metadata
+        const { data: _, ...paginationData } = data;
+        setFamilyPagination(paginationData);
       } else {
         console.error(`Failed to fetch family summaries. Server responded with status: ${res.status}`);
         setFamilySummaries([]);
@@ -75,7 +78,7 @@ export default function Home() {
     if (token) {
       getBalance();
       getTransactions();
-      getFamilySummaries();
+      getFamilySummaries(); // This will fetch page 1 by default
     } else {
       // Clear all data on logout
       setTransactions([]);
@@ -107,34 +110,63 @@ export default function Home() {
 
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Family Ledgers</h3>
             {familySummaries.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                {familySummaries.map((summary) => (
-                  <div key={summary.id} className="dashboard-card p-6 flex flex-col justify-between">
-                    <div>
-                      <h4 className="font-bold text-xl mb-4">{summary.first_name}</h4>
-                      <div className="space-y-2 text-sm">
-                        <p className="flex justify-between">
-                          <span>Total Inflow:</span>
-                          <span className="font-semibold text-green-600">+₱{parseFloat(summary.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </p>
-                        <p className="flex justify-between">
-                          <span>Total Outflow:</span>
-                          <span className="font-semibold text-red-500">-₱{parseFloat(summary.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </p>
-                        <hr className="border-dashed my-2" />
-                        <p className={`flex justify-between font-bold text-base ${summary.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                          <span>Net Position:</span>
-                          <span>₱{parseFloat(summary.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </p>
+              // Add a div wrapper to hold the grid and the pagination
+              <div className="mb-12"> 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {familySummaries.map((summary) => (
+                    // ... the mapping logic is unchanged ...
+                    <div key={summary.id} className="dashboard-card p-6 flex flex-col justify-between">
+                      <div>
+                          <h4 className="font-bold text-xl mb-4">{summary.first_name}</h4>
+                          <div className="space-y-2 text-sm">
+                          <p className="flex justify-between">
+                              <span>Total Inflow:</span>
+                              <span className="font-semibold text-green-600">+₱{parseFloat(summary.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </p>
+                          <p className="flex justify-between">
+                              <span>Total Outflow:</span>
+                              <span className="font-semibold text-red-500">-₱{parseFloat(summary.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </p>
+                          <hr className="border-dashed my-2"/>
+                          <p className={`flex justify-between font-bold text-base ${summary.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                              <span>Net Position:</span>
+                              <span>₱{parseFloat(summary.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </p>
+                          </div>
+                      </div>
+                      <div className="mt-6">
+                        <Link to={`/families/${summary.id}/ledger`} className="text-link font-bold">
+                          View Full Ledger &rarr;
+                        </Link>
                       </div>
                     </div>
-                    <div className="mt-6">
-                      <Link to={`/families/${summary.id}/ledger`} className="text-link font-bold">
-                        View Full Ledger &rarr;
-                      </Link>
-                    </div>
+                  ))}
+                </div>
+
+                {/* --- NEW FAMILY PAGINATION CONTROLS --- */}
+                {familyPagination && familyPagination.last_page > 1 && (
+                  <div className="flex justify-between items-center mt-6">
+                    <button
+                      onClick={() => getFamilySummaries(familyPagination.current_page - 1)}
+                      disabled={familyPagination.current_page === 1}
+                      className="secondary-btn disabled:opacity-50"
+                    >
+                      &larr; Previous
+                    </button>
+                    <span className="text-sm text-gray-600">
+                      Page {familyPagination.current_page} of {familyPagination.last_page}
+                    </span>
+                    <button
+                      onClick={() => getFamilySummaries(familyPagination.current_page + 1)}
+                      disabled={familyPagination.current_page === familyPagination.last_page}
+                      className="secondary-btn disabled:opacity-50"
+                    >
+                      Next &rarr;
+                    </button>
                   </div>
-                ))}
+                )}
+                {/* --- END OF NEW CONTROLS --- */}
+                
               </div>
             ) : (
               <div className="dashboard-card text-center mb-12">
