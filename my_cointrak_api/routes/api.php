@@ -42,4 +42,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // --- END OF FIX ---
     
     Route::get('/user/balance', [ReportController::class, 'getUserBalance']);
+
+    Route::get('/user/balance', [App\Http\Controllers\UserController::class, 'getBalance']);
 });

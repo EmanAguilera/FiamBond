@@ -68,4 +68,25 @@ class UserController extends Controller
             'user' => $user,
         ]);
     }
+
+     public function getBalance(Request $request)
+    {
+        $user = $request->user();
+
+        // Sum of all personal income
+        $totalInflow = $user->transactions()
+            ->whereNull('family_id')
+            ->where('type', 'income')
+            ->sum('amount');
+
+        // Sum of all personal expenses
+        $totalOutflow = $user->transactions()
+            ->whereNull('family_id')
+            ->where('type', 'expense')
+            ->sum('amount');
+
+        return response()->json([
+            'balance' => $totalInflow - $totalOutflow,
+        ]);
+    }
 }
