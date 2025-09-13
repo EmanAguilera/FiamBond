@@ -184,9 +184,9 @@ class FamilyController extends Controller
     public function summaries(Request $request)
     {
         $user = $request->user();
-        $families = $user->families()->with('owner')->get();
+        $families = $user->families()->with('owner')->paginate(2);
 
-        $summaries = $families->map(function ($family) {
+        $families->getCollection()->transform(function ($family){
             $inflow = $family->transactions()->where('type', 'income')->sum('amount');
             $outflow = $family->transactions()->where('type', 'expense')->sum('amount');
 
@@ -200,6 +200,6 @@ class FamilyController extends Controller
             ];
         });
 
-        return response($summaries);
+        return response($families);
     }
 }
