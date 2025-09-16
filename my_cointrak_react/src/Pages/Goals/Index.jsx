@@ -3,11 +3,18 @@ import { AppContext } from "../../Context/AppContext";
 
 export default function Goals() {
   const { token } = useContext(AppContext);
-  const [activeGoals, setActiveGoals] = useState([]);
-  const [completedGoals, setCompletedGoals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [listError, setListError] = useState(null); // For errors fetching/updating lists
   
+  // STATE MANAGEMENT for two separate, paginated lists
+  const [activeGoals, setActiveGoals]         = useState([]);
+  const [completedGoals, setCompletedGoals]   = useState([]);
+  const [activePagination, setActivePagination]     = useState(null);
+  const [completedPagination, setCompletedPagination] = useState(null);
+
+  // General state for loading and errors
+  const [loading, setLoading]     = useState(true);
+  const [listError, setListError] = useState(null);
+  
+  // State for the "Create New Goal" form
   const [formData, setFormData] = useState({
     name: "",
     target_amount: "",
@@ -15,43 +22,70 @@ export default function Goals() {
     family_id: "",
   });
   
-  const [families, setFamilies] = useState([]);
-  const [formErrors, setFormErrors] = useState({}); // For validation errors
-  const [formError, setFormError] = useState(null); // For general form errors
+  // State for the families dropdown in the form
+  const [families, setFamilies]         = useState([]);
+  const [formErrors, setFormErrors]     = useState({});
+  const [formError, setFormError]     = useState(null);
 
-  const getFamilies = useCallback(async () => {
+  // Fetches families for the dropdown, handling the paginated response
+  const getFamiliesForDropdown = useCallback(async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families?page=1`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch families.');
       const data = await res.json();
-      setFamilies(data.data);
+      setFamilies(data.data || []); // Make sure to use data.data and provide a fallback
     } catch (err) {
-      console.error(err); // Log error but don't block UI for this non-critical data
+      console.error(err);
     }
   }, [token]);
 
-  const getGoals = useCallback(async () => {
-    setLoading(true);
-    setListError(null);
+  // Fetches a specific page of ACTIVE goals from the API
+  const getActiveGoals = useCallback(async (page = 1) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals?status=active&page=${page}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => null);
-        throw new Error(errorData?.message || "Could not load your goals.");
-      }
+      if (!res.ok) throw new Error("Could not load active goals.");
       const data = await res.json();
-      setActiveGoals(data.filter((goal) => goal.status === "active"));
-      setCompletedGoals(data.filter((goal) => goal.status === "completed"));
+      setActiveGoals(data.data);
+      const { data: _, ...paginationData } = data;
+      setActivePagination(paginationData);
     } catch (err) {
       setListError(err.message);
     }
-    setLoading(false);
+  }, [token]);
+  
+  // Fetches a specific page of COMPLETED goals from the API
+  const getCompletedGoals = useCallback(async (page = 1) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals?status=completed&page=${page}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Could not load completed goals.");
+      const data = await res.json();
+      setCompletedGoals(data.data);
+      const { data: _, ...paginationData } = data;
+      setCompletedPagination(paginationData);
+    } catch (err) {
+      setListError(err.message);
+    }
   }, [token]);
 
+  // On component load, fetch all necessary data
+  useEffect(() => {
+    if (token) {
+      setLoading(true);
+      Promise.all([
+        getActiveGoals(),
+        getCompletedGoals(),
+        getFamiliesForDropdown()
+      ]).finally(() => setLoading(false));
+    }
+  }, [token, getActiveGoals, getCompletedGoals, getFamiliesForDropdown]);
+
+  // Handler for creating a new goal
   async function handleCreateGoal(e) {
     e.preventDefault();
     setFormErrors({});
@@ -65,23 +99,19 @@ export default function Goals() {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals`, {
         method: "post",
-        headers: {
-          Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(bodyPayload),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        if (res.status === 422) {
-          setFormErrors(data.errors);
-        } else {
-          setFormError(data.message || "An unexpected error occurred.");
-        }
+        if (res.status === 422) setFormErrors(data.errors);
+        else setFormError(data.message || "An unexpected error occurred.");
         return;
       }
       
-      setActiveGoals([data, ...activeGoals]);
+      // On success, refetch the first page of active goals to show the new one.
+      getActiveGoals(1);
       setFormData({ name: "", target_amount: "", target_date: "", family_id: "" });
     } catch (err) {
       console.error('Failed to create goal:', err);
@@ -89,8 +119,9 @@ export default function Goals() {
     }
   }
 
+  // Handler for completing a goal
   async function handleMarkAsComplete(goalId) {
-    setListError(null); // Clear previous errors
+    setListError(null);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/${goalId}/complete`, {
         method: "put",
@@ -102,24 +133,19 @@ export default function Goals() {
         throw new Error(errorData?.message || "Could not update the goal.");
       }
 
-      const completedGoal = await res.json();
-      setActiveGoals(activeGoals.filter((g) => g.id !== goalId));
-      setCompletedGoals([completedGoal, ...completedGoals]);
+      // On success, refetch the first page of BOTH lists to keep them accurate.
+      getActiveGoals(1);
+      getCompletedGoals(1);
     } catch (err) {
       setListError(err.message);
     }
   }
 
-  useEffect(() => {
-    if (token) {
-      getGoals();
-      getFamilies();
-    }
-  }, [token, getGoals, getFamilies]);
-
   return (
     <>
       <h1 className="title">Set Your Financial Goals</h1>
+      
+      {/* --- CREATE NEW GOAL FORM --- */}
       <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8">
         <h2 className="font-bold text-xl mb-4 text-gray-800">Create a New Goal</h2>
         <form onSubmit={handleCreateGoal} className="space-y-4">
@@ -172,6 +198,7 @@ export default function Goals() {
         </form>
       </div>
 
+      {/* --- ACTIVE GOALS LIST --- */}
       <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8">
         <h2 className="font-bold text-xl mb-4 text-gray-800">Your Active Goals</h2>
         {loading ? <p>Loading goals...</p> : listError ? <p className="error">{listError}</p> : activeGoals.length > 0 ? (
@@ -199,8 +226,17 @@ export default function Goals() {
         ) : (
           <p className="text-gray-600 italic">You have no active goals yet.</p>
         )}
+        {/* PAGINATION CONTROLS FOR ACTIVE GOALS */}
+        {activePagination && activePagination.last_page > 1 && (
+          <div className="flex justify-between items-center mt-6">
+            <button onClick={() => getActiveGoals(activePagination.current_page - 1)} disabled={activePagination.current_page === 1} className="secondary-btn disabled:opacity-50">&larr; Previous</button>
+            <span className="text-sm text-gray-600">Page {activePagination.current_page} of {activePagination.last_page}</span>
+            <button onClick={() => getActiveGoals(activePagination.current_page + 1)} disabled={activePagination.current_page === activePagination.last_page} className="secondary-btn disabled:opacity-50">Next &rarr;</button>
+          </div>
+        )}
       </div>
 
+      {/* --- COMPLETED GOALS LIST --- */}
       <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
         <h2 className="font-bold text-xl mb-4 text-gray-800">Completed Goals</h2>
         {loading ? <p>Loading goals...</p> : completedGoals.length > 0 ? (
@@ -219,6 +255,14 @@ export default function Goals() {
           </div>
         ) : (
           !listError && <p className="text-gray-600 italic">You have not completed any goals yet.</p>
+        )}
+        {/* PAGINATION CONTROLS FOR COMPLETED GOALS */}
+        {completedPagination && completedPagination.last_page > 1 && (
+          <div className="flex justify-between items-center mt-6">
+            <button onClick={() => getCompletedGoals(completedPagination.current_page - 1)} disabled={completedPagination.current_page === 1} className="secondary-btn disabled:opacity-50">&larr; Previous</button>
+            <span className="text-sm text-gray-600">Page {completedPagination.current_page} of {completedPagination.last_page}</span>
+            <button onClick={() => getCompletedGoals(completedPagination.current_page + 1)} disabled={completedPagination.current_page === completedPagination.last_page} className="secondary-btn disabled:opacity-50">Next &rarr;</button>
+          </div>
         )}
       </div>
     </>
