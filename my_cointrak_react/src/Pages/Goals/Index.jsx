@@ -26,7 +26,7 @@ export default function Goals() {
       });
       if (!res.ok) throw new Error('Failed to fetch families.');
       const data = await res.json();
-      setFamilies(data);
+      setFamilies(data.data);
     } catch (err) {
       console.error(err); // Log error but don't block UI for this non-critical data
     }
