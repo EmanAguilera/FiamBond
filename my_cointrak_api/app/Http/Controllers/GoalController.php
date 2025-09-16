@@ -11,8 +11,21 @@ class GoalController extends Controller
 {
     public function index(Request $request)
     {
-        // Eager load the family relationship to avoid extra queries on the frontend
-        return $request->user()->goals()->with('family')->latest()->get();
+         // --- START OF PAGINATION FIX ---
+        // We will now accept a 'status' query parameter to filter goals.
+        $status = $request->query('status');
+
+        // Start building the query for the user's goals.
+        $query = $request->user()->goals()->with('family')->latest();
+
+        // If a valid status is provided, add a 'where' clause to the query.
+        if ($status === 'active' || $status === 'completed') {
+            $query->where('status', $status);
+        }
+
+        // Return the paginated result. Let's show 5 goals per page.
+        return $query->paginate(5);
+        // --- END OF PAGINATION FIX ---
     }
 
     public function store(Request $request)
