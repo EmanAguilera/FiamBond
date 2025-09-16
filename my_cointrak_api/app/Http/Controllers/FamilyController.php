@@ -10,10 +10,17 @@ use Illuminate\Support\Carbon;
 
 class FamilyController extends Controller
 {
-    // --- Methods index(), store(), show(), addMember() etc. remain unchanged ---
+    /**
+     * Display a listing of the resource.
+     * --- THE FIX ---
+     * We'll use the paginate() method here to automatically handle
+     * the pagination logic on the backend.
+     */
     public function index(Request $request)
     {
-        return $request->user()->families()->with('owner')->get();
+        // Change `get()` to `paginate()` to return a paginated response.
+        // Let's display 5 families per page as an example.
+        return $request->user()->families()->with('owner')->paginate(5);
     }
 
     public function store(Request $request)
