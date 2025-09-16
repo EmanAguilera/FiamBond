@@ -8,12 +8,18 @@ export default function Families() {
   const [familyName, setFamilyName] = useState("");
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState(null);
-  const [listError, setListError] = useState(null); // Separate error for the list
+  const [listError, setListError] = useState(null); 
 
-  const getFamilies = useCallback(async () => {
-    setListError(null); // Clear previous list errors
+// --- START OF PAGINATION FIX ---
+ // State to hold pagination metadata from the API
+
+ const [pagination, setPagination] = useState(null);
+
+  const getFamilies = useCallback(async (page = 1) => { // Accept a page number
+    setListError(null); 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
+      // Append the page query parameter to the API request
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families?page=${page}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -28,17 +34,23 @@ export default function Families() {
       }
 
       const data = await res.json();
+      // The family list is now inside the 'data' property
       setFamilies(data);
+      // Store the pagination metadata
+      const { data: _, ...paginationData } = data;
+       setPagination(paginationData);
+
+
 
     } catch (error) {
       console.error('Failed to fetch families:', error);
       setListError('A network error occurred while fetching your families.');
     }
   }, [token]);
+    // --- END OF PAGINATION FIX --
 
   async function handleCreateFamily(e) {
     e.preventDefault();
-    // Clear all previous form errors
     setErrors({});
     setGeneralError(null);
 
@@ -57,19 +69,18 @@ export default function Families() {
 
       if (!res.ok) {
         if (res.status === 422) {
-          // Handle validation errors (e.g., name is empty)
           setErrors(data.errors);
         } else {
-          // Handle all other server errors (500, 401, etc.)
           const message = data.message || "Failed to create the family. Please try again.";
           setGeneralError(message);
         }
-        return; // Stop execution
+        return;
       }
 
-      // On success
-      setFamilies([...families, data]);
-      setFamilyName(""); // Clear the input field
+      // After creating a new family, refresh the list to see it.
+
+      getFamilies();
+      setFamilyName(""); 
 
     } catch (error) {
       console.error('Failed to create family:', error);
@@ -79,7 +90,7 @@ export default function Families() {
 
   useEffect(() => {
     if (token) {
-      getFamilies();
+      getFamilies(); // Initial fetch for the first page
     }
   }, [getFamilies, token]);
 
@@ -134,6 +145,30 @@ export default function Families() {
         ) : (
           !listError && <p className="text-gray-600 italic">You are not a part of any family yet.</p>
         )}
+
+         {/* --- START OF PAGINATION CONTROLS --- */}
+        {pagination && pagination.last_page > 1 && (
+          <div className="flex justify-between items-center mt-6">
+            <button
+              onClick={() => getFamilies(pagination.current_page - 1)}
+              disabled={pagination.current_page === 1}
+              className="secondary-btn disabled:opacity-50"
+            >
+              &larr; Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {pagination.current_page} of {pagination.last_page}
+            </span>
+            <button
+              onClick={() => getFamilies(pagination.current_page + 1)}
+              disabled={pagination.current_page === pagination.last_page}
+              className="secondary-btn disabled:opacity-50"
+            >
+              Next &rarr;
+            </button>
+          </div>
+        )}
+        {/* --- END OF PAGINATION CONTROLS --- */}
       </div>
     </>
   );
