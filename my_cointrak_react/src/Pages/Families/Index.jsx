@@ -35,7 +35,7 @@ export default function Families() {
 
       const data = await res.json();
       // The family list is now inside the 'data' property
-      setFamilies(data);
+       setFamilies(data.data);
       // Store the pagination metadata
       const { data: _, ...paginationData } = data;
        setPagination(paginationData);
