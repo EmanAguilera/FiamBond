@@ -2,7 +2,10 @@ import { useContext, useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext";
 
+// Define the limit on the frontend as well, so it's consistent with the backend.
+const MAX_MEMBERS_PER_FAMILY = 10;
 export default function Show() {
+
     const { token } = useContext(AppContext);
     const { id } = useParams();
     const [family, setFamily] = useState(null);
@@ -98,30 +101,38 @@ export default function Show() {
 
             {family && (
                 <>
-                    {/* Add Member Card */}
-                    <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8">
-                        <h2 className="font-bold text-xl mb-4 text-gray-800">Add Member to "{family.first_name}"</h2>
-                        <form onSubmit={handleAddMember} className="space-y-4">
-                            <div>
-                                <input
-                                    type="email"
-                                    placeholder="New Member's Email"
-                                    value={newMemberEmail}
-                                    onChange={(e) => setNewMemberEmail(e.target.value)}
-                                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                                {formErrors.email && <p className="error">{formErrors.email[0]}</p>}
-                                {formMessage.text && (
-                                    <p className={`mt-2 text-sm ${formMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {formMessage.text}
-                                    </p>
-                                )}
-                            </div>
-                            <button type="submit" className="primary-btn">
-                                Add Member
-                            </button>
-                        </form>
-                    </div>
+                    {/* --- START OF THE FIX: CONDITIONAL RENDERING --- */}
+                    {/* Only show the "Add Member" card if the member count is BELOW the limit. */}
+                    {family.members.length < MAX_MEMBERS_PER_FAMILY ? (
+                        <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8">
+                            <h2 className="font-bold text-xl mb-4 text-gray-800">Add Member to "{family.first_name}"</h2>
+                            <form onSubmit={handleAddMember} className="space-y-4">
+                                <div>
+                                    <input
+                                        type="email"
+                                        placeholder="New Member's Email"
+                                        value={newMemberEmail}
+                                        onChange={(e) => setNewMemberEmail(e.target.value)}
+                                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    {formErrors.email && <p className="error">{formErrors.email[0]}</p>}
+                                    {formMessage.text && (
+                                        <p className={`mt-2 text-sm ${formMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                                            {formMessage.text}
+                                        </p>
+                                    )}
+                                </div>
+                                <button type="submit" className="primary-btn">Add Member</button>
+                            </form>
+                        </div>
+                    ) : (
+                        // If the limit is reached, show a message instead of the form.
+                        <div className="w-full max-w-3xl mx-auto bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 p-4 rounded-md shadow-md mb-8">
+                            <p className="font-bold">Member Limit Reached</p>
+                            <p>This family cannot have more than {MAX_MEMBERS_PER_FAMILY} members.</p>
+                        </div>
+                    )}
+                    {/* --- END OF THE FIX --- */}
 
                     {/* Family Members Card */}
                     <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
