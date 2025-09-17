@@ -122,7 +122,7 @@ class FamilyController extends Controller
         $paginatedTransactions = $family->transactions()
             ->whereBetween('created_at', [$startDate, $endDate])
             ->latest() // Order by most recent
-            ->paginate(5);
+            ->paginate(10);
 
         // Calculations for totals should use the complete, unpaginated list.
         $inflow = $allTransactionsForPeriod->where('type', 'income')->sum('amount');
