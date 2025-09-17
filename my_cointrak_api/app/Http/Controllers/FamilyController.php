@@ -85,12 +85,12 @@ class FamilyController extends Controller
      */
     public function monthlyReport(Request $request, Family $family)
     {
-        // Authorization: Ensure the current user is a member of this family
+        // Authorization check remains the same
         if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
             return response(['message' => 'Unauthorized'], 403);
         }
         
-        // --- START OF NEW LOGIC ---
+        // Date range logic remains the same
         $period = $request->query('period', 'monthly');
         if (!in_array($period, ['weekly', 'monthly', 'yearly'])) {
             $period = 'monthly';
@@ -111,28 +111,38 @@ class FamilyController extends Controller
             $title = $now->format('F Y');
         }
 
-        // Fetch transactions belonging ONLY to this family for the target period
-        $transactions = $family->transactions()
+        // --- START OF PAGINATION FIX ---
+        // We fetch ALL transactions for the period to calculate totals accurately.
+        $allTransactionsForPeriod = $family->transactions()
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
+        
+        // We create a SEPARATE paginated query for the list view.
+        // Let's show 10 transactions per page.
+        $paginatedTransactions = $family->transactions()
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->latest() // Order by most recent
+            ->paginate(10);
 
-        $inflow = $transactions->where('type', 'income')->sum('amount');
-        $outflow = $transactions->where('type', 'expense')->sum('amount');
+        // Calculations for totals should use the complete, unpaginated list.
+        $inflow = $allTransactionsForPeriod->where('type', 'income')->sum('amount');
+        $outflow = $allTransactionsFor-Period->where('type', 'expense')->sum('amount');
 
-        // Prepare data for the bar chart using the helper method
-        $chartData = $this->prepareChartData($transactions, $period, $startDate);
+        // The chart should also be prepared with all data for the period.
+        $chartData = $this->prepareChartData($allTransactionsForPeriod, $period, $startDate);
 
         return response([
-            'reportTitle' => $title, // Use the dynamic title
+            'reportTitle' => $title,
             'familyName' => $family->first_name,
             'totalInflow' => $inflow,
             'totalOutflow' => $outflow,
             'netPosition' => $inflow - $outflow,
-            'transactionCount' => $transactions->count(),
-            'chartData' => $chartData, // Add chart data to the response
-            'transactions' => $transactions, 
+            'transactionCount' => $allTransactionsForPeriod->count(),
+            'chartData' => $chartData,
+            // The 'transactions' key now holds the full pagination object.
+            'transactions' => $paginatedTransactions, 
         ]);
-        // --- END OF NEW LOGIC ---
+        // --- END OF PAGINATION FIX ---
     }
 
 
