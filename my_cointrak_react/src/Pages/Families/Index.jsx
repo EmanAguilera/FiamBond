@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
+import FamilyListItem from "../../Components/FamilyListItem.jsx"; // Import the new component
 
 export default function Families() {
   const { token } = useContext(AppContext);
@@ -15,6 +16,7 @@ export default function Families() {
 
  const [pagination, setPagination] = useState(null);
 
+// --- UPDATE: Backend must send member count for our business rules to work ---
   const getFamilies = useCallback(async (page = 1) => { // Accept a page number
     setListError(null); 
     try {
@@ -79,7 +81,7 @@ export default function Families() {
 
       // After creating a new family, refresh the list to see it.
 
-      getFamilies();
+      getFamilies(1);
       setFamilyName(""); 
 
     } catch (error) {
@@ -93,6 +95,14 @@ export default function Families() {
       getFamilies(); // Initial fetch for the first page
     }
   }, [getFamilies, token]);
+
+  function handleFamilyUpdated(updatedFamily) {
+    setFamilies(families.map(f => f.id === updatedFamily.id ? updatedFamily : f));
+  }
+
+  function handleFamilyDeleted(deletedFamilyId) {
+    setFamilies(families.filter(f => f.id !== deletedFamilyId));
+  }
 
   return (
     <>
@@ -127,9 +137,13 @@ export default function Families() {
 
         {!listError && families.length > 0 ? (
           <div className="space-y-3">
+            {/* --- UPDATE: Use the new component --- */}
             {families.map((family) => (
               <div
                 key={family.id}
+                family={family}
+                onFamilyUpdated={handleFamilyUpdated}
+                onFamilyDeleted={handleFamilyDeleted}
                 className="p-4 bg-gray-50 border border-gray-200 rounded-md flex justify-between items-center transition duration-200 ease-in-out hover:bg-gray-100"
               >
                 <h3 className="font-semibold text-lg text-gray-700">{family.first_name}</h3>

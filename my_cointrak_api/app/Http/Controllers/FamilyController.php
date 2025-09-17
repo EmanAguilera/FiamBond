@@ -7,25 +7,15 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Gate;
 
 class FamilyController extends Controller
 {
-
-    // --- ADD A CONSTANT FOR THE LIMIT ---
-    // Defining it here makes it easy to find and change later.
     const MAX_MEMBERS_PER_FAMILY = 10;
 
-    /**
-     * Display a listing of the resource.
-     * --- THE FIX ---
-     * We'll use the paginate() method here to automatically handle
-     * the pagination logic on the backend.
-     */
     public function index(Request $request)
     {
-        // Change `get()` to `paginate()` to return a paginated response.
-        // Let's display 5 families per page as an example.
-        return $request->user()->families()->with('owner')->paginate(5);
+        return $request->user()->families()->with('owner')->withCount('members')->paginate(5);
     }
 
     public function store(Request $request)
@@ -51,16 +41,11 @@ class FamilyController extends Controller
 
     public function addMember(Request $request, Family $family)
     {
-
-         // --- START OF THE FIX: ENFORCE THE LIMIT ---
-        // First, count the current number of members.
         if ($family->members()->count() >= self::MAX_MEMBERS_PER_FAMILY) {
-            // If the family is full, return a 'Forbidden' error.
             return response(['message' => 'This family has reached the maximum member limit of ' . self::MAX_MEMBERS_PER_FAMILY . '.'], 403);
         }
-        // --- END OF THE FIX ---
         
-        if ($request->user()->id !== $family->owner_id) {
+        if (Gate::denies('update-family', $family)) {
             return response(['message' => 'Only the family owner can add members.'], 403);
         }
 
@@ -77,20 +62,47 @@ class FamilyController extends Controller
         $family->members()->attach($user->id);
         return $family->load('members');
     }
-    // --- END of unchanged methods ---
 
+    public function update(Request $request, Family $family)
+    {
+        if (Gate::denies('update-family', $family)) {
+            return response(['message' => 'Only the family owner can perform this action.'], 403);
+        }
 
-    /**
-     * Generate a financial report for a specific family.
-     */
+        if ($family->members()->where('user_id', '!=', $family->owner_id)->exists()) {
+            return response(['message' => 'Cannot rename a family that has other members.'], 403);
+        }
+
+        $fields = $request->validate([
+            'first_name' => 'required|string|max:255'
+        ]);
+
+        $family->update($fields);
+
+        return response($family);
+    }
+
+    public function destroy(Family $family)
+    {
+        if (Gate::denies('update-family', $family)) {
+            return response(['message' => 'Only the family owner can perform this action.'], 403);
+        }
+
+        if ($family->members()->where('user_id', '!=', $family->owner_id)->exists()) {
+            return response(['message' => 'You must remove all other members before deleting this family.'], 403);
+        }
+
+        $family->delete();
+
+        return response(['message' => 'Family has been deleted successfully.']);
+    }
+
     public function monthlyReport(Request $request, Family $family)
     {
-        // Authorization check remains the same
         if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
             return response(['message' => 'Unauthorized'], 403);
         }
         
-        // Date range logic remains the same
         $period = $request->query('period', 'monthly');
         if (!in_array($period, ['weekly', 'monthly', 'yearly'])) {
             $period = 'monthly';
@@ -105,34 +117,25 @@ class FamilyController extends Controller
             $startDate = $now->copy()->startOfYear();
             $endDate = $now->copy()->endOfYear();
             $title = 'This Year (' . $now->format('Y') . ')';
-        } else { // 'monthly' is the default
+        } else {
             $startDate = $now->copy()->startOfMonth();
             $endDate = $now->copy()->endOfMonth();
             $title = $now->format('F Y');
         }
-
-        // --- START OF PAGINATION FIX ---
-        // We add ->with('user') to eager load the user relationship for each transaction.
-        // This is a major performance optimization (prevents N+1 query problems).
 
         $allTransactionsForPeriod = $family->transactions()
             ->with('user')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
         
-        // We create a SEPARATE paginated query for the list view.
-        // Let's show 10 transactions per page.
         $paginatedTransactions = $family->transactions()
             ->with('user')
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->latest() // Order by most recent. Get it!
+            ->latest()
             ->paginate(10);
 
-        // Calculations for totals should use the complete, unpaginated list.
         $inflow = $allTransactionsForPeriod->where('type', 'income')->sum('amount');
         $outflow = $allTransactionsForPeriod->where('type', 'expense')->sum('amount');
-
-        // The chart should also be prepared with all data for the period.
         $chartData = $this->prepareChartData($allTransactionsForPeriod, $period, $startDate);
 
         return response([
@@ -143,17 +146,10 @@ class FamilyController extends Controller
             'netPosition' => $inflow - $outflow,
             'transactionCount' => $allTransactionsForPeriod->count(),
             'chartData' => $chartData,
-            // The 'transactions' key now holds the full pagination object.
             'transactions' => $paginatedTransactions, 
         ]);
-        // --- END OF PAGINATION FIX ---
     }
 
-
-    /**
-     * Helper function to format transaction data for chart.js.
-     * This is the same helper from ReportController.
-     */
     private function prepareChartData($transactions, $period, Carbon $startDate)
     {
         $labels = [];
@@ -219,12 +215,20 @@ class FamilyController extends Controller
     public function summaries(Request $request)
     {
         $user = $request->user();
-        $families = $user->families()->with('owner')->paginate(2);
+        
+        $families = $user->families()
+            ->with('owner')
+            ->withSum(['transactions as totalInflow' => function ($query) {
+                $query->where('type', 'income');
+            }], 'amount')
+            ->withSum(['transactions as totalOutflow' => function ($query) {
+                $query->where('type', 'expense');
+            }], 'amount')
+            ->paginate(2);
 
-        $families->getCollection()->transform(function ($family){
-            $inflow = $family->transactions()->where('type', 'income')->sum('amount');
-            $outflow = $family->transactions()->where('type', 'expense')->sum('amount');
-
+        return $families->through(function ($family) {
+            $inflow = $family->totalInflow ?? 0;
+            $outflow = $family->totalOutflow ?? 0;
             return [
                 'id' => $family->id,
                 'first_name' => $family->first_name,
@@ -234,7 +238,5 @@ class FamilyController extends Controller
                 'netPosition' => $inflow - $outflow,
             ];
         });
-
-        return response($families);
     }
 }
