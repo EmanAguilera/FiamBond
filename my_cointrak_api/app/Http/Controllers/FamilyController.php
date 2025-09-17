@@ -112,16 +112,20 @@ class FamilyController extends Controller
         }
 
         // --- START OF PAGINATION FIX ---
-        // We fetch ALL transactions for the period to calculate totals accurately.
+        // We add ->with('user') to eager load the user relationship for each transaction.
+        // This is a major performance optimization (prevents N+1 query problems).
+
         $allTransactionsForPeriod = $family->transactions()
+            ->with('user')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get();
         
         // We create a SEPARATE paginated query for the list view.
         // Let's show 10 transactions per page.
         $paginatedTransactions = $family->transactions()
+            ->with('user')
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->latest() // Order by most recents
+            ->latest() // Order by most recent. Get it!
             ->paginate(10);
 
         // Calculations for totals should use the complete, unpaginated list.
