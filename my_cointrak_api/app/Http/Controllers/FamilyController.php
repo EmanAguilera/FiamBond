@@ -10,6 +10,11 @@ use Illuminate\Support\Carbon;
 
 class FamilyController extends Controller
 {
+
+    // --- ADD A CONSTANT FOR THE LIMIT ---
+    // Defining it here makes it easy to find and change later.
+    const MAX_MEMBERS_PER_FAMILY = 10;
+
     /**
      * Display a listing of the resource.
      * --- THE FIX ---
@@ -46,6 +51,15 @@ class FamilyController extends Controller
 
     public function addMember(Request $request, Family $family)
     {
+
+         // --- START OF THE FIX: ENFORCE THE LIMIT ---
+        // First, count the current number of members.
+        if ($family->members()->count() >= self::MAX_MEMBERS_PER_FAMILY) {
+            // If the family is full, return a 'Forbidden' error.
+            return response(['message' => 'This family has reached the maximum member limit of ' . self::MAX_MEMBERS_PER_FAMILY . '.'], 403);
+        }
+        // --- END OF THE FIX ---
+        
         if ($request->user()->id !== $family->owner_id) {
             return response(['message' => 'Only the family owner can add members.'], 403);
         }
