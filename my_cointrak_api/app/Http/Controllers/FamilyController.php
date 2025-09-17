@@ -126,7 +126,7 @@ class FamilyController extends Controller
 
         // Calculations for totals should use the complete, unpaginated list.
         $inflow = $allTransactionsForPeriod->where('type', 'income')->sum('amount');
-        $outflow = $allTransactionsFor-Period->where('type', 'expense')->sum('amount');
+        $outflow = $allTransactionsForPeriod->where('type', 'expense')->sum('amount');
 
         // The chart should also be prepared with all data for the period.
         $chartData = $this->prepareChartData($allTransactionsForPeriod, $period, $startDate);
