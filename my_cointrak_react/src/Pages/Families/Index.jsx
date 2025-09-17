@@ -1,107 +1,78 @@
 import { useContext, useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
-import FamilyListItem from "../../Components/FamilyListItem.jsx"; // Import the new component
+import FamilyListItem from "../../Components/FamilyListItem.jsx";
 
 export default function Families() {
   const { token } = useContext(AppContext);
   const [families, setFamilies] = useState([]);
+  const [pagination, setPagination] = useState(null);
   const [familyName, setFamilyName] = useState("");
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState(null);
-  const [listError, setListError] = useState(null); 
+  const [listError, setListError] = useState(null);
 
-// --- START OF PAGINATION FIX ----
- // State to hold pagination metadata from the API
-
- const [pagination, setPagination] = useState(null);
-
-// --- UPDATE: Backend must send member count for our business rules to work ---
-  const getFamilies = useCallback(async (page = 1) => { // Accept a page number
-    setListError(null); 
+  const getFamilies = useCallback(async (page = 1) => {
+    setListError(null);
     try {
-      // Append the page query parameter to the API request
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families?page=${page}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!res.ok) {
-        // Handle failure to fetch the list of families
         const errorData = await res.json().catch(() => null);
-        const message = errorData?.message || "Could not load your families. Please try refreshing the page.";
-        setListError(message);
-        return;
+        throw new Error(errorData?.message || "Could not load your families.");
       }
-
       const data = await res.json();
-      // The family list is now inside the 'data' property
-       setFamilies(data.data);
-      // Store the pagination metadata
+      setFamilies(data.data);
       const { data: _, ...paginationData } = data;
-       setPagination(paginationData);
-
-
-
+      setPagination(paginationData);
     } catch (error) {
       console.error('Failed to fetch families:', error);
       setListError('A network error occurred while fetching your families.');
     }
   }, [token]);
-    // --- END OF PAGINATION FIX --
 
   async function handleCreateFamily(e) {
     e.preventDefault();
     setErrors({});
     setGeneralError(null);
-
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
         method: "post",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ first_name: familyName }),
       });
-
-      const data = await res.json();
-
       if (!res.ok) {
-        if (res.status === 422) {
-          setErrors(data.errors);
-        } else {
-          const message = data.message || "Failed to create the family. Please try again.";
-          setGeneralError(message);
-        }
+        const data = await res.json();
+        if (res.status === 422) setErrors(data.errors);
+        else setGeneralError(data.message || "Failed to create the family.");
         return;
       }
-
-      // After creating a new family, refresh the list to see it.
-
       getFamilies(1);
-      setFamilyName(""); 
-
+      setFamilyName("");
     } catch (error) {
       console.error('Failed to create family:', error);
-      setGeneralError('A network error occurred. Please check your connection and try again.');
+      setGeneralError('A network error occurred. Please check your connection.');
     }
   }
 
   useEffect(() => {
     if (token) {
-      getFamilies(); // Initial fetch for the first page
+      getFamilies();
     }
   }, [getFamilies, token]);
 
   function handleFamilyUpdated(updatedFamily) {
-    setFamilies(families.map(f => f.id === updatedFamily.id ? updatedFamily : f));
+    setFamilies(families.map(f => (f.id === updatedFamily.id ? updatedFamily : f)));
   }
 
-  function handleFamilyDeleted(deletedFamilyId) {
-    setFamilies(families.filter(f => f.id !== deletedFamilyId));
+  // --- THIS IS THE CORRECTED FUNCTION ---
+  // The unused 'deletedFamilyId' parameter has been removed to fix the ESLint error.
+  function handleFamilyDeleted() {
+    const currentPage = pagination?.current_page || 1;
+    const isLastItemOnPage = families.length === 1 && currentPage > 1;
+    const pageToFetch = isLastItemOnPage ? currentPage - 1 : currentPage;
+    
+    getFamilies(pageToFetch);
   }
 
   return (
@@ -121,46 +92,28 @@ export default function Families() {
             />
             {errors.first_name && <p className="error">{errors.first_name[0]}</p>}
           </div>
-
           {generalError && <p className="error">{generalError}</p>}
-
-          <button type="submit" className="primary-btn">
-            Create Family
-          </button>
+          <button type="submit" className="primary-btn">Create Family</button>
         </form>
       </div>
 
       <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
         <h2 className="font-bold text-xl mb-4 text-gray-800">Your Families</h2>
-
         {listError && <p className="error mb-4">{listError}</p>}
-
         {!listError && families.length > 0 ? (
           <div className="space-y-3">
-            {/* --- UPDATE: Use the new component --- */}
             {families.map((family) => (
-              <div
+              <FamilyListItem
                 key={family.id}
                 family={family}
                 onFamilyUpdated={handleFamilyUpdated}
                 onFamilyDeleted={handleFamilyDeleted}
-                className="p-4 bg-gray-50 border border-gray-200 rounded-md flex justify-between items-center transition duration-200 ease-in-out hover:bg-gray-100"
-              >
-                <h3 className="font-semibold text-lg text-gray-700">{family.first_name}</h3>
-                <Link
-                  to={`/families/${family.id}`}
-                  className="bg-indigo-600 text-white text-sm rounded-md px-4 py-2 hover:bg-indigo-700 transition duration-200 ease-in-out"
-                >
-                  Manage
-                </Link>
-              </div>
+              />
             ))}
           </div>
         ) : (
           !listError && <p className="text-gray-600 italic">You are not a part of any family yet.</p>
         )}
-
-         {/* --- START OF PAGINATION CONTROLS --- */}
         {pagination && pagination.last_page > 1 && (
           <div className="flex justify-between items-center mt-6">
             <button
@@ -182,7 +135,6 @@ export default function Families() {
             </button>
           </div>
         )}
-        {/* --- END OF PAGINATION CONTROLS --- */}
       </div>
     </>
   );
