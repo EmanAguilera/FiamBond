@@ -9,46 +9,63 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 export default function FamilyLedger() {
   const { token } = useContext(AppContext);
   const { id } = useParams();
+
+  // --- REWORKED STATE ---
+  // State for the main report data (totals, chart, title)
   const [report, setReport] = useState(null);
+  // Separate state for the list of transactions on the current page
+  const [transactions, setTransactions] = useState([]);
+  // State for the pagination metadata
+  const [pagination, setPagination] = useState(null);
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // New state for handling errors
+  const [error, setError] = useState(null);
   const [period, setPeriod] = useState('monthly');
 
-  const getReport = useCallback(async () => {
-    setLoading(true);
-    setError(null); // Clear previous errors on a new request
+  // --- REWORKED FETCHING LOGIC ---
+  const getReport = useCallback(async (page = 1) => {
+    // We only want the main "loading" spinner on the initial load, not for page changes.
+    if (page === 1) {
+      setLoading(true);
+    }
+    setError(null);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/report?period=${period}`, {
+      // Append the page number to the request
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/report?period=${period}&page=${page}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) {
-        // Handle server errors (e.g., 404, 500)
         const errorData = await res.json().catch(() => null);
-        const message = errorData?.message || "The server could not process the report request.";
-        setError(message);
-        setReport(null); // Ensure no old data is displayed
-        setLoading(false);
-        return; // Stop execution
+        throw new Error(errorData?.message || "The server could not process the report request.");
       }
 
       const data = await res.json();
+      
+      // Set the main report state (everything EXCEPT the transactions list)
       setReport(data);
+      // Set the transactions list from the nested 'data' property
+      setTransactions(data.transactions.data);
+      // Set the pagination metadata from the 'transactions' object
+      const { data: _, ...paginationData } = data.transactions;
+      setPagination(paginationData);
 
     } catch (err) {
-      // Handle network errors
       console.error('Failed to fetch family report:', err);
-      setError('A network error occurred. Please check your connection and try again.');
+      setError(err.message);
       setReport(null);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [token, id, period]);
 
+  // This useEffect will re-run the report whenever the period (weekly/monthly/yearly) changes.
   useEffect(() => {
-    if (token) getReport();
-  }, [token, getReport]);
+    if (token) {
+      getReport(); // Fetch page 1 of the new period
+    }
+  }, [period, getReport, token]); // Now depends on 'period'
 
   const chartOptions = {
     responsive: true,
@@ -73,16 +90,15 @@ export default function FamilyLedger() {
         {loading ? (
           <p className="text-center">Generating Family Ledger...</p>
         ) : error ? (
-          <p className="error text-center">{error}</p> // Display the specific error message
+          <p className="error text-center">{error}</p>
         ) : report ? (
           <>
+            {/* The chart and summary section remains mostly the same, using data from 'report' state */}
             <div className="mb-8 relative" style={{ height: '400px' }}>
               {report.chartData && report.chartData.datasets && report.chartData.datasets.length > 0 ? (
                 <Bar options={chartOptions} data={report.chartData} />
               ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p>Not enough data to display a chart for this period.</p>
-                </div>
+                <div className="flex items-center justify-center h-full"><p>Not enough data to display a chart for this period.</p></div>
               )}
             </div>
 
@@ -92,20 +108,17 @@ export default function FamilyLedger() {
               <hr className="border-dashed" />
               <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
               <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
-              <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}
-              </p>
+              <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}</p>
               <hr className="border-dashed" />
               <p className="font-bold">Analysis:</p>
-              <ul className="list-disc pl-6">
-                <li>{report.transactionCount} individual transactions were logged in this period.</li>
-              </ul>
+              <ul className="list-disc pl-6"><li>{report.transactionCount} individual transactions were logged in this period.</li></ul>
               <hr className="border-dashed mt-4"/>
             </div>
             
             <h3 className="font-bold text-xl mb-4">Transactions for {report.reportTitle}</h3>
             <div className="dashboard-card p-0">
-              {report.transactions.length > 0 ? report.transactions.map((transaction) => (
+              {/* --- MAPPING OVER THE NEW 'transactions' STATE --- */}
+              {transactions.length > 0 ? transactions.map((transaction) => (
                 <div key={transaction.id} className="transaction-item border-b last:border-b-0 border-gray-100">
                   <div>
                     <p className="transaction-description">{transaction.description}</p>
@@ -117,6 +130,15 @@ export default function FamilyLedger() {
                 </div>
               )) : <p className="p-4">No transactions for this family in this period.</p>}
             </div>
+
+            {/* --- PAGINATION CONTROLS --- */}
+            {pagination && pagination.last_page > 1 && (
+              <div className="flex justify-between items-center mt-6">
+                <button onClick={() => getReport(pagination.current_page - 1)} disabled={pagination.current_page === 1} className="secondary-btn disabled:opacity-50">&larr; Previous</button>
+                <span className="text-sm text-gray-600">Page {pagination.current_page} of {pagination.last_page}</span>
+                <button onClick={() => getReport(pagination.current_page + 1)} disabled={pagination.current_page === pagination.last_page} className="secondary-btn disabled:opacity-50">Next &rarr;</button>
+              </div>
+            )}
           </>
         ) : (
           <p className="text-center">No report data available for this period.</p>
