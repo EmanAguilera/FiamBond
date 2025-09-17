@@ -46,7 +46,7 @@ export default function CreateTransaction() {
       });
       if (!res.ok) throw new Error('Could not load families.');
       const data = await res.json();
-      setFamilies(data);
+      setFamilies(data.data || []);
     } catch (err) {
       console.error(err);
       // We can choose to show an error or just have an empty dropdown
