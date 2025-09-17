@@ -122,7 +122,16 @@ export default function FamilyLedger() {
                 <div key={transaction.id} className="transaction-item border-b last:border-b-0 border-gray-100">
                   <div>
                     <p className="transaction-description">{transaction.description}</p>
-                    <small className="transaction-date">{new Date(transaction.created_at).toLocaleDateString()}</small>
+
+                     {/* --- START OF THE FIX --- */}
+                    {/* We combine the date and the user's name on one line. */}
+                    {/* The `transaction.user &&` is a safety check in case a user was deleted. */}
+                    <small className="transaction-date">
+                      {new Date(transaction.created_at).toLocaleDateString()}
+                      {transaction.user && ` • By: ${transaction.user.full_name}`}
+                    </small>
+                    {/* --- END OF THE FIX --- */}
+                    
                   </div>
                   <p className={`transaction-amount ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>
                     {transaction.type === 'income' ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
