@@ -69,10 +69,6 @@ class FamilyController extends Controller
             return response(['message' => 'Only the family owner can perform this action.'], 403);
         }
 
-        if ($family->members()->where('user_id', '!=', $family->owner_id)->exists()) {
-            return response(['message' => 'Cannot rename a family that has other members.'], 403);
-        }
-
         $fields = $request->validate([
             'first_name' => 'required|string|max:255'
         ]);
@@ -86,10 +82,6 @@ class FamilyController extends Controller
     {
         if (Gate::denies('update-family', $family)) {
             return response(['message' => 'Only the family owner can perform this action.'], 403);
-        }
-
-        if ($family->members()->where('user_id', '!=', $family->owner_id)->exists()) {
-            return response(['message' => 'You must remove all other members before deleting this family.'], 403);
         }
 
         $family->delete();

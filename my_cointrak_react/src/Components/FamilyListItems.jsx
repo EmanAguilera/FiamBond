@@ -2,7 +2,6 @@ import { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { AppContext } from '../Context/AppContext.jsx';
 
-
 export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
     const { token, user } = useContext(AppContext);
     const [isEditing, setIsEditing] = useState(false);
@@ -13,7 +12,7 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
     const isOwner = user?.id === family.owner_id;
 
     // A family can be renamed only if the current user is the owner AND is the only member.
-    const canRename = isOwner && family.members_count === 1;
+    const canRename = isOwner;
 
     async function handleUpdate(e) {
         e.preventDefault();
@@ -81,7 +80,7 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                                     onClick={() => setIsEditing(true)}
                                     className="secondary-btn-sm"
                                     disabled={!canRename}
-                                    title={canRename ? "Rename family" : "Cannot rename a family with other members"}
+                                    title={canRename ? "Rename family" : "Only the family owner can rename"}
                                 >
                                     Rename
                                 </button>
