@@ -79,7 +79,11 @@ class FamilyController extends Controller
 
         $family->update($fields);
 
-        return response($family);
+        // --- THE FIX ---
+        // After updating, we reload the `owner` relationship and the `members` count
+        // to ensure the API response has the same data structure as the initial page load.
+        // This prevents the frontend from crashing.
+        return response($family->load('owner')->loadCount('members'));
     }
 
     public function destroy(Request $request, Family $family)
