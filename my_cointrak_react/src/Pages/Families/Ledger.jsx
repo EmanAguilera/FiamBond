@@ -10,28 +10,22 @@ export default function FamilyLedger() {
   const { token } = useContext(AppContext);
   const { id } = useParams();
 
-  // --- REWORKED STATE ---
-  // State for the main report data (totals, chart, title)
+  // Reworked state for clarity
   const [report, setReport] = useState(null);
-  // Separate state for the list of transactions on the current page
   const [transactions, setTransactions] = useState([]);
-  // State for the pagination metadata
   const [pagination, setPagination] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [period, setPeriod] = useState('monthly');
 
-  // --- REWORKED FETCHING LOGIC ---
   const getReport = useCallback(async (page = 1) => {
-    // We only want the main "loading" spinner on the initial load, not for page changes.
     if (page === 1) {
       setLoading(true);
     }
     setError(null);
 
     try {
-      // Append the page number to the request
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${id}/report?period=${period}&page=${page}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -43,11 +37,9 @@ export default function FamilyLedger() {
 
       const data = await res.json();
       
-      // Set the main report state (everything EXCEPT the transactions list)
+      // Correctly set state from the paginated response
       setReport(data);
-      // Set the transactions list from the nested 'data' property
       setTransactions(data.transactions.data);
-      // Set the pagination metadata from the 'transactions' object
       const { data: _, ...paginationData } = data.transactions;
       setPagination(paginationData);
 
@@ -60,12 +52,11 @@ export default function FamilyLedger() {
     }
   }, [token, id, period]);
 
-  // This useEffect will re-run the report whenever the period (weekly/monthly/yearly) changes.
   useEffect(() => {
     if (token) {
-      getReport(); // Fetch page 1 of the new period
+      getReport();
     }
-  }, [period, getReport, token]); // Now depends on 'period'
+  }, [period, getReport, token]);
 
   const chartOptions = {
     responsive: true,
@@ -93,7 +84,6 @@ export default function FamilyLedger() {
           <p className="error text-center">{error}</p>
         ) : report ? (
           <>
-            {/* The chart and summary section remains mostly the same, using data from 'report' state */}
             <div className="mb-8 relative" style={{ height: '400px' }}>
               {report.chartData && report.chartData.datasets && report.chartData.datasets.length > 0 ? (
                 <Bar options={chartOptions} data={report.chartData} />
@@ -117,21 +107,15 @@ export default function FamilyLedger() {
             
             <h3 className="font-bold text-xl mb-4">Transactions for {report.reportTitle}</h3>
             <div className="dashboard-card p-0">
-              {/* --- MAPPING OVER THE NEW 'transactions' STATE --- */}
               {transactions.length > 0 ? transactions.map((transaction) => (
                 <div key={transaction.id} className="transaction-item border-b last:border-b-0 border-gray-100">
                   <div>
                     <p className="transaction-description">{transaction.description}</p>
-
-                     {/* --- START OF THE FIX --- */}
-                    {/* We combine the date and the user's name on one line. */}
-                    {/* The `transaction.user &&` is a safety check in case a user was deleted. */}
+                    {/* Safety check for user is a great addition */}
                     <small className="transaction-date">
                       {new Date(transaction.created_at).toLocaleDateString()}
                       {transaction.user && ` • By: ${transaction.user.full_name}`}
                     </small>
-                    {/* --- END OF THE FIX --- */}
-                    
                   </div>
                   <p className={`transaction-amount ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>
                     {transaction.type === 'income' ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -140,7 +124,6 @@ export default function FamilyLedger() {
               )) : <p className="p-4">No transactions for this family in this period.</p>}
             </div>
 
-            {/* --- PAGINATION CONTROLS --- */}
             {pagination && pagination.last_page > 1 && (
               <div className="flex justify-between items-center mt-6">
                 <button onClick={() => getReport(pagination.current_page - 1)} disabled={pagination.current_page === 1} className="secondary-btn disabled:opacity-50">&larr; Previous</button>
