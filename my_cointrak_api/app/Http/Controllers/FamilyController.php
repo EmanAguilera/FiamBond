@@ -24,7 +24,12 @@ class FamilyController extends Controller
     public function store(Request $request)
     {
         $fields = $request->validate([
-            'first_name' => 'required|string|max:255'
+            'first_name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('families', 'first_name')->where('owner_id', $request->user()->id)
+            ]
         ]);
 
         $family = Family::create([
@@ -81,7 +86,17 @@ class FamilyController extends Controller
         }
 
         $fields = $request->validate([
-            'first_name' => 'required|string|max:255'
+            // --- THE FIX: Apply the same unique rule for updates ---
+            // We add ->ignore($family->id) so the rule doesn't fail by finding
+            // the name of the very family we are trying to update.
+            'first_name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('families', 'first_name')
+                    ->where('owner_id', $request->user()->id)
+                    ->ignore($family->id)
+            ]
         ]);
 
         $family->update($fields);
@@ -100,7 +115,7 @@ class FamilyController extends Controller
         if ($family->transactions()->exists()) {
             return response(['message' => 'This family cannot be deleted because it has existing transactions.'], 403); // 403 Forbidden
         }
-        
+
         Log::info('Delete attempt by User ID: ' . $request->user()->id);
 
         // Log the details of the family being deleted, including its owner's ID.
