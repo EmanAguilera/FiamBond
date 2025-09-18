@@ -1,6 +1,6 @@
 import { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { AppContext } from '../Context/AppContext';
+import { AppContext } from '../Context/AppContext.jsx';
 
 export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
     const { token, user } = useContext(AppContext);
