@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 
 class FamilyController extends Controller
 {
@@ -84,13 +84,24 @@ class FamilyController extends Controller
 
     public function destroy(Request $request, Family $family)
     {
-        // --- THE FIX ---
-        // We inject the Request and perform a direct check on the user's ID
-        // against the family's owner_id. This is a more explicit authorization check.
+         // --- THE FIX: Add logging to debug the authorization check ---
+        
+        // Log the ID of the user attempting the action.
+        Log::info('Delete attempt by User ID: ' . $request->user()->id);
+
+        // Log the details of the family being deleted, including its owner's ID.
+        Log::info('Attempting to delete Family ID: ' . $family->id . ' with Owner ID: ' . $family->owner_id);
+
+        // This is the authorization check.
         if ($request->user()->id !== $family->owner_id) {
+            // Log that the authorization failed before sending the response.
+            Log::warning('Authorization FAILED for family deletion.');
             return response(['message' => 'Only the family owner can perform this action.'], 403);
         }
 
+        // If the check passes, log the success.
+        Log::info('Authorization PASSED. Deleting family.');
+        
         $family->delete();
 
         return response(['message' => 'Family has been deleted successfully.']);
