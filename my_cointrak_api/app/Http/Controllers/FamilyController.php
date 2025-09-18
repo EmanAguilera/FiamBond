@@ -15,7 +15,10 @@ class FamilyController extends Controller
 
     public function index(Request $request)
     {
-        return $request->user()->families()->with('owner')->withCount('members')->paginate(5);
+        // --- THE FIX: PART A ---
+        // We will also count the transactions for each family here.
+        // This will be used by the frontend to disable buttons.
+        return $request->user()->families()->with('owner')->withCount('members', 'transactions')->paginate(5);
     }
 
     public function store(Request $request)
@@ -67,8 +70,12 @@ class FamilyController extends Controller
 
     public function update(Request $request, Family $family)
     {
-        // --- THE FIX ---
-        // Replace the Gate with a direct authorization check.
+         // --- THE FIX: PART B ---
+        // First, check if the family has any transactions. If so, block the rename.
+        if ($family->transactions()->exists()) {
+            return response(['message' => 'This family cannot be renamed because it has existing transactions.'], 403); // 403 Forbidden
+        }
+
         if ($request->user()->id !== $family->owner_id) {
             return response(['message' => 'Only the family owner can perform this action.'], 403);
         }
@@ -88,9 +95,12 @@ class FamilyController extends Controller
 
     public function destroy(Request $request, Family $family)
     {
-         // --- THE FIX: Add logging to debug the authorization check ---
+          // --- THE FIX: PART C ---
+        // First, check if the family has any transactions. If so, block the deletion.
+        if ($family->transactions()->exists()) {
+            return response(['message' => 'This family cannot be deleted because it has existing transactions.'], 403); // 403 Forbidden
+        }
         
-        // Log the ID of the user attempting the action.
         Log::info('Delete attempt by User ID: ' . $request->user()->id);
 
         // Log the details of the family being deleted, including its owner's ID.

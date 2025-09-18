@@ -8,11 +8,29 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
     const [familyName, setFamilyName] = useState(family.first_name);
     const [error, setError] = useState(null);
 
-    // Determines if the current user is the owner of this family.
+    // --- START OF THE FIX ---
+
+    // 1. Check if the family has existing transactions.
+    const hasTransactions = family.transactions_count > 0;
+
+    // 2. Check if the currently logged-in user is the owner of the family.
     const isOwner = user?.id === family.owner_id;
 
-    // A family can be renamed only if the current user is the owner AND is the only member.
-    const canRename = isOwner;
+    // 3. Combine checks: Actions are only allowed if the user is the owner AND there are no transactions.
+    const canPerformActions = isOwner && !hasTransactions;
+
+    // 4. Create a dynamic message to explain why buttons might be disabled.
+    const getDisabledMessage = () => {
+        if (!isOwner) {
+            return "Only the family owner can perform this action.";
+        }
+        if (hasTransactions) {
+            return "Actions are disabled for families with existing transactions.";
+        }
+        return ""; // No message needed if actions are enabled.
+    };
+    
+    // --- END OF THE FIX ---
 
     async function handleUpdate(e) {
         e.preventDefault();
@@ -25,7 +43,7 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Failed to update family.');
-            onFamilyUpdated(data); // Notify parent component of the change
+            onFamilyUpdated(data);
             setIsEditing(false);
         } catch (err) {
             setError(err.message);
@@ -46,14 +64,15 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                 const data = await res.json();
                 throw new Error(data.message || 'Failed to delete family.');
             }
-            onFamilyDeleted(family.id); // Notify parent component of the change
+            onFamilyDeleted(family.id);
         } catch (err) {
-            alert(err.message); // Show error in a simple alert
+            // Use the state for errors to display it cleanly, instead of an alert.
+            setError(err.message);
         }
     }
 
     return (
-        <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
+        <div className="p-4 bg-gray-50 border border-gray-200 rounded-md space-y-3">
             {isEditing ? (
                 <form onSubmit={handleUpdate} className="flex items-center gap-4">
                     <input
@@ -64,29 +83,34 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                     />
                     <button type="submit" className="primary-btn-sm">Save</button>
                     <button type="button" onClick={() => setIsEditing(false)} className="secondary-btn-sm">Cancel</button>
-                    {error && <p className="error text-xs">{error}</p>}
                 </form>
             ) : (
                 <div className="flex justify-between items-center">
                     <div>
                         <h3 className="font-semibold text-lg text-gray-700">{family.first_name}</h3>
-                        <p className="text-xs text-gray-500">Owner: {family.owner.full_name}</p>
+                        {/* --- FIX: Added a safety check for owner in case it's not loaded --- */}
+                        <p className="text-xs text-gray-500">Owner: {family.owner?.full_name || 'Loading...'}</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Link to={`/families/${family.id}`} className="primary-btn-sm">Manage</Link>
+                        {/* Only show Rename and Delete buttons if the user is the owner */}
                         {isOwner && (
                             <>
                                 <button
                                     onClick={() => setIsEditing(true)}
                                     className="secondary-btn-sm"
-                                    disabled={!canRename}
-                                    title={canRename ? "Rename family" : "Only the family owner can rename"}
+                                    // --- FIX: Button is disabled if actions are not allowed ---
+                                    disabled={!canPerformActions}
+                                    title={canPerformActions ? "Rename family" : getDisabledMessage()}
                                 >
                                     Rename
                                 </button>
                                 <button
                                     onClick={handleDelete}
                                     className="danger-btn-sm"
+                                    // --- FIX: Button is disabled if actions are not allowed ---
+                                    disabled={!canPerformActions}
+                                    title={canPerformActions ? "Delete family" : getDisabledMessage()}
                                 >
                                     Delete
                                 </button>
@@ -95,6 +119,8 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                     </div>
                 </div>
             )}
+            {/* Display any error messages at the bottom */}
+            {error && <p className="error text-xs text-red-600">{error}</p>}
         </div>
     );
 }
