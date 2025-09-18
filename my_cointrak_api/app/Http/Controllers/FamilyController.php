@@ -45,7 +45,9 @@ class FamilyController extends Controller
             return response(['message' => 'This family has reached the maximum member limit of ' . self::MAX_MEMBERS_PER_FAMILY . '.'], 403);
         }
         
-        if (Gate::denies('update-family', $family)) {
+        // --- THE FIX ---
+        // Replace the Gate with a direct authorization check.
+        if ($request->user()->id !== $family->owner_id) {
             return response(['message' => 'Only the family owner can add members.'], 403);
         }
 
@@ -65,7 +67,9 @@ class FamilyController extends Controller
 
     public function update(Request $request, Family $family)
     {
-        if (Gate::denies('update-family', $family)) {
+        // --- THE FIX ---
+        // Replace the Gate with a direct authorization check.
+        if ($request->user()->id !== $family->owner_id) {
             return response(['message' => 'Only the family owner can perform this action.'], 403);
         }
 
@@ -78,9 +82,12 @@ class FamilyController extends Controller
         return response($family);
     }
 
-    public function destroy(Family $family)
+    public function destroy(Request $request, Family $family)
     {
-        if (Gate::denies('update-family', $family)) {
+        // --- THE FIX ---
+        // We inject the Request and perform a direct check on the user's ID
+        // against the family's owner_id. This is a more explicit authorization check.
+        if ($request->user()->id !== $family->owner_id) {
             return response(['message' => 'Only the family owner can perform this action.'], 403);
         }
 
