@@ -37,6 +37,18 @@
         /* Set to full-width by default for mobile, and auto-width on larger screens (sm and up) */
         @apply flex justify-center w-full sm:w-auto px-8 py-3 text-base font-semibold leading-6 text-white bg-indigo-600 rounded-lg shadow-lg whitespace-nowrap disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-105;
     }
+
+    /* --- NEW: Smaller button variants for list items --- */
+    .primary-btn-sm {
+        @apply px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-md shadow-sm hover:bg-indigo-700 transition-colors;
+    }
+    .secondary-btn-sm {
+        @apply px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 transition-colors;
+    }
+    .danger-btn-sm {
+        @apply px-4 py-2 text-xs font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed transition-colors;
+    }
+
     .text-link {
         @apply font-semibold text-indigo-600 hover:text-indigo-500 transition duration-200 ease-in-out;
     }
@@ -204,4 +216,18 @@
     .active-period-btn {
         @apply px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
     }
+
+     /* --- NEW: Styles for the cards on the Families page --- */
+    .content-card {
+        @apply w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8;
+    }
+    .content-card-title {
+        @apply font-bold text-xl mb-4 text-gray-800;
+    }
+    
+    /* --- NEW: Style for each item in the family list --- */
+    .family-list-item {
+        @apply flex justify-between items-center p-4 bg-white border border-gray-200 rounded-md transition-shadow duration-200 hover:shadow-sm;
+    }
+
 }
