@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState, useCallback } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import FamilyListItem from "../../Components/FamilyListItems.jsx";
+import FamilyListItem from "../Components/FamilyListItems.jsx";
 
 export default function Families() {
   const { token } = useContext(AppContext);
