@@ -250,7 +250,7 @@ export default function Goals() {
                 <div className="text-right mt-3 space-x-2">
                   <button onClick={() => handleMarkAsComplete(goal.id)} className="secondary-btn text-xs">Mark as Complete</button>
                   {/* I recommend adding a more distinct style for a destructive action */}
-                  <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn text-xs">Abandon</button>
+                  <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn-sm text-xs">Abandon</button>
                 </div>
                 {/* --- END OF DELETION FEATURE --- */}
               </div>
