@@ -7,6 +7,7 @@ import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
 // --- WIDGET IMPORTS ---
+import Modal from "../Components/Modal";
 import ActiveGoalsWidget from "../Components/ActiveGoalsWidget";
 import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
 
@@ -15,6 +16,8 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default function Home() {
   const { user, token } = useContext(AppContext);
+
+   const [activeModal, setActiveModal] = useState(null);
 
   // --- STATE FOR THE ENTIRE DASHBOARD ---
 
@@ -173,13 +176,39 @@ export default function Home() {
               <div className="dashboard-card text-center mb-12"><p className="text-gray-500">You are not a member of any families yet.</p></div>
             )}
           </div>
+
           
-          {/* --- OTHER WIDGETS --- */}
-          <div className="space-y-8">
-            <ActiveGoalsWidget />
-            <RecentTransactionsWidget />
+          
+                    {/* --- NEW SUMMARY CARDS SECTION --- */}
+          <div className="dashboard-section grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Active Goals Summary Card */}
+            <div className="dashboard-card p-6 flex flex-col justify-between">
+              <div>
+                <h3 className="font-bold text-xl mb-4">Your Active Goals</h3>
+                <p className="text-gray-600">You have active financial goals you are working towards.</p>
+              </div>
+              <div className="mt-6">
+                <button onClick={() => setActiveModal('goals')} className="text-link font-bold">
+                  View Goals &rarr;
+                </button>
+              </div>
+            </div>
+
+            {/* Personal Transactions Summary Card */}
+            <div className="dashboard-card p-6 flex flex-col justify-between">
+              <div>
+                <h3 className="font-bold text-xl mb-4">Your Personal Transactions</h3>
+                <p className="text-gray-600">Review and manage your complete transaction history.</p>
+              </div>
+              <div className="mt-6">
+                <button onClick={() => setActiveModal('transactions')} className="text-link font-bold">
+                  View Transactions &rarr;
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+
       ) : (
         <div className="hero-section">
           <div className="hero-content">
@@ -213,6 +242,26 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* --- MODALS --- */}
+      {/* These are rendered here but only become visible when `activeModal` is set */}
+      
+      <Modal 
+        isOpen={activeModal === 'goals'} 
+        onClose={() => setActiveModal(null)}
+        title="Your Active Goals"
+      >
+        <ActiveGoalsWidget />
+      </Modal>
+
+      <Modal 
+        isOpen={activeModal === 'transactions'} 
+        onClose={() => setActiveModal(null)}
+        title="Your Personal Transactions"
+      >
+        <RecentTransactionsWidget />
+      </Modal>
+      
     </>
   );
 }

@@ -1,5 +1,4 @@
 import { useContext, useEffect, useState, useCallback } from "react";
-// We no longer need the Link component here
 import { AppContext } from "../Context/AppContext.jsx";
 
 export default function RecentTransactionsWidget() {
@@ -13,7 +12,6 @@ export default function RecentTransactionsWidget() {
     if (!token) return;
     try {
       setLoading(true);
-      // We can fetch a reasonable number per page, like 10
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions?page=${page}&per_page=10`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -36,16 +34,12 @@ export default function RecentTransactionsWidget() {
   }, [getTransactions]);
 
   return (
-    <div className="dashboard-section">
-      {/* --- START OF FIX --- */}
-      {/* The header is now just a simple title, as it's the main list view. */}
-      <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Personal Transactions</h3>
-      {/* --- END OF FIX --- */}
-      
+    // The outer wrapper and title have been removed.
+    <div>
       {loading ? (
-        <p className="text-gray-500">Loading transactions...</p>
+        <p className="text-gray-500 text-center py-4">Loading transactions...</p>
       ) : error ? (
-        <p className="error">{error}</p>
+        <p className="error text-center py-4">{error}</p>
       ) : (
         <>
           <div className="dashboard-card p-0">
@@ -70,7 +64,6 @@ export default function RecentTransactionsWidget() {
             )}
           </div>
           
-          {/* The pagination controls allow the user to browse all transactions */}
           {pagination && pagination.last_page > 1 && (
             <div className="flex justify-between items-center mt-6">
               <button onClick={() => getTransactions(pagination.current_page - 1)} disabled={pagination.current_page === 1} className="pagination-btn">
