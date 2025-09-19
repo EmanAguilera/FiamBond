@@ -49,6 +49,10 @@
         @apply px-4 py-2 text-xs font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed transition-colors;
     }
 
+    .success-btn-sm {
+        @apply px-4 py-2 text-xs font-semibold text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors;
+    }
+
     .text-link {
         @apply font-semibold text-indigo-600 hover:text-indigo-500 transition duration-200 ease-in-out;
     }
