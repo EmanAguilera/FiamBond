@@ -14,6 +14,18 @@ class GoalController extends Controller
          // --- START OF PAGINATION FIX ---
         // We will now accept a 'status' query parameter to filter goals.
         $status = $request->query('status');
+        $limit = $request->query('limit'); // Get the limit parameter
+
+          $query = $request->user()->goals()->with('family')->latest();
+
+        if ($status === 'active' || $status === 'completed') {
+            $query->where('status', $status);
+        }
+
+        // If a limit is provided, use it. Otherwise, paginate.
+        if ($limit) {
+            return $query->take($limit)->get(); // Use take() and get() for a simple limit
+        }
 
         // Start building the query for the user's goals.
         $query = $request->user()->goals()->with('family')->latest();
