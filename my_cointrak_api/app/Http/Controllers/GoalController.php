@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Goal;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule; // <-- FIX #1: This line was missing, causing the 500 error.
+use Illuminate\Validation\Rule; // Make sure this line is present and not commented out.
 
 class GoalController extends Controller
 {
@@ -31,8 +31,20 @@ class GoalController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
+        $familyId = $request->input('family_id');
+
         $fields = $request->validate([
-            'name' => 'required|string|max:255',
+            // --- START OF VALIDATION FIX ---
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('goals')->where(function ($query) use ($user, $familyId) {
+                    return $query->where('user_id', $user->id)
+                                 ->where('family_id', $familyId);
+                }),
+            ],
+            // --- END OF VALIDATION FIX ---
             'target_amount' => 'required|numeric|min:1',
             'target_date' => 'nullable|date|after:today',
             'family_id' => [
