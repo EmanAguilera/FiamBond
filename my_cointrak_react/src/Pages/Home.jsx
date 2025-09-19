@@ -109,10 +109,6 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="mt-8">
-        <ActiveGoalsWidget />
-      </div>
-
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Family Ledgers</h3>
             {familySummaries.length > 0 ? (
               // Add a div wrapper to hold the grid and the pagination
@@ -178,6 +174,10 @@ export default function Home() {
                 <p className="text-gray-500">You are not a member of any families yet. Create or join one to see its ledger here.</p>
               </div>
             )}
+
+             <div className="mt-8">
+              <ActiveGoalsWidget />
+              </div>
 
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Recent Personal Transactions</h3>
             {transactions.length > 0 ? (
