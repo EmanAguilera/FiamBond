@@ -29,14 +29,10 @@ export default function ActiveGoalsWidget() {
   }, [getActiveGoals]);
 
   return (
-    <div className="dashboard-section">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-2xl text-gray-800">Your Active Goals</h3>
-        <Link to="/goals" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-          View All &rarr;
-        </Link>
-      </div>
-      {loading ? (<p className="text-gray-500">Loading goals...</p>) : error ? (<p className="error">{error}</p>) : (
+    // The outer wrapper and title have been removed.
+    // The modal now provides the title and structure.
+    <div>
+      {loading ? (<p className="text-gray-500 text-center py-4">Loading goals...</p>) : error ? (<p className="error text-center py-4">{error}</p>) : (
         <div className="dashboard-card p-0">
           {activeGoals.length > 0 ? (
             activeGoals.map((goal) => (
