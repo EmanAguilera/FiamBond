@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom"; // Import Link for navigation
+import { Link } from "react-router-dom";
 import { AppContext } from "../Context/AppContext";
 
 export default function ActiveGoalsWidget() {
@@ -11,7 +11,6 @@ export default function ActiveGoalsWidget() {
   const getActiveGoals = useCallback(async () => {
     if (!token) return;
     try {
-      // Fetch only the 3 most recent active goals
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals?status=active&limit=3`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -31,48 +30,50 @@ export default function ActiveGoalsWidget() {
     getActiveGoals();
   }, [getActiveGoals]);
 
+  // --- START: MODIFIED JSX WITH NEW DESIGN ---
   return (
-    <div className="w-full max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
+    <div className="w-full max-w-3xl mx-auto">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="font-bold text-xl text-gray-800">Your Active Goals</h2>
-        {/* Link to the main Goals page */}
+        <h3 className="font-bold text-2xl text-gray-800">Your Active Goals</h3>
         <Link to="/goals" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors">
           View All &rarr;
         </Link>
       </div>
 
-      {/* Conditional Rendering */}
       {loading ? (
         <p className="text-gray-500">Loading goals...</p>
       ) : error ? (
         <p className="error">{error}</p>
       ) : activeGoals.length > 0 ? (
-        <div className="space-y-3">
+        // Use the new dashboard-card class, p-0 is important so items can control their own padding
+        <div className="dashboard-card p-0">
           {activeGoals.map((goal) => (
-            <div key={goal.id} className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold text-md text-gray-700">{goal.name}</h3>
-                  {goal.family ? (
-                    <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full inline-block mt-1">
-                      For: {goal.family.first_name}
-                    </p>
-                  ) : (
-                    <p className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded-full inline-block mt-1">
-                      Personal Goal
-                    </p>
-                  )}
-                </div>
-                <p className="font-bold text-lg text-indigo-600">
-                  ₱{parseFloat(goal.target_amount).toLocaleString()}
-                </p>
+            // Use the new list item class and border logic from the transaction list
+            <div
+              key={goal.id}
+              className="dashboard-list-item border-b last:border-b-0 border-gray-100"
+            >
+              <div>
+                <p className="item-description">{goal.name}</p>
+                {/* Use the new subtext class for the family/personal tag */}
+                {goal.family ? (
+                  <small className="item-subtext">For Family: {goal.family.first_name}</small>
+                ) : (
+                  <small className="item-subtext">Personal Goal</small>
+                )}
               </div>
+              <p className="item-amount text-indigo-600">
+                ₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-gray-600 italic">You have no active goals. <Link to="/goals" className="font-semibold text-indigo-600">Set one now!</Link></p>
+        <div className="dashboard-card p-6 text-center">
+            <p className="text-gray-600 italic">You have no active goals. <Link to="/goals" className="font-semibold text-indigo-600">Set one now!</Link></p>
+        </div>
       )}
     </div>
   );
+  // --- END: MODIFIED JSX ---
 }
