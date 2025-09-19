@@ -141,6 +141,35 @@ export default function Goals() {
     }
   }
 
+  // --- START OF DELETION FEATURE ---
+  // Handler for deleting a goal
+  async function handleDeleteGoal(goalId) {
+    // Optional: Ask for confirmation before deleting
+    if (!window.confirm("Are you sure you want to abandon this goal? This action cannot be undone.")) {
+      return;
+    }
+
+    setListError(null);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/${goalId}`, {
+        method: "delete",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.message || "Could not delete the goal.");
+      }
+
+      // On success, refetch the active goals to update the list.
+      // We use the current page from pagination state to avoid jumping back to page 1.
+      getActiveGoals(activePagination.current_page);
+    } catch (err) {
+      setListError(err.message);
+    }
+  }
+  // --- END OF DELETION FEATURE ---
+
   return (
     <>
       <h1 className="title">Set Your Financial Goals</h1>
@@ -250,6 +279,13 @@ export default function Goals() {
                   </div>
                   <p className="font-bold text-lg text-green-700">₱{parseFloat(goal.target_amount).toLocaleString()}</p>
                 </div>
+                 {/* --- START OF DELETION FEATURE --- */}
+                <div className="text-right mt-3 space-x-2">
+                  <button onClick={() => handleMarkAsComplete(goal.id)} className="secondary-btn text-xs">Mark as Complete</button>
+                  {/* I recommend adding a more distinct style for a destructive action */}
+                  <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn text-xs">Abandon</button>
+                </div>
+                {/* --- END OF DELETION FEATURE --- */}
               </div>
             ))}
           </div>
