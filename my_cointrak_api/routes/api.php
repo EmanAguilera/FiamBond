@@ -46,4 +46,5 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/user/balance', [App\Http\Controllers\UserController::class, 'getBalance']);
     Route::put('/families/{family}', [FamilyController::class, 'update']); // Add this for updating
     Route::delete('/families/{family}', [FamilyController::class, 'destroy']); // Add this for deleting
+    Route::delete('/goals/{goal}', [GoalController::class, 'destroy']);
 });
