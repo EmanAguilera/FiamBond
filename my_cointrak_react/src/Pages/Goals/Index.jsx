@@ -259,14 +259,40 @@ export default function Goals() {
         ) : (
           <p className="text-gray-600 italic">You have no active goals yet.</p>
         )}
-        {/* PAGINATION CONTROLS FOR ACTIVE GOALS */}
-        {activePagination && activePagination.last_page > 1 && (
-          <div className="flex justify-between items-center mt-6">
-            <button onClick={() => getActiveGoals(activePagination.current_page - 1)} disabled={activePagination.current_page === 1} className="secondary-btn disabled:opacity-50">&larr; Previous</button>
-            <span className="text-sm text-gray-600">Page {activePagination.current_page} of {activePagination.last_page}</span>
-            <button onClick={() => getActiveGoals(activePagination.current_page + 1)} disabled={activePagination.current_page === activePagination.last_page} className="secondary-btn disabled:opacity-50">Next &rarr;</button>
-          </div>
-        )}
+        {/* --- START: UPDATED PAGINATION CONTROLS FOR ACTIVE GOALS --- */}
+{activePagination && activePagination.last_page > 1 && (
+  <div className="flex justify-between items-center mt-6">
+    {/* Previous Button */}
+    <button 
+      onClick={() => getActiveGoals(activePagination.current_page - 1)} 
+      disabled={activePagination.current_page === 1} 
+      className="pagination-btn"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+      </svg>
+      Previous
+    </button>
+
+    {/* Page Info */}
+    <span className="pagination-text">
+      Page {activePagination.current_page} of {activePagination.last_page}
+    </span>
+
+    {/* Next Button */}
+    <button 
+      onClick={() => getActiveGoals(activePagination.current_page + 1)} 
+      disabled={activePagination.current_page === activePagination.last_page} 
+      className="pagination-btn"
+    >
+      Next
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+      </svg>
+    </button>
+  </div>
+)}
+{/* --- END: UPDATED PAGINATION CONTROLS --- */}
       </div>
 
       {/* --- COMPLETED GOALS LIST --- */}
