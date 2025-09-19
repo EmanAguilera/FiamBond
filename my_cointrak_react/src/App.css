@@ -217,6 +217,25 @@
         @apply px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
     }
 
+    .dashboard-list-item {
+        @apply flex items-center justify-between p-4; /* Use p-4 for consistent spacing */
+    }
+    /* The main description text for an item */
+    
+    .item-description {
+        @apply font-semibold text-gray-700;
+    }
+    
+    /* The secondary, smaller text (like date or category) */
+    .item-subtext {
+        @apply text-sm text-gray-500 mt-1;
+    }
+    
+    /* The amount or primary value on the right side */
+    .item-amount {
+        @apply font-bold text-lg;
+    }
+
     .active-period-btn {
         @apply px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
     }
