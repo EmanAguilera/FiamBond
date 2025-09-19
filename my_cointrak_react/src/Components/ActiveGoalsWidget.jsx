@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { AppContext } from "../Context/AppContext";
+import { AppContext } from "../Context/AppContext.jsx";
 
 export default function ActiveGoalsWidget() {
   const { token } = useContext(AppContext);
@@ -11,14 +11,12 @@ export default function ActiveGoalsWidget() {
   const getActiveGoals = useCallback(async () => {
     if (!token) return;
     try {
+      setLoading(true);
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals?status=active&limit=3`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) {
-        throw new Error("Could not load your active goals.");
-      }
-      const data = await res.json();
-      setActiveGoals(data);
+      if (!res.ok) throw new Error("Could not load your active goals.");
+      setActiveGoals(await res.json());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -30,49 +28,35 @@ export default function ActiveGoalsWidget() {
     getActiveGoals();
   }, [getActiveGoals]);
 
-  // --- START: MODIFIED JSX WITH NEW DESIGN ---
   return (
-     <div className="w-full max-w-3xl mx-auto dashboard-section"> {/* Added dashboard-section for consistent spacing */}
-    <div className="flex justify-between items-center mb-4">
+    <div className="dashboard-section">
+      <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-2xl text-gray-800">Your Active Goals</h3>
         <Link to="/goals" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
           View All &rarr;
         </Link>
-    </div>
-
-    {loading ? ( <p>Loading...</p> ) : error ? ( <p className="error">{error}</p> ) : 
-    activeGoals.length > 0 ? (
-      // Use dashboard-card with p-0 to contain the items
-      <div className="dashboard-card p-0"> 
-        {activeGoals.map((goal) => (
-          // --- APPLYING THE CORRECT CLASSES ---
-          <div
-            key={goal.id}
-            // Use transaction-item for the hover effect and layout
-            className="transaction-item border-b last:border-b-0 border-gray-100"
-          >
-            <div>
-              {/* Use transaction-description for the main title */}
-              <p className="transaction-description">{goal.name}</p>
-              {/* Use transaction-date for the subtext to get the smaller font */}
-              <small className="transaction-date">
-                {goal.family ? `For Family: ${goal.family.first_name}` : 'Personal Goal'}
-              </small>
+      </div>
+      {loading ? (<p className="text-gray-500">Loading goals...</p>) : error ? (<p className="error">{error}</p>) : (
+        <div className="dashboard-card p-0">
+          {activeGoals.length > 0 ? (
+            activeGoals.map((goal) => (
+              <div key={goal.id} className="transaction-item border-b last:border-b-0 border-gray-100">
+                <div>
+                  <p className="transaction-description">{goal.name}</p>
+                  <small className="transaction-date">{goal.family ? `For Family: ${goal.family.first_name}` : 'Personal Goal'}</small>
+                </div>
+                <p className="transaction-amount text-indigo-600">
+                  ₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            ))
+          ) : (
+            <div className="p-4 text-center text-gray-600 italic">
+              You have no active goals. <Link to="/goals" className="font-semibold text-indigo-600">Set one now!</Link>
             </div>
-            {/* Use transaction-amount for the value */}
-            <p className="transaction-amount text-indigo-600">
-              ₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-          </div>
-          // --- END OF CHANGES ---
-        ))}
-      </div>
-    ) : (
-      <div className="dashboard-card p-6 text-center">
-        <p className="text-gray-600 italic">You have no active goals. <Link to="/goals" className="font-semibold text-indigo-600">Set one now!</Link></p>
-      </div>
-    )}
-  </div>
-);
-  // --- END: MODIFIED JSX ---
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

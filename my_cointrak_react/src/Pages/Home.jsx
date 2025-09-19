@@ -1,32 +1,18 @@
 import { useContext, useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
+import ActiveGoalsWidget from "../Components/ActiveGoalsWidget";
+import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
 
 export default function Home() {
   const { user, token } = useContext(AppContext);
 
-  // --- STATE MANAGEMENT FOR THE ENTIRE DASHBOARD ---
-
-  // State for the main balance
+  // State managed by Home.jsx (top-level concerns)
   const [balance, setBalance] = useState(0);
-
-  // State for Family Ledgers
   const [familySummaries, setFamilySummaries] = useState([]);
   const [familyPagination, setFamilyPagination] = useState(null);
 
-  // State for Active Goals Widget
-  const [activeGoals, setActiveGoals] = useState([]);
-  const [goalsLoading, setGoalsLoading] = useState(true);
-  const [goalsError, setGoalsError] = useState(null);
-
-  // State for Recent Transactions Widget
-  const [transactions, setTransactions] = useState([]);
-  const [transactionsLoading, setTransactionsLoading] = useState(true);
-  const [transactionsError, setTransactionsError] = useState(null);
-
-
-  // --- DATA FETCHING FUNCTIONS FOR ALL SECTIONS ---
-
+  // Data fetching for Home.jsx concerns
   const getBalance = useCallback(async () => {
     if (!token) return;
     try {
@@ -51,61 +37,18 @@ export default function Home() {
       }
     } catch (error) { console.error("Error fetching family summaries:", error); }
   }, [token]);
-  
-  const getActiveGoals = useCallback(async () => {
-    if (!token) return;
-    try {
-      setGoalsLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals?status=active&limit=3`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Could not load your active goals.");
-      setActiveGoals(await res.json());
-    } catch (err) {
-      setGoalsError(err.message);
-    } finally {
-      setGoalsLoading(false);
-    }
-  }, [token]);
 
-  const getRecentTransactions = useCallback(async () => {
-    if (!token) return;
-    try {
-      setTransactionsLoading(true);
-      // Fetch only the first 5 transactions
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions?per_page=5`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Could not load recent transactions.");
-      const data = await res.json();
-      setTransactions(Array.isArray(data.data) ? data.data : []);
-    } catch (err) {
-      setTransactionsError(err.message);
-    } finally {
-      setTransactionsLoading(false);
-    }
-  }, [token]);
-
-
-  // --- EFFECT TO FETCH ALL DASHBOARD DATA ON LOAD ---
-
+  // Effect now only fetches data relevant to this page
   useEffect(() => {
     if (token) {
       getBalance();
       getFamilySummaries();
-      getActiveGoals();
-      getRecentTransactions();
     } else {
-      // Clear all data on logout
       setBalance(0);
       setFamilySummaries([]);
       setFamilyPagination(null);
-      setActiveGoals([]);
-      setTransactions([]);
     }
-  }, [token, getBalance, getFamilySummaries, getActiveGoals, getRecentTransactions]);
-
-  // --- RENDER THE COMPLETE DASHBOARD ---
+  }, [token, getBalance, getFamilySummaries]);
 
   return (
     <>
@@ -132,6 +75,7 @@ export default function Home() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {familySummaries.map((summary) => (
                     <div key={summary.id} className="dashboard-card p-6 flex flex-col justify-between">
+                      {/* Family card content */}
                       <div>
                         <h4 className="font-bold text-xl mb-4">{summary.first_name}</h4>
                         <div className="space-y-2 text-sm">
@@ -156,54 +100,11 @@ export default function Home() {
             ) : (
               <div className="dashboard-card text-center mb-12"><p className="text-gray-500">You are not a member of any families yet.</p></div>
             )}
-
+            
             <div className="space-y-8">
-                {/* --- ACTIVE GOALS WIDGET SECTION --- */}
-                <div className="dashboard-section">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-2xl text-gray-800">Your Active Goals</h3>
-                        <Link to="/goals" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">View All &rarr;</Link>
-                    </div>
-                    {goalsLoading ? (<p className="text-gray-500">Loading goals...</p>) : goalsError ? (<p className="error">{goalsError}</p>) : (
-                    <div className="dashboard-card p-0">
-                        {activeGoals.length > 0 ? (
-                        activeGoals.map((goal) => (
-                            <div key={goal.id} className="transaction-item border-b last:border-b-0 border-gray-100">
-                            <div>
-                                <p className="transaction-description">{goal.name}</p>
-                                <small className="transaction-date">{goal.family ? `For Family: ${goal.family.first_name}` : 'Personal Goal'}</small>
-                            </div>
-                            <p className="transaction-amount text-indigo-600">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                            </div>
-                        ))
-                        ) : (
-                        <div className="p-4 text-center text-gray-600 italic">You have no active goals. <Link to="/goals" className="font-semibold text-indigo-600">Set one now!</Link></div>
-                        )}
-                    </div>
-                    )}
-                </div>
-
-                {/* --- RECENT TRANSACTIONS WIDGET SECTION --- */}
-                <div className="dashboard-section">
-                    <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Recent Personal Transactions</h3>
-                    {transactionsLoading ? (<p className="text-gray-500">Loading transactions...</p>) : transactionsError ? (<p className="error">{transactionsError}</p>) : (
-                    <div className="dashboard-card p-0">
-                        {transactions.length > 0 ? (
-                        transactions.map((transaction) => (
-                            <div key={transaction.id} className="transaction-item border-b last:border-b-0 border-gray-100">
-                            <div>
-                                <p className="transaction-description">{transaction.description}</p>
-                                <small className="transaction-date">{new Date(transaction.created_at).toLocaleDateString()}</small>
-                            </div>
-                            <p className={`transaction-amount ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>{transaction.type === 'income' ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                            </div>
-                        ))
-                        ) : (
-                        <div className="p-4 text-center text-gray-600 italic">You have no personal transactions yet.</div>
-                        )}
-                    </div>
-                    )}
-                </div>
+              {/* Widgets are now self-contained and easy to manage */}
+              <ActiveGoalsWidget />
+              <RecentTransactionsWidget />
             </div>
           </div>
         </div>
