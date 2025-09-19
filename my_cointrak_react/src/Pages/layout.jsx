@@ -11,6 +11,7 @@ import {
     Bars3Icon, // Hamburger menu icon
     XMarkIcon,  // Close (X) icon
 } from '@heroicons/react/24/outline';
+import CointrakLogo from '/CoinTrak_Logo.png'; // Import the logo
 
 export default function Layout() {
     const { user, handleLogout } = useContext(AppContext);
@@ -28,7 +29,11 @@ export default function Layout() {
         <>
             <header className="app-header">
                 <nav className="top-nav">
-                    <Link to="/" className="logo">Cointrak</Link>
+                    {/* --- FIX: Added logo next to the site title --- */}
+                    <Link to="/" className="logo flex items-center space-x-2">
+                        <img src={CointrakLogo} alt="Cointrak Logo" className="h-8 w-8" />
+                        <span className="text-xl font-bold">Cointrak</span>
+                    </Link>
                     
                     {user ? (
                         // --- FIX: This container now manages desktop vs mobile views ---
