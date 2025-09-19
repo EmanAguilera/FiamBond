@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
+import ActiveGoalsWidget from "../Components/ActiveGoalsWidget"; 
 
 export default function Home() {
   const [transactions, setTransactions] = useState([]);
@@ -107,6 +108,10 @@ export default function Home() {
                 ₱{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
+
+            <div className="mt-8">
+        <ActiveGoalsWidget />
+      </div>
 
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Family Ledgers</h3>
             {familySummaries.length > 0 ? (
