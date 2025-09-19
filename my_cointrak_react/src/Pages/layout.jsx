@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-to-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
 import {
     HomeIcon,
@@ -11,7 +11,6 @@ import {
     Bars3Icon, // Hamburger menu icon
     XMarkIcon,  // Close (X) icon
 } from '@heroicons/react/24/outline';
-// Using the full logo image which includes the text
 import CointrakLogo from '/CoinTrak_Logo.png'; 
 
 export default function Layout() {
@@ -30,9 +29,8 @@ export default function Layout() {
         <>
             <header className="app-header">
                 <nav className="top-nav">
-                    {/* --- FIX: Use the full logo image and remove the redundant text --- */}
-                    <Link to="/" className="logo">
-                        {/* The 'h-9' class controls the height, and 'w-auto' ensures the width scales proportionally */}
+                    {/* --- FIX: Added 'flex-shrink-0' to prevent the logo from being squished by other nav items --- */}
+                    <Link to="/" className="logo flex-shrink-0">
                         <img src={CointrakLogo} alt="Cointrak Logo" className="h-9 w-auto" />
                     </Link>
                     
