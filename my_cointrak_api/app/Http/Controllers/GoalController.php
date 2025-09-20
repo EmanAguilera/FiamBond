@@ -40,6 +40,20 @@ class GoalController extends Controller
         // --- END OF PAGINATION FIX ---
     }
 
+    /**
+     * --- START OF FIX ---
+     * Get the count of active, personal goals for the dashboard.
+     */
+    public function getActivePersonalCount(Request $request)
+    {
+        $count = $request->user()->goals()
+            ->where('status', 'active')
+            ->whereNull('family_id') // This ensures we only count personal goals.
+            ->count();
+
+        return response()->json(['count' => $count]);
+    }
+
     public function store(Request $request)
     {
         $user = $request->user();

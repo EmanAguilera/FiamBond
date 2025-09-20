@@ -22,9 +22,9 @@ export default function Home() {
   // --- STATE FOR THE ENTIRE DASHBOARD ---
 
   // State for the summary cards
-  const [balance, setBalance] = useState(null);
-  const [balanceLoading, setBalanceLoading] = useState(true);
-  const [balanceError, setBalanceError] = useState(null);
+  const [summaryData, setSummaryData] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState(null);
   
   // State for active goals count
   const [activeGoalsCount, setActiveGoalsCount] = useState(0);
@@ -43,43 +43,49 @@ export default function Home() {
 
   // --- DATA FETCHING FOR THE DASHBOARD ---
 
-  const getBalance = useCallback(async () => {
+  const getSummaryData = useCallback(async () => {
     if (!token) return;
-    setBalanceLoading(true);
-    setBalanceError(null);
+    setSummaryLoading(true);
+    setSummaryError(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/balance`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
         throw new Error("Could not load summary data.");
       }
-      const data = await res.json();
-      setBalance(data.balance);
+      setSummaryData(await res.json());
     } catch (err) {
-      setBalanceError(err.message);
+      setSummaryError(err.message);
     } finally {
-      setBalanceLoading(false);
+      setSummaryLoading(false);
     }
   }, [token]);
   
+  // --- START OF FIX ---
+  // This function is updated to call the new, dedicated endpoint for counting
+  // only personal active goals, which is more accurate and efficient.
   const getActiveGoalsCount = useCallback(async () => {
     if (!token) return;
     setGoalsCountLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals?status=active`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/active-personal-count`, {
           headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
-        setActiveGoalsCount(data.data.length || 0);
+        setActiveGoalsCount(data.count || 0); // Directly use the count from the API response
+      } else {
+        setActiveGoalsCount(0);
       }
     } catch (error) {
         console.error("Error fetching active goals count:", error);
+        setActiveGoalsCount(0);
     } finally {
         setGoalsCountLoading(false);
     }
   }, [token]);
+  // --- END OF FIX ---
 
 
   const getReport = useCallback(async () => {
@@ -121,18 +127,18 @@ export default function Home() {
   // Main effect to fetch all dashboard data
   useEffect(() => {
     if (token) {
-      getBalance();
+      getSummaryData();
       getActiveGoalsCount();
       getReport();
       getFamilySummaries();
     } else {
-      setBalance(null);
+      setSummaryData(null);
       setActiveGoalsCount(0);
       setReport(null);
       setFamilySummaries([]);
       setFamilyPagination(null);
     }
-  }, [token, getReport, getFamilySummaries, getBalance, getActiveGoalsCount]);
+  }, [token, getReport, getFamilySummaries, getSummaryData, getActiveGoalsCount]);
 
 
   const chartOptions = {
@@ -159,11 +165,11 @@ export default function Home() {
             {/* Current Money Card */}
             <div className="dashboard-card">
               <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
-              {balanceLoading ? <div className="h-8 w-3/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
-               balanceError ? <p className="text-red-500 text-sm">Could not load data</p> :
-               (
-                <p className={`text-3xl font-bold mt-2 ${balance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                  ₱{parseFloat(balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {summaryLoading ? <div className="h-8 w-3/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
+               summaryError ? <p className="text-red-500 text-sm">Could not load data</p> :
+               summaryData && (
+                <p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  ₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               )}
             </div>

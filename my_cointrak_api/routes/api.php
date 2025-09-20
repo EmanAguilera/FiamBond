@@ -29,6 +29,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::apiResource('families', FamilyController::class);
 
     // Goal Routes
+    Route::get('/goals/active-personal-count', [GoalController::class, 'getActivePersonalCount']);
     Route::put('/goals/{goal}/complete', [GoalController::class, 'markAsCompleted']);
     Route::apiResource('goals', GoalController::class)->except(['show', 'update']);
     
