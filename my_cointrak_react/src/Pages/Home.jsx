@@ -10,7 +10,8 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import Modal from "../Components/Modal";
 import ActiveGoalsWidget from "../Components/ActiveGoalsWidget";
 import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
-import FamilyLedgersWidget from "../Components/FamilyLedgersWidget"; // Import the new widget
+import FamilyLedgersWidget from "../Components/FamilyLedgersWidget";
+import CreateTransactionWidget from "../Components/CreateTransactionWidget"; // Import the new widget
 
 // Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -21,28 +22,23 @@ export default function Home() {
   // State hooks for controlling modal visibility
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
-  const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false); // Add state for family modal
+  const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
+  const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false); // State for the new modal
 
   // --- STATE FOR THE DASHBOARD ---
-
   const [summaryData, setSummaryData] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState(null);
-  
   const [activeGoalsCount, setActiveGoalsCount] = useState(0);
   const [goalsCountLoading, setGoalsCountLoading] = useState(true);
-
-  // We only need the total family count for the card now
   const [familyCount, setFamilyCount] = useState(0);
   const [familyCountLoading, setFamilyCountLoading] = useState(true);
-
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(true);
   const [reportError, setReportError] = useState(null);
   const [period, setPeriod] = useState('monthly');
 
   // --- DATA FETCHING ---
-
   const getSummaryData = useCallback(async () => {
     if (!token) return;
     setSummaryLoading(true);
@@ -79,12 +75,10 @@ export default function Home() {
     }
   }, [token]);
 
-  // Fetch only the family count for the dashboard card
   const getFamilyCount = useCallback(async () => {
     if (!token) return;
     setFamilyCountLoading(true);
     try {
-      // We only need the first page to get the total count from the pagination meta data
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries?page=1`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -135,6 +129,14 @@ export default function Home() {
     }
   }, [token, getReport, getSummaryData, getActiveGoalsCount, getFamilyCount]);
 
+  // This function will be called on successful transaction creation
+  function handleTransactionSuccess() {
+    setIsCreateTransactionModalOpen(false); // Close the modal
+    // Re-fetch all relevant data to update the dashboard immediately
+    getSummaryData();
+    getReport();
+  }
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -149,13 +151,16 @@ export default function Home() {
       {user ? (
         <div className="p-4 md:p-10">
           <header className="dashboard-header">
-            <Link to="/transactions/create" className="primary-btn max-w-xs sm:max-w-[200px]">
+            {/* This is now a button that opens the modal */}
+            <button 
+              onClick={() => setIsCreateTransactionModalOpen(true)}
+              className="primary-btn max-w-xs sm:max-w-[200px]"
+            >
               + Add Transaction
-            </Link>
+            </button>
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Current Money Card -> Opens Transactions Modal */}
             <div 
               className="dashboard-card-interactive" 
               onClick={() => setIsTransactionsModalOpen(true)}
@@ -172,8 +177,6 @@ export default function Home() {
               )}
               <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
             </div>
-            
-            {/* Active Goals Card -> Opens Goals Modal */}
             <div 
               className="dashboard-card-interactive" 
               onClick={() => setIsGoalsModalOpen(true)}
@@ -187,8 +190,6 @@ export default function Home() {
               )}
               <span className="text-link text-sm mt-2">View Goals &rarr;</span>
             </div>
-            
-            {/* Your Families Card -> Opens Family Ledgers Modal */}
             <div 
               className="dashboard-card-interactive" 
               onClick={() => setIsFamilyModalOpen(true)}
@@ -204,7 +205,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* --- FINANCIAL REPORT WIDGET SECTION --- */}
           <div className="dashboard-section">
             <div className="w-full mx-auto flex justify-center gap-4 mb-6">
               <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
@@ -244,7 +244,6 @@ export default function Home() {
           </div>
           
         </div>
-
       ) : (
         <div className="hero-section">
           <div className="hero-content">
@@ -302,6 +301,14 @@ export default function Home() {
         title="Your Family Ledgers"
       >
         <FamilyLedgersWidget />
+      </Modal>
+      
+      <Modal
+        isOpen={isCreateTransactionModalOpen}
+        onClose={() => setIsCreateTransactionModalOpen(false)}
+        title="Add a New Transaction"
+      >
+        <CreateTransactionWidget onSuccess={handleTransactionSuccess} />
       </Modal>
       
     </>
