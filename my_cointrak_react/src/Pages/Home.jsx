@@ -25,6 +25,11 @@ export default function Home() {
   const [summaryData, setSummaryData] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState(null);
+  
+  // State for active goals count
+  const [activeGoalsCount, setActiveGoalsCount] = useState(0);
+  const [goalsCountLoading, setGoalsCountLoading] = useState(true);
+
 
   // State for the main Financial Report
   const [report, setReport] = useState(null);
@@ -43,7 +48,6 @@ export default function Home() {
     setSummaryLoading(true);
     setSummaryError(null);
     try {
-      // This endpoint should return a summary for the dashboard cards.
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -57,6 +61,26 @@ export default function Home() {
       setSummaryLoading(false);
     }
   }, [token]);
+  
+  const getActiveGoalsCount = useCallback(async () => {
+    if (!token) return;
+    setGoalsCountLoading(true);
+    try {
+      // Assumes an endpoint that returns the count of active goals
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/active/count`, {
+          headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActiveGoalsCount(data.count || 0);
+      }
+    } catch (error) {
+        console.error("Error fetching active goals count:", error);
+    } finally {
+        setGoalsCountLoading(false);
+    }
+  }, [token]);
+
 
   const getReport = useCallback(async () => {
     if (!token) return;
@@ -98,15 +122,17 @@ export default function Home() {
   useEffect(() => {
     if (token) {
       getSummaryData();
+      getActiveGoalsCount();
       getReport();
       getFamilySummaries();
     } else {
       setSummaryData(null);
+      setActiveGoalsCount(0);
       setReport(null);
       setFamilySummaries([]);
       setFamilyPagination(null);
     }
-  }, [token, getReport, getFamilySummaries, getSummaryData]);
+  }, [token, getReport, getFamilySummaries, getSummaryData, getActiveGoalsCount]);
 
 
   const chartOptions = {
@@ -129,38 +155,37 @@ export default function Home() {
             </Link>
           </header>
 
-          {/* --- NEW DASHBOARD CARDS SECTION --- */}
+          {/* --- UPDATED DASHBOARD CARDS SECTION --- */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {summaryLoading ? (
-              Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="dashboard-card animate-pulse bg-slate-200 h-24"></div>
-              ))
-            ) : summaryError ? (
-              <div className="md:col-span-3 dashboard-card bg-red-50 text-red-700">
-                <p><strong>Error:</strong> {summaryError}</p>
-              </div>
-            ) : summaryData ? (
-              <>
-                <div className="dashboard-card">
-                  <h4 className="font-bold text-gray-600">Total Inflow (Monthly)</h4>
-                  <p className="text-2xl font-bold text-green-600 mt-2">
-                    +₱{parseFloat(summaryData.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="dashboard-card">
-                  <h4 className="font-bold text-gray-600">Total Outflow (Monthly)</h4>
-                  <p className="text-2xl font-bold text-red-500 mt-2">
-                    -₱{parseFloat(summaryData.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="dashboard-card">
-                  <h4 className="font-bold text-gray-600">Net Position (Monthly)</h4>
-                  <p className={`text-2xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    ₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-              </>
-            ) : null}
+            {/* Current Money Card */}
+            <div className="dashboard-card">
+              <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
+              {summaryLoading ? <div className="h-8 w-3/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
+               summaryError ? <p className="text-red-500 text-sm">Could not load data</p> :
+               summaryData && (
+                <p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  ₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              )}
+            </div>
+
+            {/* Active Goals Card */}
+            <div className="dashboard-card">
+              <h4 className="font-bold text-gray-600">Active Goals</h4>
+              {goalsCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
+              (
+                <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
+              )}
+            </div>
+            
+            {/* Family Count Card */}
+            <div className="dashboard-card">
+              <h4 className="font-bold text-gray-600">Your Families</h4>
+              {familyPagination === null ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
+              (
+                 <p className="text-3xl font-bold text-slate-800 mt-2">{familyPagination?.total || 0}</p>
+              )}
+            </div>
           </div>
 
 
