@@ -17,9 +17,14 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 export default function Home() {
   const { user, token } = useContext(AppContext);
 
-   const [activeModal, setActiveModal] = useState(null);
+  const [activeModal, setActiveModal] = useState(null);
 
   // --- STATE FOR THE ENTIRE DASHBOARD ---
+
+  // State for the summary cards
+  const [summaryData, setSummaryData] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState(null);
 
   // State for the main Financial Report
   const [report, setReport] = useState(null);
@@ -32,6 +37,26 @@ export default function Home() {
   const [familyPagination, setFamilyPagination] = useState(null);
 
   // --- DATA FETCHING FOR THE DASHBOARD ---
+
+  const getSummaryData = useCallback(async () => {
+    if (!token) return;
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      // This endpoint should return a summary for the dashboard cards.
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        throw new Error("Could not load summary data.");
+      }
+      setSummaryData(await res.json());
+    } catch (err) {
+      setSummaryError(err.message);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, [token]);
 
   const getReport = useCallback(async () => {
     if (!token) return;
@@ -55,7 +80,6 @@ export default function Home() {
   }, [token, period]);
 
   const getFamilySummaries = useCallback(async (page = 1) => {
-    // Family summary fetching logic remains the same...
     if (!token) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries?page=${page}`, {
@@ -73,14 +97,16 @@ export default function Home() {
   // Main effect to fetch all dashboard data
   useEffect(() => {
     if (token) {
-      getReport(); // Now fetches the main report
+      getSummaryData();
+      getReport();
       getFamilySummaries();
     } else {
+      setSummaryData(null);
       setReport(null);
       setFamilySummaries([]);
       setFamilyPagination(null);
     }
-  }, [token, getReport, getFamilySummaries]);
+  }, [token, getReport, getFamilySummaries, getSummaryData]);
 
 
   const chartOptions = {
@@ -103,7 +129,42 @@ export default function Home() {
             </Link>
           </header>
 
-          {/* --- FINANCIAL REPORT WIDGET SECTION (MOVED FROM REPORTS PAGE) --- */}
+          {/* --- NEW DASHBOARD CARDS SECTION --- */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {summaryLoading ? (
+              Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="dashboard-card animate-pulse bg-slate-200 h-24"></div>
+              ))
+            ) : summaryError ? (
+              <div className="md:col-span-3 dashboard-card bg-red-50 text-red-700">
+                <p><strong>Error:</strong> {summaryError}</p>
+              </div>
+            ) : summaryData ? (
+              <>
+                <div className="dashboard-card">
+                  <h4 className="font-bold text-gray-600">Total Inflow (Monthly)</h4>
+                  <p className="text-2xl font-bold text-green-600 mt-2">
+                    +₱{parseFloat(summaryData.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="dashboard-card">
+                  <h4 className="font-bold text-gray-600">Total Outflow (Monthly)</h4>
+                  <p className="text-2xl font-bold text-red-500 mt-2">
+                    -₱{parseFloat(summaryData.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="dashboard-card">
+                  <h4 className="font-bold text-gray-600">Net Position (Monthly)</h4>
+                  <p className={`text-2xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                    ₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </>
+            ) : null}
+          </div>
+
+
+          {/* --- FINANCIAL REPORT WIDGET SECTION --- */}
           <div className="dashboard-section">
             <div className="w-full mx-auto flex justify-center gap-4 mb-6">
               <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
@@ -145,7 +206,6 @@ export default function Home() {
           {/* --- FAMILY LEDGERS SECTION --- */}
           <div className="dashboard-section">
             <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Family Ledgers</h3>
-            {/* ... Family Summaries JSX remains the same ... */}
             {familySummaries.length > 0 ? (
               <div className="mb-12">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -176,12 +236,9 @@ export default function Home() {
               <div className="dashboard-card text-center mb-12"><p className="text-gray-500">You are not a member of any families yet.</p></div>
             )}
           </div>
-
           
-          
-                    {/* --- NEW SUMMARY CARDS SECTION --- */}
+          {/* --- WIDGET CARDS SECTION --- */}
           <div className="dashboard-section grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Active Goals Summary Card */}
             <div className="dashboard-card p-6 flex flex-col justify-between">
               <div>
                 <h3 className="font-bold text-xl mb-4">Your Active Goals</h3>
@@ -193,8 +250,6 @@ export default function Home() {
                 </button>
               </div>
             </div>
-
-            {/* Personal Transactions Summary Card */}
             <div className="dashboard-card p-6 flex flex-col justify-between">
               <div>
                 <h3 className="font-bold text-xl mb-4">Your Personal Transactions</h3>
