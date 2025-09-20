@@ -53,33 +53,36 @@ export default function FamilyLedgersWidget() {
           <div className="space-y-6">
             {summaries.map((summary) => (
               <div key={summary.id} className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                {/* --- START OF FIX --- */}
+                {/* Corrected property names from snake_case to camelCase to match the API response */}
                 <h4 className="font-bold text-lg mb-3">{summary.name}</h4>
                 <div className="space-y-2 text-sm">
                   <p className="flex justify-between">
                     <span>Total Inflow:</span>
                     <span className="font-semibold text-green-600">
-                      +₱{parseFloat(summary.total_inflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      +₱{parseFloat(summary.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </p>
                   <p className="flex justify-between">
                     <span>Total Outflow:</span>
                     <span className="font-semibold text-red-500">
-                      -₱{parseFloat(summary.total_outflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      -₱{parseFloat(summary.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </p>
                   <hr className="border-dashed my-2" />
-                  <p className={`flex justify-between font-bold text-base ${summary.net_position >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  <p className={`flex justify-between font-bold text-base ${summary.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                     <span>Net Position:</span>
                     <span>
-                      ₱{parseFloat(summary.net_position).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₱{parseFloat(summary.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </p>
                 </div>
                 <div className="mt-4">
-                  <Link to={`/families/${summary.id}`} className="text-link font-bold text-sm">
+                  <Link to={`/families/${summary.id}/ledger`} className="text-link font-bold text-sm">
                     View Full Ledger &rarr;
                   </Link>
                 </div>
+                {/* --- END OF FIX --- */}
               </div>
             ))}
           </div>

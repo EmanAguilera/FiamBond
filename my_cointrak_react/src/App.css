@@ -193,8 +193,9 @@
         /* Reduced font size for mobile */
         @apply text-2xl sm:text-3xl font-extrabold text-gray-900;
     }
-    .dashboard-card {
-        @apply p-6 mb-4 bg-white border border-gray-100 rounded-lg shadow-md;
+    
+    .dashboard-card-interactive {
+        @apply bg-white p-6 rounded-lg shadow-md transition-all duration-300 ease-in-out cursor-pointer hover:shadow-xl hover:-translate-y-1;
     }
     .balance-amount {
         /* Reduced font size for mobile */
