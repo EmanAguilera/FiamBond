@@ -17,14 +17,18 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 export default function Home() {
   const { user, token } = useContext(AppContext);
 
-  const [activeModal, setActiveModal] = useState(null);
+  // --- START OF FIX ---
+  // State hooks to control the visibility of each specific modal.
+  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
+  const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
+  // --- END OF FIX ---
 
   // --- STATE FOR THE ENTIRE DASHBOARD ---
 
   // State for the summary cards
-  const [balance, setBalance] = useState(null);
-  const [balanceLoading, setBalanceLoading] = useState(true);
-  const [balanceError, setBalanceError] = useState(null);
+  const [summaryData, setSummaryData] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState(null);
   
   // State for active goals count
   const [activeGoalsCount, setActiveGoalsCount] = useState(0);
@@ -43,10 +47,10 @@ export default function Home() {
 
   // --- DATA FETCHING FOR THE DASHBOARD ---
 
-  const getBalance = useCallback(async () => {
+  const getSummaryData = useCallback(async () => {
     if (!token) return;
-    setBalanceLoading(true);
-    setBalanceError(null);
+    setSummaryLoading(true);
+    setSummaryError(null);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/balance`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -55,17 +59,15 @@ export default function Home() {
         throw new Error("Could not load summary data.");
       }
       const data = await res.json();
-      setBalance(data.balance);
+      // Assuming the balance is the netPosition for this card
+      setSummaryData({ netPosition: data.balance });
     } catch (err) {
-      setBalanceError(err.message);
+      setSummaryError(err.message);
     } finally {
-      setBalanceLoading(false);
+      setSummaryLoading(false);
     }
   }, [token]);
   
-  // --- START OF FIX ---
-  // This function is updated to call the new, dedicated endpoint for counting
-  // only personal active goals, which is more accurate and efficient.
   const getActiveGoalsCount = useCallback(async () => {
     if (!token) return;
     setGoalsCountLoading(true);
@@ -75,19 +77,14 @@ export default function Home() {
       });
       if (res.ok) {
         const data = await res.json();
-        setActiveGoalsCount(data.count || 0); // Directly use the count from the API response
-      } else {
-        setActiveGoalsCount(0);
+        setActiveGoalsCount(data.count || 0);
       }
     } catch (error) {
         console.error("Error fetching active goals count:", error);
-        setActiveGoalsCount(0);
     } finally {
         setGoalsCountLoading(false);
     }
   }, [token]);
-  // --- END OF FIX ---
-
 
 
   const getReport = useCallback(async () => {
@@ -129,18 +126,18 @@ export default function Home() {
   // Main effect to fetch all dashboard data
   useEffect(() => {
     if (token) {
-      getBalance();
+      getSummaryData();
       getActiveGoalsCount();
       getReport();
       getFamilySummaries();
     } else {
-      setBalance(null);
+      setSummaryData(null);
       setActiveGoalsCount(0);
       setReport(null);
       setFamilySummaries([]);
       setFamilyPagination(null);
     }
-  }, [token, getReport, getFamilySummaries, getBalance, getActiveGoalsCount]);
+  }, [token, getReport, getFamilySummaries, getSummaryData, getActiveGoalsCount]);
 
 
   const chartOptions = {
@@ -164,28 +161,41 @@ export default function Home() {
 
           {/* --- UPDATED DASHBOARD CARDS SECTION --- */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Current Money Card */}
-            <div className="dashboard-card">
+            {/* --- START OF FIX: This card now opens the transactions modal --- */}
+            <div 
+              className="dashboard-card-interactive" 
+              onClick={() => setIsTransactionsModalOpen(true)}
+              role="button"
+              tabIndex="0"
+            >
               <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
-              {balanceLoading ? <div className="h-8 w-3/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
-               balanceError ? <p className="text-red-500 text-sm">Could not load data</p> :
-               (
-                <p className={`text-3xl font-bold mt-2 ${balance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                  ₱{parseFloat(balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {summaryLoading ? <div className="h-8 w-3/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
+               summaryError ? <p className="text-red-500 text-sm">Could not load data</p> :
+               summaryData && (
+                <p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  ₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               )}
+              <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
             </div>
+            {/* --- END OF FIX --- */}
 
-            {/* Active Goals Card */}
-            <div className="dashboard-card">
-              <h4 className="font-bold text-gray-600">Active Goals</h4>
+            {/* --- START OF FIX: This card now opens the goals modal --- */}
+            <div 
+              className="dashboard-card-interactive" 
+              onClick={() => setIsGoalsModalOpen(true)}
+              role="button"
+              tabIndex="0"
+            >
+              <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
               {goalsCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
               (
                 <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
               )}
+              <span className="text-link text-sm mt-2">View Goals &rarr;</span>
             </div>
+            {/* --- END OF FIX --- */}
             
-            {/* Family Count Card */}
             <div className="dashboard-card">
               <h4 className="font-bold text-gray-600">Your Families</h4>
               {familyPagination === null ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
@@ -269,31 +279,10 @@ export default function Home() {
             )}
           </div>
           
-          {/* --- WIDGET CARDS SECTION --- */}
-          <div className="dashboard-section grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="dashboard-card p-6 flex flex-col justify-between">
-              <div>
-                <h3 className="font-bold text-xl mb-4">Your Active Goals</h3>
-                <p className="text-gray-600">You have active financial goals you are working towards.</p>
-              </div>
-              <div className="mt-6">
-                <button onClick={() => setActiveModal('goals')} className="text-link font-bold">
-                  View Goals &rarr;
-                </button>
-              </div>
-            </div>
-            <div className="dashboard-card p-6 flex flex-col justify-between">
-              <div>
-                <h3 className="font-bold text-xl mb-4">Your Personal Transactions</h3>
-                <p className="text-gray-600">Review and manage your complete transaction history.</p>
-              </div>
-              <div className="mt-6">
-                <button onClick={() => setActiveModal('transactions')} className="text-link font-bold">
-                  View Transactions &rarr;
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* --- START OF FIX: The dedicated widget section has been removed. --- */}
+          {/* The cards above now handle opening the modals directly. */}
+          {/* --- END OF FIX --- */}
+
         </div>
 
       ) : (
@@ -330,24 +319,25 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALS --- */}
-      {/* These are rendered here but only become visible when `activeModal` is set */}
+      {/* --- START OF FIX: MODALS --- */}
+      {/* These are now controlled by their own state variables for a cleaner UX. */}
       
       <Modal 
-        isOpen={activeModal === 'goals'} 
-        onClose={() => setActiveModal(null)}
-        title="Your Active Goals"
+        isOpen={isGoalsModalOpen} 
+        onClose={() => setIsGoalsModalOpen(false)}
+        title="Your Active Personal Goals"
       >
         <ActiveGoalsWidget />
       </Modal>
 
       <Modal 
-        isOpen={activeModal === 'transactions'} 
-        onClose={() => setActiveModal(null)}
+        isOpen={isTransactionsModalOpen} 
+        onClose={() => setIsTransactionsModalOpen(false)}
         title="Your Personal Transactions"
       >
         <RecentTransactionsWidget />
       </Modal>
+      {/* --- END OF FIX --- */}
       
     </>
   );
