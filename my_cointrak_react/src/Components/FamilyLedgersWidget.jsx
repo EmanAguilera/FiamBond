@@ -54,8 +54,9 @@ export default function FamilyLedgersWidget() {
             {summaries.map((summary) => (
               <div key={summary.id} className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                 {/* --- START OF FIX --- */}
-                {/* Corrected property names from snake_case to camelCase to match the API response */}
-                <h4 className="font-bold text-lg mb-3">{summary.name}</h4>
+                {/* The property from the API is 'first_name', not 'name'. This corrects the missing title. */}
+                <h4 className="font-bold text-lg mb-3">{summary.first_name}</h4>
+                {/* --- END OF FIX --- */}
                 <div className="space-y-2 text-sm">
                   <p className="flex justify-between">
                     <span>Total Inflow:</span>
@@ -82,7 +83,6 @@ export default function FamilyLedgersWidget() {
                     View Full Ledger &rarr;
                   </Link>
                 </div>
-                {/* --- END OF FIX --- */}
               </div>
             ))}
           </div>
