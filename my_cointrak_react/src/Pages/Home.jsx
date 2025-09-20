@@ -10,6 +10,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import Modal from "../Components/Modal";
 import ActiveGoalsWidget from "../Components/ActiveGoalsWidget";
 import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
+import FamilyLedgersWidget from "../Components/FamilyLedgersWidget"; // Import the new widget
 
 // Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -17,35 +18,30 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 export default function Home() {
   const { user, token } = useContext(AppContext);
 
-  // --- START OF FIX ---
-  // State hooks to control the visibility of each specific modal.
+  // State hooks for controlling modal visibility
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
-  // --- END OF FIX ---
+  const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false); // Add state for family modal
 
-  // --- STATE FOR THE ENTIRE DASHBOARD ---
+  // --- STATE FOR THE DASHBOARD ---
 
-  // State for the summary cards
   const [summaryData, setSummaryData] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState(null);
   
-  // State for active goals count
   const [activeGoalsCount, setActiveGoalsCount] = useState(0);
   const [goalsCountLoading, setGoalsCountLoading] = useState(true);
 
+  // We only need the total family count for the card now
+  const [familyCount, setFamilyCount] = useState(0);
+  const [familyCountLoading, setFamilyCountLoading] = useState(true);
 
-  // State for the main Financial Report
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(true);
   const [reportError, setReportError] = useState(null);
-  const [period, setPeriod] = useState('monthly'); // Default period for the report
+  const [period, setPeriod] = useState('monthly');
 
-  // State for Family Ledgers
-  const [familySummaries, setFamilySummaries] = useState([]);
-  const [familyPagination, setFamilyPagination] = useState(null);
-
-  // --- DATA FETCHING FOR THE DASHBOARD ---
+  // --- DATA FETCHING ---
 
   const getSummaryData = useCallback(async () => {
     if (!token) return;
@@ -55,11 +51,8 @@ export default function Home() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/balance`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) {
-        throw new Error("Could not load summary data.");
-      }
+      if (!res.ok) throw new Error("Could not load summary data.");
       const data = await res.json();
-      // Assuming the balance is the netPosition for this card
       setSummaryData({ netPosition: data.balance });
     } catch (err) {
       setSummaryError(err.message);
@@ -86,6 +79,25 @@ export default function Home() {
     }
   }, [token]);
 
+  // Fetch only the family count for the dashboard card
+  const getFamilyCount = useCallback(async () => {
+    if (!token) return;
+    setFamilyCountLoading(true);
+    try {
+      // We only need the first page to get the total count from the pagination meta data
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries?page=1`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFamilyCount(data.total || 0);
+      }
+    } catch (error) { 
+      console.error("Error fetching family count:", error); 
+    } finally {
+      setFamilyCountLoading(false);
+    }
+  }, [token]);
 
   const getReport = useCallback(async () => {
     if (!token) return;
@@ -108,37 +120,20 @@ export default function Home() {
     }
   }, [token, period]);
 
-  const getFamilySummaries = useCallback(async (page = 1) => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries?page=${page}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setFamilySummaries(Array.isArray(data.data) ? data.data : []);
-        const { data: _, ...paginationData } = data;
-        setFamilyPagination(paginationData);
-      }
-    } catch (error) { console.error("Error fetching family summaries:", error); }
-  }, [token]);
-
   // Main effect to fetch all dashboard data
   useEffect(() => {
     if (token) {
       getSummaryData();
       getActiveGoalsCount();
+      getFamilyCount();
       getReport();
-      getFamilySummaries();
     } else {
       setSummaryData(null);
       setActiveGoalsCount(0);
+      setFamilyCount(0);
       setReport(null);
-      setFamilySummaries([]);
-      setFamilyPagination(null);
     }
-  }, [token, getReport, getFamilySummaries, getSummaryData, getActiveGoalsCount]);
-
+  }, [token, getReport, getSummaryData, getActiveGoalsCount, getFamilyCount]);
 
   const chartOptions = {
     responsive: true,
@@ -159,9 +154,8 @@ export default function Home() {
             </Link>
           </header>
 
-          {/* --- UPDATED DASHBOARD CARDS SECTION --- */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* --- START OF FIX: This card now opens the transactions modal --- */}
+            {/* Current Money Card -> Opens Transactions Modal */}
             <div 
               className="dashboard-card-interactive" 
               onClick={() => setIsTransactionsModalOpen(true)}
@@ -178,9 +172,8 @@ export default function Home() {
               )}
               <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
             </div>
-            {/* --- END OF FIX --- */}
-
-            {/* --- START OF FIX: This card now opens the goals modal --- */}
+            
+            {/* Active Goals Card -> Opens Goals Modal */}
             <div 
               className="dashboard-card-interactive" 
               onClick={() => setIsGoalsModalOpen(true)}
@@ -194,17 +187,22 @@ export default function Home() {
               )}
               <span className="text-link text-sm mt-2">View Goals &rarr;</span>
             </div>
-            {/* --- END OF FIX --- */}
             
-            <div className="dashboard-card">
+            {/* Your Families Card -> Opens Family Ledgers Modal */}
+            <div 
+              className="dashboard-card-interactive" 
+              onClick={() => setIsFamilyModalOpen(true)}
+              role="button"
+              tabIndex="0"
+            >
               <h4 className="font-bold text-gray-600">Your Families</h4>
-              {familyPagination === null ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
+              {familyCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
               (
-                 <p className="text-3xl font-bold text-slate-800 mt-2">{familyPagination?.total || 0}</p>
+                 <p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>
               )}
+              <span className="text-link text-sm mt-2">View Ledgers &rarr;</span>
             </div>
           </div>
-
 
           {/* --- FINANCIAL REPORT WIDGET SECTION --- */}
           <div className="dashboard-section">
@@ -245,44 +243,6 @@ export default function Home() {
             </div>
           </div>
           
-          {/* --- FAMILY LEDGERS SECTION --- */}
-          <div className="dashboard-section">
-            <h3 className="font-bold text-2xl text-gray-800 mb-6">Your Family Ledgers</h3>
-            {familySummaries.length > 0 ? (
-              <div className="mb-12">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {familySummaries.map((summary) => (
-                    <div key={summary.id} className="dashboard-card p-6 flex flex-col justify-between">
-                      <div>
-                        <h4 className="font-bold text-xl mb-4">{summary.first_name}</h4>
-                        <div className="space-y-2 text-sm">
-                          <p className="flex justify-between"><span>Total Inflow:</span><span className="font-semibold text-green-600">+₱{parseFloat(summary.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
-                          <p className="flex justify-between"><span>Total Outflow:</span><span className="font-semibold text-red-500">-₱{parseFloat(summary.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
-                          <hr className="border-dashed my-2"/>
-                          <p className={`flex justify-between font-bold text-base ${summary.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}><span>Net Position:</span><span>₱{parseFloat(summary.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></p>
-                        </div>
-                      </div>
-                      <div className="mt-6"><Link to={`/families/${summary.id}/ledger`} className="text-link font-bold">View Full Ledger &rarr;</Link></div>
-                    </div>
-                  ))}
-                </div>
-                {familyPagination && familyPagination.last_page > 1 && (
-                  <div className="flex justify-between items-center mt-6">
-                    <button onClick={() => getFamilySummaries(familyPagination.current_page - 1)} disabled={familyPagination.current_page === 1} className="pagination-btn">&larr; Previous</button>
-                    <span className="pagination-text">Page {familyPagination.current_page} of {familyPagination.last_page}</span>
-                    <button onClick={() => getFamilySummaries(familyPagination.current_page + 1)} disabled={familyPagination.current_page === familyPagination.last_page} className="pagination-btn">Next &rarr;</button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="dashboard-card text-center mb-12"><p className="text-gray-500">You are not a member of any families yet.</p></div>
-            )}
-          </div>
-          
-          {/* --- START OF FIX: The dedicated widget section has been removed. --- */}
-          {/* The cards above now handle opening the modals directly. */}
-          {/* --- END OF FIX --- */}
-
         </div>
 
       ) : (
@@ -319,9 +279,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- START OF FIX: MODALS --- */}
-      {/* These are now controlled by their own state variables for a cleaner UX. */}
-      
+      {/* --- MODALS --- */}
       <Modal 
         isOpen={isGoalsModalOpen} 
         onClose={() => setIsGoalsModalOpen(false)}
@@ -337,7 +295,14 @@ export default function Home() {
       >
         <RecentTransactionsWidget />
       </Modal>
-      {/* --- END OF FIX --- */}
+      
+      <Modal 
+        isOpen={isFamilyModalOpen} 
+        onClose={() => setIsFamilyModalOpen(false)}
+        title="Your Family Ledgers"
+      >
+        <FamilyLedgersWidget />
+      </Modal>
       
     </>
   );
