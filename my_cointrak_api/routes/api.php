@@ -34,6 +34,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::apiResource('goals', GoalController::class)->except(['show', 'update']);
     
     // Transaction Routes
+
+    // --- START OF FIX ---
+    // The route is corrected to /reports to match the frontend API call.
+    // The auth middleware is added to protect the route.
+    Route::get('/reports', [ReportController::class, 'generateMonthlyReport'])->middleware('auth:sanctum');
+    // --- END OF FIX ---
     
     Route::get('/user/balance', [ReportController::class, 'getUserBalance']);
 
