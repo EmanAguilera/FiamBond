@@ -8,7 +8,6 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 
 // --- WIDGET IMPORTS ---
 import Modal from "../Components/Modal";
-import ActiveGoalsWidget from "../Components/ActiveGoalsWidget";
 import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
 import FamilyLedgersWidget from "../Components/FamilyLedgersWidget";
 import CreateTransactionWidget from "../Components/CreateTransactionWidget"; // Import the new widget
@@ -295,13 +294,14 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALS --- */}
+       {/* --- MODALS --- */}
+      {/* --- THIS IS THE UPDATED MODAL --- */}
       <Modal 
         isOpen={isGoalsModalOpen} 
         onClose={() => setIsGoalsModalOpen(false)}
-        title="Your Active Personal Goals"
+        title="Manage Your Financial Goals" // Updated title
       >
-        <ActiveGoalsWidget />
+        <GoalManager /> {/* Use the new component */}
       </Modal>
 
       <Modal 
