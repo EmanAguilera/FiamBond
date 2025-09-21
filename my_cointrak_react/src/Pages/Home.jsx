@@ -8,10 +8,11 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 
 // --- WIDGET IMPORTS ---
 import Modal from "../Components/Modal";
-import GoalManager from "../Components/GoalManager"; 
+import GoalListsWidget from "../Components/GoalListsWidget";
+import CreateGoalWidget from "../Components/CreateGoalWidget";
 import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
 import FamilyLedgersWidget from "../Components/FamilyLedgersWidget";
-import CreateTransactionWidget from "../Components/CreateTransactionWidget"; // Import the new widget
+import CreateTransactionWidget from "../Components/CreateTransactionWidget";
 
 // Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -23,7 +24,8 @@ export default function Home() {
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
-  const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false); // State for the new modal
+  const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false);
+  const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false); // State for the new goal creation modal
 
   // --- STATE FOR THE DASHBOARD ---
   const [summaryData, setSummaryData] = useState(null);
@@ -114,44 +116,41 @@ export default function Home() {
     }
   }, [token, period]);
 
-  // --- START OF THE FIX ---
-
-  // OPTIMIZATION: This effect fetches core stats that only depend on the user's token.
-  // It runs only once when the user logs in and won't re-run unnecessarily when the report period changes.
+  // --- OPTIMIZED EFFECTS ---
+  // Effect for core stats that don't change often
   useEffect(() => {
     if (token) {
       getSummaryData();
       getActiveGoalsCount();
       getFamilyCount();
     } else {
-      // Reset state if the user logs out
       setSummaryData(null);
       setActiveGoalsCount(0);
       setFamilyCount(0);
     }
   }, [token, getSummaryData, getActiveGoalsCount, getFamilyCount]);
 
-  // OPTIMIZATION: This effect is now dedicated to fetching the financial report.
-  // It re-runs ONLY when the 'token' or the 'period' state changes.
-  // This is what makes the period filter buttons feel fast and responsive.
+  // Effect specifically for the financial report, which depends on the 'period' filter
   useEffect(() => {
     if (token) {
       getReport();
     } else {
-      // Reset report if the user logs out
       setReport(null);
     }
-  }, [token, getReport]); // getReport is memoized and only updates when 'token' or 'period' changes.
+  }, [token, getReport]);
 
-  // --- END OF THE FIX ---
-
-
-  // This function will be called on successful transaction creation
+  // --- SUCCESS HANDLERS ---
+  // Called on successful transaction creation to update the dashboard
   function handleTransactionSuccess() {
-    setIsCreateTransactionModalOpen(false); // Close the modal
-    // Re-fetch all relevant data to update the dashboard immediately
-    getSummaryData();
-    getReport();
+    setIsCreateTransactionModalOpen(false);
+    getSummaryData(); // Refresh balance
+    getReport();      // Refresh financial report
+  }
+  
+  // Called on successful goal creation to update the dashboard
+  function handleGoalSuccess() {
+    setIsCreateGoalModalOpen(false);
+    getActiveGoalsCount(); // Refresh the active goal count on the card
   }
 
   const chartOptions = {
@@ -168,13 +167,20 @@ export default function Home() {
       {user ? (
         <div className="p-4 md:p-10">
           <header className="dashboard-header">
-            {/* This is now a button that opens the modal */}
-            <button 
-              onClick={() => setIsCreateTransactionModalOpen(true)}
-              className="primary-btn max-w-xs sm:max-w-[200px]"
-            >
-              + Add Transaction
-            </button>
+            <div className="flex flex-wrap gap-4">
+              <button 
+                onClick={() => setIsCreateTransactionModalOpen(true)}
+                className="primary-btn"
+              >
+                + Add Transaction
+              </button>
+              <button 
+                onClick={() => setIsCreateGoalModalOpen(true)}
+                className="secondary-btn"
+              >
+                + Add Goal
+              </button>
+            </div>
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -295,14 +301,13 @@ export default function Home() {
         </div>
       )}
 
-       {/* --- MODALS --- */}
-      {/* --- THIS IS THE UPDATED MODAL --- */}
+      {/* --- MODALS --- */}
       <Modal 
         isOpen={isGoalsModalOpen} 
         onClose={() => setIsGoalsModalOpen(false)}
-        title="Manage Your Financial Goals" // Updated title
+        title="Your Financial Goals"
       >
-        <GoalManager /> {/* Use the new component */}
+        <GoalListsWidget />
       </Modal>
 
       <Modal 
@@ -327,6 +332,14 @@ export default function Home() {
         title="Add a New Transaction"
       >
         <CreateTransactionWidget onSuccess={handleTransactionSuccess} />
+      </Modal>
+      
+      <Modal
+        isOpen={isCreateGoalModalOpen}
+        onClose={() => setIsCreateGoalModalOpen(false)}
+        title="Create a New Goal"
+      >
+        <CreateGoalWidget onSuccess={handleGoalSuccess} />
       </Modal>
       
     </>
