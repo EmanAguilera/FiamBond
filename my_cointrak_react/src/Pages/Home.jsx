@@ -11,8 +11,9 @@ import Modal from "../Components/Modal";
 import GoalListsWidget from "../Components/GoalListsWidget";
 import CreateGoalWidget from "../Components/CreateGoalWidget";
 import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
-import FamilyLedgersWidget from "../Components/FamilyLedgersWidget";
 import CreateTransactionWidget from "../Components/CreateTransactionWidget";
+import FamilyManagementWidget from "../Components/FamilyManagementWidget";
+import CreateFamilyWidget from "../Components/CreateFamilyWidget"; 
 
 // Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -25,7 +26,8 @@ export default function Home() {
   const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
   const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false);
-  const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false); // State for the new goal creation modal
+  const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false);
+  const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
 
   // --- STATE FOR THE DASHBOARD ---
   const [summaryData, setSummaryData] = useState(null);
@@ -53,7 +55,9 @@ export default function Home() {
       const data = await res.json();
       setSummaryData({ netPosition: data.balance });
     } catch (err) {
-      setSummaryError(err.message);
+      // --- FIX 1: The error is now logged to the console, resolving the ESLint warning ---
+      console.error("Failed to fetch summary data:", err);
+      setSummaryError("Network error. Please check your connection.");
     } finally {
       setSummaryLoading(false);
     }
@@ -103,13 +107,12 @@ export default function Home() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reports?period=${period}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => null);
-        throw new Error(errorData?.message || "Could not process the financial report.");
-      }
+      if (!res.ok) throw new Error("Could not process the financial report.");
       setReport(await res.json());
     } catch (err) {
-      setReportError(err.message);
+      // --- FIX 2: The error is now logged to the console, resolving the ESLint warning ---
+      console.error("Failed to fetch report:", err);
+      setReportError("Network error. Please try again.");
       setReport(null);
     } finally {
       setReportLoading(false);
@@ -117,7 +120,6 @@ export default function Home() {
   }, [token, period]);
 
   // --- OPTIMIZED EFFECTS ---
-  // Effect for core stats that don't change often
   useEffect(() => {
     if (token) {
       getSummaryData();
@@ -130,27 +132,26 @@ export default function Home() {
     }
   }, [token, getSummaryData, getActiveGoalsCount, getFamilyCount]);
 
-  // Effect specifically for the financial report, which depends on the 'period' filter
   useEffect(() => {
-    if (token) {
-      getReport();
-    } else {
-      setReport(null);
-    }
+    if (token) getReport();
+    else setReport(null);
   }, [token, getReport]);
 
   // --- SUCCESS HANDLERS ---
-  // Called on successful transaction creation to update the dashboard
   function handleTransactionSuccess() {
     setIsCreateTransactionModalOpen(false);
-    getSummaryData(); // Refresh balance
-    getReport();      // Refresh financial report
+    getSummaryData();
+    getReport();
   }
   
-  // Called on successful goal creation to update the dashboard
   function handleGoalSuccess() {
     setIsCreateGoalModalOpen(false);
-    getActiveGoalsCount(); // Refresh the active goal count on the card
+    getActiveGoalsCount();
+  }
+
+  function handleFamilySuccess() {
+    setIsCreateFamilyModalOpen(false);
+    getFamilyCount();
   }
 
   const chartOptions = {
@@ -168,63 +169,31 @@ export default function Home() {
         <div className="p-4 md:p-10">
           <header className="dashboard-header">
             <div className="flex flex-wrap gap-4">
-              <button 
-                onClick={() => setIsCreateTransactionModalOpen(true)}
-                className="primary-btn"
-              >
-                + Add Transaction
-              </button>
-              <button 
-                onClick={() => setIsCreateGoalModalOpen(true)}
-                className="secondary-btn"
-              >
-                + Add Goal
-              </button>
+              <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
+              <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
+              <button onClick={() => setIsCreateFamilyModalOpen(true)} className="secondary-btn">+ Add Family</button>
             </div>
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div 
-              className="dashboard-card-interactive" 
-              onClick={() => setIsTransactionsModalOpen(true)}
-              role="button"
-              tabIndex="0"
-            >
+            <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
               <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
               {summaryLoading ? <div className="h-8 w-3/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
-               summaryError ? <p className="text-red-500 text-sm">Could not load data</p> :
-               summaryData && (
-                <p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                  ₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              )}
+               summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
+               summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
               <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
             </div>
-            <div 
-              className="dashboard-card-interactive" 
-              onClick={() => setIsGoalsModalOpen(true)}
-              role="button"
-              tabIndex="0"
-            >
+            
+            <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
               <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
-              {goalsCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
-              (
-                <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
-              )}
+              {goalsCountLoading ? <div className="h-8 w-1/á bg-slate-200 animate-pulse mt-2 rounded"></div> : (<p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>)}
               <span className="text-link text-sm mt-2">View Goals &rarr;</span>
             </div>
-            <div 
-              className="dashboard-card-interactive" 
-              onClick={() => setIsFamilyModalOpen(true)}
-              role="button"
-              tabIndex="0"
-            >
+
+            <div className="dashboard-card-interactive" onClick={() => setIsFamilyModalOpen(true)} role="button" tabIndex="0">
               <h4 className="font-bold text-gray-600">Your Families</h4>
-              {familyCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
-              (
-                 <p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>
-              )}
-              <span className="text-link text-sm mt-2">View Ledgers &rarr;</span>
+              {familyCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> : (<p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>)}
+              <span className="text-link text-sm mt-2">Manage Families &rarr;</span>
             </div>
           </div>
 
@@ -234,20 +203,13 @@ export default function Home() {
               <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
               <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
             </div>
-
             <div className="content-card font-mono text-slate-800">
-              {reportLoading ? (
-                <p className="text-center py-10">Generating Your Financial Report...</p>
-              ) : reportError ? (
-                <p className="error text-center py-10">{reportError}</p>
-              ) : report ? (
+              {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
+               reportError ? <p className="error text-center py-10">{reportError}</p> : 
+               report ? (
                 <>
                   <div className="mb-8 relative" style={{ height: '350px' }}>
-                    {report.chartData && report.chartData.datasets && report.chartData.datasets.length > 0 ? (
-                      <Bar options={chartOptions} data={report.chartData} />
-                    ) : (
-                      <div className="flex items-center justify-center h-full"><p>Not enough data to display a chart for this period.</p></div>
-                    )}
+                    {report.chartData?.datasets?.length > 0 ? (<Bar options={chartOptions} data={report.chartData} />) : (<div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>)}
                   </div>
                   <div className="space-y-3 text-sm">
                     <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
@@ -260,30 +222,19 @@ export default function Home() {
                     <ul className="list-disc pl-6"><li>{report.transactionCount} individual transactions were logged in this period.</li></ul>
                   </div>
                 </>
-              ) : (
-                <p className="text-center py-10">No report data available for the selected period.</p>
-              )}
+              ) : <p className="text-center py-10">No report data available.</p>}
             </div>
           </div>
-          
         </div>
       ) : (
         <div className="hero-section">
           <div className="hero-content">
             <div className="hero-text">
-              <h1 className="hero-headline">
-                Take Control of Your Finances
-              </h1>
-              <p className="hero-subheadline">
-                Cointrak is the simplest way to manage your personal and family finances. Track your income, monitor expenses, and achieve your financial goals with ease.
-              </p>
+              <h1 className="hero-headline">Take Control of Your Finances</h1>
+              <p className="hero-subheadline">Cointrak is the simplest way to manage your personal and family finances. Track your income, monitor expenses, and achieve your financial goals with ease.</p>
               <div className="hero-cta">
-                <Link to="/register" className="primary-btn text-lg">
-                  Get Started for Free
-                </Link>
-                <Link to="/login" className="text-link text-lg">
-                  Login to your account
-                </Link>
+                <Link to="/register" className="primary-btn text-lg">Get Started for Free</Link>
+                <Link to="/login" className="text-link text-lg">Login to your account</Link>
               </div>
               <div className="mt-8 p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-700 rounded-r-lg">
                 <p className="font-bold">Disclaimer:</p>
@@ -291,57 +242,21 @@ export default function Home() {
               </div>
             </div>
             <div className="hero-visual">
-              <img
-                src="/CoinTrak_Image.png"
-                alt="A family happily managing their finances on a tablet with an overlay of financial charts"
-                className="rounded-xl shadow-2xl"
-              />
+              <img src="/CoinTrak_Image.png" alt="A family happily managing their finances on a tablet with an overlay of financial charts" className="rounded-xl shadow-2xl" />
             </div>
           </div>
         </div>
       )}
 
       {/* --- MODALS --- */}
-      <Modal 
-        isOpen={isGoalsModalOpen} 
-        onClose={() => setIsGoalsModalOpen(false)}
-        title="Your Financial Goals"
-      >
-        <GoalListsWidget />
-      </Modal>
-
-      <Modal 
-        isOpen={isTransactionsModalOpen} 
-        onClose={() => setIsTransactionsModalOpen(false)}
-        title="Your Personal Transactions"
-      >
-        <RecentTransactionsWidget />
-      </Modal>
+      <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><RecentTransactionsWidget /></Modal>
+      <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>
+      <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget /></Modal>
       
-      <Modal 
-        isOpen={isFamilyModalOpen} 
-        onClose={() => setIsFamilyModalOpen(false)}
-        title="Your Family Ledgers"
-      >
-        <FamilyLedgersWidget />
-      </Modal>
-      
-      <Modal
-        isOpen={isCreateTransactionModalOpen}
-        onClose={() => setIsCreateTransactionModalOpen(false)}
-        title="Add a New Transaction"
-      >
-        <CreateTransactionWidget onSuccess={handleTransactionSuccess} />
-      </Modal>
-      
-      <Modal
-        isOpen={isCreateGoalModalOpen}
-        onClose={() => setIsCreateGoalModalOpen(false)}
-        title="Create a New Goal"
-      >
-        <CreateGoalWidget onSuccess={handleGoalSuccess} />
-      </Modal>
-      
+      {/* Action Modals */}
+      <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>
+      <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>
+      <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>
     </>
   );
 }
