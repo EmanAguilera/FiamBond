@@ -1,5 +1,5 @@
 import { useState, useCallback, useContext, useEffect } from 'react';
-import { AppContext } from '../Context/AppContext';
+import { AppContext } from '../Context/AppContext.jsx';
 import FamilyListItem from './FamilyListItems.jsx'; // Make sure this path is correct
 
 // --- CHART IMPORTS ---
