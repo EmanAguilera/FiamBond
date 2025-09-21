@@ -8,6 +8,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 
 // --- WIDGET IMPORTS ---
 import Modal from "../Components/Modal";
+import GoalManager from "../Components/GoalManager"; 
 import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
 import FamilyLedgersWidget from "../Components/FamilyLedgersWidget";
 import CreateTransactionWidget from "../Components/CreateTransactionWidget"; // Import the new widget
