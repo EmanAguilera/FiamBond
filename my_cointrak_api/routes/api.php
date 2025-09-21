@@ -34,7 +34,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::apiResource('goals', GoalController::class)->except(['show', 'update']);
     
     // Transaction Routes
-    Route::apiResource('transactions', TransactionController::class);
     
     Route::get('/user/balance', [ReportController::class, 'getUserBalance']);
 
