@@ -8,7 +8,6 @@ import FamiliesShow from "./Pages/Families/Show.jsx";
 import GoalsIndex from "./Pages/Goals/Index.jsx";
 import FamilyLedger from "./Pages/Families/Ledger.jsx";
 import TransactionsCreate from "./Pages/Transactions/Create.jsx";
-import ReportsIndex from "./Pages/Reports/Index.jsx";
 import Settings from "./Pages/Settings.jsx"; // Import the new Settings component
 import PrivateRoutes from "./Utils/PrivateRoutes"; // Import a guard for authenticated routes
 
@@ -28,7 +27,6 @@ export default function App() {
           <Route path="/families/:id/ledger" element={<FamilyLedger />} />
           <Route path="/goals" element={<GoalsIndex />} />
           <Route path="/transactions/create" element={<TransactionsCreate />} />
-          <Route path="/reports" element={<ReportsIndex />} />
           <Route path="/settings" element={<Settings />} /> {/* Add the new settings route here */}
         </Route>
       </Route>

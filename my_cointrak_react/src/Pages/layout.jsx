@@ -20,7 +20,6 @@ export default function Layout() {
         { name: "Dashboard", href: "/", icon: HomeIcon },
         { name: "Families", href: "/families", icon: UserGroupIcon },
         { name: "Goals", href: "/goals", icon: CalendarDaysIcon },
-        { name: "Ledger", href: "/reports", icon: BookOpenIcon },
         { name: "Settings", href: "/settings", icon: Cog6ToothIcon },
     ] : [];
 
