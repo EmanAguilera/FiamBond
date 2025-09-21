@@ -11,7 +11,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 // --- Internal Component for the Ledger View ---
 const FamilyLedgerView = ({ family, onBack }) => {
-    // ... (This component is correct and does not need changes)
+    // This component is correct and does not need changes.
     const { token } = useContext(AppContext);
     const [report, setReport] = useState(null);
     const [transactions, setTransactions] = useState([]);
@@ -109,52 +109,84 @@ const FamilyLedgerView = ({ family, onBack }) => {
     );
 };
 
+
 // --- Internal Component for the Members View (with fixes) ---
 const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
     const { token } = useContext(AppContext);
-    const [currentFamily, setCurrentFamily] = useState(family);
+    
+    const [detailedFamily, setDetailedFamily] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
     const [newMemberEmail, setNewMemberEmail] = useState("");
     const [formErrors, setFormErrors] = useState({});
     const [formMessage, setFormMessage] = useState({ type: '', text: '' });
     const MAX_MEMBERS_PER_FAMILY = 10;
 
-    // Ensure members is an array, defaulting to an empty one if it's missing
-    const members = currentFamily?.members || [];
+    const getFamilyDetails = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error("Could not load family details.");
+            const data = await res.json();
+            setDetailedFamily(data);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [token, family.id]);
+
+    useEffect(() => {
+        getFamilyDetails();
+    }, [getFamilyDetails]);
 
     async function handleAddMember(e) {
         e.preventDefault();
         setFormMessage({ type: '', text: '' });
-        setFormErrors({});
+        setFormErrors({}); // Reset errors on new submission
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${currentFamily.id}/members`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/members`, {
                 method: "post",
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
                 body: JSON.stringify({ email: newMemberEmail }),
             });
             const data = await res.json();
             if (!res.ok) {
-                if (res.status === 422) setFormErrors(data.errors);
-                else setFormMessage({ type: 'error', text: data.message || "Failed to add member." });
+                // --- FIX 2: Handle validation errors (422) by calling setFormErrors ---
+                if (res.status === 422) {
+                    setFormErrors(data.errors);
+                } else {
+                    setFormMessage({ type: 'error', text: data.message || "Failed to add member." });
+                }
                 return;
             }
-            setCurrentFamily(data);
+            setDetailedFamily(data); 
             onFamilyUpdate(data);
             setNewMemberEmail("");
             setFormMessage({ type: 'success', text: "Member added successfully!" });
         } catch (err) {
-            console.error('Failed to add member:', err);
+            // --- FIX 1: Log the caught error to resolve the 'no-unused-vars' warning ---
+            console.error("Failed to add member:", err);
             setFormMessage({ type: 'error', text: 'A network error occurred.' });
         }
     }
     
+    if (loading) return <p className="text-center py-4">Loading members...</p>;
+    if (error) return <p className="error text-center py-4">{error}</p>;
+
+    const members = detailedFamily?.members || [];
+
     return (
         <div className="space-y-8">
             <button onClick={onBack} className="secondary-btn-sm">&larr; Back to Families List</button>
 
-            {/* --- FIX 1: Check if members array exists BEFORE checking its length --- */}
             {members.length < MAX_MEMBERS_PER_FAMILY ? (
                 <div>
-                    <h2 className="font-bold text-xl mb-4 text-gray-800">Add Member to "{currentFamily.first_name}"</h2>
+                    <h2 className="font-bold text-xl mb-4 text-gray-800">Add Member to "{detailedFamily.first_name}"</h2>
                     <form onSubmit={handleAddMember} className="space-y-4">
                         <input type="email" placeholder="New Member's Email" value={newMemberEmail} onChange={(e) => setNewMemberEmail(e.target.value)} className="w-full p-2 border rounded-md" />
                         {formErrors.email && <p className="error">{formErrors.email[0]}</p>}
@@ -163,11 +195,10 @@ const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
                     </form>
                 </div>
             ) : (
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 p-4 rounded-md"><p className="font-bold">Member Limit Reached</p><p>This family cannot have more than {MAX_MEMBERS_PER_FAMILY} members.</p></div>
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 p-4 rounded-md"><p className="font-bold">Member Limit Reached</p></div>
             )}
 
             <div>
-                {/* --- FIX 2: Use the safe 'members' variable for the count and map --- */}
                 <h2 className="font-bold text-xl mb-4 text-gray-800">Current Members ({members.length})</h2>
                 <div className="space-y-3">
                     {members.length > 0 ? (
@@ -187,9 +218,8 @@ const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
 };
 
 
-// --- Main Family Management Component (No changes needed here) ---
+// --- Main Family Management Component ---
 export default function FamilyManagementWidget() {
-    // ... (This component is correct and does not need changes)
     const { token } = useContext(AppContext);
     const [view, setView] = useState('list');
     const [selectedFamily, setSelectedFamily] = useState(null);
