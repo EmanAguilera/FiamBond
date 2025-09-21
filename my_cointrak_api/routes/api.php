@@ -34,6 +34,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::apiResource('goals', GoalController::class)->except(['show', 'update']);
     
     // Transaction Routes
+    Route::apiResource('transactions', TransactionController::class);
 
     // --- START OF FIX ---
     // The route is corrected to /reports to match the frontend API call.
