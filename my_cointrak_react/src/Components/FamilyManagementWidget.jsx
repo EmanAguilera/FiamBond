@@ -1,5 +1,5 @@
 import { useState, useCallback, useContext, useEffect } from 'react';
-import { AppContext } from '../Context/AppContext.jsx';
+import { AppContext } from '../Context/AppContext';
 import FamilyListItem from './FamilyListItems.jsx'; // Make sure this path is correct
 
 // --- CHART IMPORTS ---
@@ -11,6 +11,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 // --- Internal Component for the Ledger View ---
 const FamilyLedgerView = ({ family, onBack }) => {
+    // ... (This component is correct and does not need changes)
     const { token } = useContext(AppContext);
     const [report, setReport] = useState(null);
     const [transactions, setTransactions] = useState([]);
@@ -108,7 +109,7 @@ const FamilyLedgerView = ({ family, onBack }) => {
     );
 };
 
-// --- Internal Component for the Members View ---
+// --- Internal Component for the Members View (with fixes) ---
 const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
     const { token } = useContext(AppContext);
     const [currentFamily, setCurrentFamily] = useState(family);
@@ -116,6 +117,9 @@ const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
     const [formErrors, setFormErrors] = useState({});
     const [formMessage, setFormMessage] = useState({ type: '', text: '' });
     const MAX_MEMBERS_PER_FAMILY = 10;
+
+    // Ensure members is an array, defaulting to an empty one if it's missing
+    const members = currentFamily?.members || [];
 
     async function handleAddMember(e) {
         e.preventDefault();
@@ -138,7 +142,6 @@ const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
             setNewMemberEmail("");
             setFormMessage({ type: 'success', text: "Member added successfully!" });
         } catch (err) {
-            // --- FIX: The error is now logged to the console, resolving the ESLint warning ---
             console.error('Failed to add member:', err);
             setFormMessage({ type: 'error', text: 'A network error occurred.' });
         }
@@ -147,7 +150,9 @@ const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
     return (
         <div className="space-y-8">
             <button onClick={onBack} className="secondary-btn-sm">&larr; Back to Families List</button>
-            {currentFamily.members.length < MAX_MEMBERS_PER_FAMILY ? (
+
+            {/* --- FIX 1: Check if members array exists BEFORE checking its length --- */}
+            {members.length < MAX_MEMBERS_PER_FAMILY ? (
                 <div>
                     <h2 className="font-bold text-xl mb-4 text-gray-800">Add Member to "{currentFamily.first_name}"</h2>
                     <form onSubmit={handleAddMember} className="space-y-4">
@@ -160,23 +165,31 @@ const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
             ) : (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 p-4 rounded-md"><p className="font-bold">Member Limit Reached</p><p>This family cannot have more than {MAX_MEMBERS_PER_FAMILY} members.</p></div>
             )}
+
             <div>
-                <h2 className="font-bold text-xl mb-4 text-gray-800">Current Members ({currentFamily.members.length})</h2>
+                {/* --- FIX 2: Use the safe 'members' variable for the count and map --- */}
+                <h2 className="font-bold text-xl mb-4 text-gray-800">Current Members ({members.length})</h2>
                 <div className="space-y-3">
-                    {currentFamily.members.map((member) => (
-                        <div key={member.id} className="p-4 bg-gray-50 border rounded-md">
-                            <h3 className="font-semibold text-gray-700">{member.full_name}</h3>
-                            <p className="text-sm text-gray-500">{member.email}</p>
-                        </div>
-                    ))}
+                    {members.length > 0 ? (
+                        members.map((member) => (
+                            <div key={member.id} className="p-4 bg-gray-50 border rounded-md">
+                                <h3 className="font-semibold text-gray-700">{member.full_name}</h3>
+                                <p className="text-sm text-gray-500">{member.email}</p>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="italic text-gray-600">This family has no members yet.</p>
+                    )}
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Main Family Management Component ---
+
+// --- Main Family Management Component (No changes needed here) ---
 export default function FamilyManagementWidget() {
+    // ... (This component is correct and does not need changes)
     const { token } = useContext(AppContext);
     const [view, setView] = useState('list');
     const [selectedFamily, setSelectedFamily] = useState(null);
