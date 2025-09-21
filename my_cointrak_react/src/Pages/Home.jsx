@@ -114,20 +114,37 @@ export default function Home() {
     }
   }, [token, period]);
 
-  // Main effect to fetch all dashboard data
+  // --- START OF THE FIX ---
+
+  // OPTIMIZATION: This effect fetches core stats that only depend on the user's token.
+  // It runs only once when the user logs in and won't re-run unnecessarily when the report period changes.
   useEffect(() => {
     if (token) {
       getSummaryData();
       getActiveGoalsCount();
       getFamilyCount();
-      getReport();
     } else {
+      // Reset state if the user logs out
       setSummaryData(null);
       setActiveGoalsCount(0);
       setFamilyCount(0);
+    }
+  }, [token, getSummaryData, getActiveGoalsCount, getFamilyCount]);
+
+  // OPTIMIZATION: This effect is now dedicated to fetching the financial report.
+  // It re-runs ONLY when the 'token' or the 'period' state changes.
+  // This is what makes the period filter buttons feel fast and responsive.
+  useEffect(() => {
+    if (token) {
+      getReport();
+    } else {
+      // Reset report if the user logs out
       setReport(null);
     }
-  }, [token, getReport, getSummaryData, getActiveGoalsCount, getFamilyCount]);
+  }, [token, getReport]); // getReport is memoized and only updates when 'token' or 'period' changes.
+
+  // --- END OF THE FIX ---
+
 
   // This function will be called on successful transaction creation
   function handleTransactionSuccess() {
