@@ -13,7 +13,7 @@ import CreateGoalWidget from "../Components/CreateGoalWidget";
 import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
 import CreateTransactionWidget from "../Components/CreateTransactionWidget";
 import FamilyManagementWidget from "../Components/FamilyManagementWidget";
-import CreateFamilyWidget from "../Components/CreateFamilyWidget"; 
+import CreateFamilyWidget from "../Components/CreateFamilyWidget";
 
 // Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -55,7 +55,6 @@ export default function Home() {
       const data = await res.json();
       setSummaryData({ netPosition: data.balance });
     } catch (err) {
-      // --- FIX 1: The error is now logged to the console, resolving the ESLint warning ---
       console.error("Failed to fetch summary data:", err);
       setSummaryError("Network error. Please check your connection.");
     } finally {
@@ -110,7 +109,6 @@ export default function Home() {
       if (!res.ok) throw new Error("Could not process the financial report.");
       setReport(await res.json());
     } catch (err) {
-      // --- FIX 2: The error is now logged to the console, resolving the ESLint warning ---
       console.error("Failed to fetch report:", err);
       setReportError("Network error. Please try again.");
       setReport(null);
@@ -161,6 +159,11 @@ export default function Home() {
       legend: { position: 'top' },
       title: { display: true, text: 'Personal Inflow vs. Outflow' },
     },
+    scales: {
+      y: {
+        beginAtZero: true
+      }
+    }
   };
 
   return (
@@ -186,7 +189,7 @@ export default function Home() {
             
             <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
               <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
-              {goalsCountLoading ? <div className="h-8 w-1/á bg-slate-200 animate-pulse mt-2 rounded"></div> : (<p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>)}
+              {goalsCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> : (<p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>)}
               <span className="text-link text-sm mt-2">View Goals &rarr;</span>
             </div>
 
