@@ -18,7 +18,6 @@ export default function Layout() {
 
     const navItems = user ? [
         { name: "Dashboard", href: "/", icon: HomeIcon },
-        { name: "Families", href: "/families", icon: UserGroupIcon },
         { name: "Settings", href: "/settings", icon: Cog6ToothIcon },
     ] : [];
 
