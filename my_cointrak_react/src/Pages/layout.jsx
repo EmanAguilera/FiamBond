@@ -25,7 +25,7 @@ export default function Layout() {
         <>
             <header className="app-header">
                 <nav className="top-nav">
-                    <Link to="/" className="logo">Cointrak</Link>
+                    <Link to="/" className="logo">Fiambond</Link>
                     
                     {user ? (
                         // --- FIX: This container now manages desktop vs mobile views ---
