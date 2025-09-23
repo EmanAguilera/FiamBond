@@ -119,10 +119,10 @@ export default function Settings() {
   }
 
   return (
-    <main className="p-4 md:p-10 max-w-4xl mx-auto">
+    <div className="p-10 max-w-4xl mx-auto">
       <h2 className="dashboard-title mb-8">Account Settings</h2>
 
-      <section className="dashboard-card mb-10">
+      <div className="dashboard-card mb-10">
         <h3 className="font-bold text-xl mb-6">Profile Information</h3>
         <form onSubmit={handleProfileUpdate} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -145,15 +145,15 @@ export default function Settings() {
 
           {profileMessage.text && <p className={`text-sm ${profileMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{profileMessage.text}</p>}
 
-          <div className="flex justify-end">
+          <div className="text-right">
             <button type="submit" className="primary-btn" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
-      </section>
+      </div>
 
-      <section className="dashboard-card">
+      <div className="dashboard-card">
         <h3 className="font-bold text-xl mb-6">Change Password</h3>
         <form onSubmit={handlePasswordUpdate} className="space-y-6">
           <div>
@@ -168,13 +168,13 @@ export default function Settings() {
 
           {passwordMessage.text && <p className={`text-sm ${passwordMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{passwordMessage.text}</p>}
 
-          <div className="flex justify-end">
+          <div className="text-right">
             <button type="submit" className="primary-btn" disabled={isSubmitting}>
               {isSubmitting ? 'Updating...' : 'Update Password'}
             </button>
           </div>
         </form>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
