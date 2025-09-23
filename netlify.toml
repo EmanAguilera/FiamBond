@@ -1,13 +1,13 @@
 # This is the final, correct configuration for Netlify.
 [build]
-  base    = "my_cointrak_react"
+  base    = "my_fiambond_react"
   # FIX: The publish directory is relative to the base directory.
   publish = "dist"
   command = "npm run build"
   
   [build.environment]
     NODE_VERSION = "20"
-    VITE_API_URL = "https://cointrak-api.onrender.com"
+    VITE_API_URL = "https://fiambond-api.onrender.com"
 
 [[redirects]]
   from = "/*"
