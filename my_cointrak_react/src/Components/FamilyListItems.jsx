@@ -8,30 +8,16 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
     const [familyName, setFamilyName] = useState(family.first_name);
     const [error, setError] = useState(null);
 
-    // --- START OF THE FIX ---
-
-    // 1. Check if the family has existing transactions.
     const hasTransactions = family.transactions_count > 0;
-
-    // 2. Check if the currently logged-in user is the owner of the family.
     const isOwner = user?.id === family.owner_id;
-
-    // 3. Combine checks: Actions are only allowed if the user is the owner AND there are no transactions.
     const canPerformActions = isOwner && !hasTransactions;
 
-    // 4. Create a dynamic message to explain why buttons might be disabled.
     const getDisabledMessage = () => {
-        if (!isOwner) {
-            return "Only the family owner can perform this action.";
-        }
-        if (hasTransactions) {
-            return "Actions are disabled for families with existing transactions.";
-        }
-        return ""; // No message needed if actions are enabled.
+        if (!isOwner) return "Only the family owner can perform this action.";
+        if (hasTransactions) return "Actions are disabled for families with existing transactions.";
+        return "";
     };
     
-    // --- END OF THE FIX ---
-
     async function handleUpdate(e) {
         e.preventDefault();
         setError(null);
@@ -66,7 +52,6 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
             }
             onFamilyDeleted(family.id);
         } catch (err) {
-            // Use the state for errors to display it cleanly, instead of an alert.
             setError(err.message);
         }
     }
@@ -85,22 +70,20 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                     <button type="button" onClick={() => setIsEditing(false)} className="secondary-btn-sm">Cancel</button>
                 </form>
             ) : (
-                <div className="flex justify-between items-center">
-                     {/* --- FIX START --- */}
-                    <div className="min-w-0"> {/* Allows this flex item to shrink */}
-                        <h3 className="font-semibold text-lg text-gray-700 break-words">{family.first_name}</h3> {/* Ensures long text wraps */}
+                <div className="flex justify-between items-center gap-4">
+                    {/* --- THIS IS THE FIX --- */}
+                    <div className="min-w-0">
+                        <h3 className="font-semibold text-lg text-gray-700 break-words">{family.first_name}</h3>
                         <p className="text-xs text-gray-500 truncate">Owner: {family.owner?.full_name || 'Loading...'}</p>
                     </div>
-                    {/* --- FIX END --- */}
-                    <div className="flex items-center gap-2 flex-shrink-0"> {/* Prevents buttons from shrinking */}
+                    
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         <Link to={`/families/${family.id}`} className="primary-btn-sm">Manage</Link>
-                        {/* Only show Rename and Delete buttons if the user is the owner */}
                         {isOwner && (
                             <>
                                 <button
                                     onClick={() => setIsEditing(true)}
                                     className="secondary-btn-sm"
-                                    // --- FIX: Button is disabled if actions are not allowed ---
                                     disabled={!canPerformActions}
                                     title={canPerformActions ? "Rename family" : getDisabledMessage()}
                                 >
@@ -109,7 +92,6 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                                 <button
                                     onClick={handleDelete}
                                     className="danger-btn-sm"
-                                    // --- FIX: Button is disabled if actions are not allowed ---
                                     disabled={!canPerformActions}
                                     title={canPerformActions ? "Delete family" : getDisabledMessage()}
                                 >
@@ -120,7 +102,6 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                     </div>
                 </div>
             )}
-            {/* Display any error messages at the bottom */}
             {error && <p className="error text-xs text-red-600">{error}</p>}
         </div>
     );
