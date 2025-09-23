@@ -188,7 +188,11 @@ const FamilyMembersView = ({ family, onBack, onFamilyUpdate }) => {
 
             {members.length < MAX_MEMBERS_PER_FAMILY ? (
                 <div>
-                    <h2 className="font-bold text-xl mb-4 text-gray-800">Add Member to "{detailedFamily.first_name}"</h2>
+                    {/* --- THIS IS THE FIX --- */}
+                    <h2 className="font-bold text-xl mb-4 text-gray-800 break-words">
+                        Add Member to "{detailedFamily.first_name}"
+                    </h2>
+                    {/* --- END OF THE FIX --- */}
                     <form onSubmit={handleAddMember} className="space-y-4">
                         <input type="email" placeholder="New Member's Email" value={newMemberEmail} onChange={(e) => setNewMemberEmail(e.target.value)} className="w-full p-2 border rounded-md" />
                         {formErrors.email && <p className="error">{formErrors.email[0]}</p>}
