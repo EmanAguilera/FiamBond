@@ -46,13 +46,15 @@ export default function RecentTransactionsWidget() {
             {transactions.length > 0 ? (
               transactions.map((transaction) => (
                 <div key={transaction.id} className="transaction-item border-b last:border-b-0 border-gray-100">
-                  <div>
-                    <p className="transaction-description">{transaction.description}</p>
+                   {/* --- FIX START --- */}
+                  <div className="min-w-0 pr-4"> {/* Allow shrinking and add padding */}
+                    <p className="transaction-description break-words">{transaction.description}</p> {/* Wrap long descriptions */}
                     <small className="transaction-date">
                       {new Date(transaction.created_at).toLocaleDateString()}
                     </small>
                   </div>
-                  <p className={`transaction-amount ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>
+                  <p className={`transaction-amount flex-shrink-0 ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}> {/* Prevent amount from shrinking */}
+                  {/* --- FIX END --- */}
                     {transaction.type === 'income' ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>

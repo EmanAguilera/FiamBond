@@ -86,12 +86,13 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                 </form>
             ) : (
                 <div className="flex justify-between items-center">
-                    <div>
-                        <h3 className="font-semibold text-lg text-gray-700">{family.first_name}</h3>
-                        {/* --- FIX: Added a safety check for owner in case it's not loaded --- */}
-                        <p className="text-xs text-gray-500">Owner: {family.owner?.full_name || 'Loading...'}</p>
+                     {/* --- FIX START --- */}
+                    <div className="min-w-0"> {/* Allows this flex item to shrink */}
+                        <h3 className="font-semibold text-lg text-gray-700 break-words">{family.first_name}</h3> {/* Ensures long text wraps */}
+                        <p className="text-xs text-gray-500 truncate">Owner: {family.owner?.full_name || 'Loading...'}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    {/* --- FIX END --- */}
+                    <div className="flex items-center gap-2 flex-shrink-0"> {/* Prevents buttons from shrinking */}
                         <Link to={`/families/${family.id}`} className="primary-btn-sm">Manage</Link>
                         {/* Only show Rename and Delete buttons if the user is the owner */}
                         {isOwner && (

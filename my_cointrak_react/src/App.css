@@ -34,7 +34,7 @@
 
     /* --- BUTTONS & LINKS --- */
     .primary-btn {
-        @apply inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors;
+        @apply flex justify-center w-full sm:w-auto px-6 py-3 text-base font-semibold leading-6 text-white bg-indigo-600 rounded-lg shadow-md whitespace-nowrap disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-105;
     }
     .secondary-btn {
         @apply flex justify-center w-full sm:w-auto px-6 py-3 text-base font-semibold leading-6 text-indigo-700 bg-indigo-100 rounded-lg shadow-md whitespace-nowrap disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-105;
@@ -211,7 +211,7 @@
     .success-message {
         @apply text-green-600 text-sm mt-4 p-3 bg-green-50 rounded-lg;
     }
-
+    
     .balance-amount {
         @apply text-4xl sm:text-5xl font-extrabold;
     }

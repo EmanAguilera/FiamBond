@@ -115,17 +115,19 @@ export default function GoalListsWidget() {
           <div className="space-y-3">
             {activeGoals.map((goal) => (
               <div key={goal.id} className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                 <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-lg text-gray-700">{goal.name}</h3>
+                  {/* --- FIX START --- */}
+                 <div className="flex justify-between items-start gap-4">
+                  <div className="min-w-0"> {/* Allow shrinking */}
+                    <h3 className="font-semibold text-lg text-gray-700 break-words">{goal.name}</h3> {/* Wrap long goal names */}
                     {goal.family ? (
                       <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full inline-block mt-1">For: {goal.family.first_name}</p>
                     ) : (
                       <p className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded-full inline-block mt-1">Personal Goal</p>
                     )}
                   </div>
-                  <p className="font-bold text-lg text-indigo-600">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="font-bold text-lg text-indigo-600 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p> {/* Prevent amount from shrinking */}
                 </div>
+                {/* --- FIX END --- */}
                 <div className="text-right mt-3 space-x-2">
                   <button onClick={() => handleMarkAsComplete(goal.id)} className="success-btn-sm text-xs">Mark as Complete</button>
                   <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn-sm text-xs">Abandon</button>
@@ -152,13 +154,15 @@ export default function GoalListsWidget() {
           <div className="space-y-3">
             {completedGoals.map((goal) => (
               <div key={goal.id} className="p-4 bg-green-50 border border-green-200 rounded-md opacity-80">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-semibold text-lg text-green-800">{goal.name}</h3>
+                {/* --- FIX START --- */}
+                 <div className="flex justify-between items-start gap-4">
+                  <div className="min-w-0"> {/* Allow shrinking */}
+                    <h3 className="font-semibold text-lg text-green-800 break-words">{goal.name}</h3> {/* Wrap long goal names */}
                     {goal.family ? (<p className="text-xs font-bold text-green-700">For Family: {goal.family.first_name}</p>) : (<p className="text-xs font-bold text-slate-600">Personal Goal</p>)}
                   </div>
-                  <p className="font-bold text-lg text-green-700">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="font-bold text-lg text-green-700 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p> {/* Prevent amount from shrinking */}
                 </div>
+                {/* --- FIX END --- */}
               </div>
             ))}
           </div>
