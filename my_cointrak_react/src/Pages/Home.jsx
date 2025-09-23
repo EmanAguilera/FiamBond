@@ -234,7 +234,7 @@ export default function Home() {
           <div className="hero-content">
             <div className="hero-text">
               <h1 className="hero-headline">Take Control of Your Finances</h1>
-              <p className="hero-subheadline">Cointrak is the simplest way to manage your personal and family finances. Track your income, monitor expenses, and achieve your financial goals with ease.</p>
+              <p className="hero-subheadline">Fiambond is the simplest way to manage your personal and family finances. Track your income, monitor expenses, and achieve your financial goals with ease.</p>
               <div className="hero-cta">
                 <Link to="/register" className="primary-btn text-lg">Get Started for Free</Link>
                 <Link to="/login" className="text-link text-lg">Login to your account</Link>
@@ -245,7 +245,7 @@ export default function Home() {
               </div>
             </div>
             <div className="hero-visual">
-              <img src="/CoinTrak_Image.png" alt="A family happily managing their finances on a tablet with an overlay of financial charts" className="rounded-xl shadow-2xl" />
+              <img src="/Fiambond_Image.png" alt="A family happily managing their finances on a tablet with an overlay of financial charts" className="rounded-xl shadow-2xl" />
             </div>
           </div>
         </div>
