@@ -70,18 +70,19 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
                     <button type="button" onClick={() => setIsEditing(false)} className="secondary-btn-sm">Cancel</button>
                 </form>
             ) : (
-                <div className="flex justify-between items-center gap-4">
-                    {/* --- START OF THE FIX --- */}
-                    {/* 1. This wrapper is now allowed to shrink */}
+                // --- START OF THE RESPONSIVE FIX ---
+
+                // This container will be a vertical column on mobile, and a horizontal row on screens 'sm' and larger.
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                    
+                    {/* The text container. The min-w-0 and break-words are still needed for the sm: layout. */}
                     <div className="min-w-0"> 
-                        {/* 2. This text is now forced to wrap */}
                         <h3 className="font-semibold text-lg text-gray-700 break-words">{family.first_name}</h3>
                         <p className="text-xs text-gray-500 truncate">Owner: {family.owner?.full_name || 'Loading...'}</p>
                     </div>
                     
-                    {/* 3. This button group is prevented from shrinking */}
-                    <div className="flex items-center gap-2 flex-shrink-0"> 
-                    {/* --- END OF THE FIX --- */}
+                    {/* The button container. `flex-wrap` allows buttons to wrap if the screen is extra narrow. */}
+                    <div className="flex items-center gap-2 flex-wrap flex-shrink-0"> 
                         <Link to={`/families/${family.id}`} className="primary-btn-sm">Manage</Link>
                         {isOwner && (
                             <>
@@ -105,6 +106,7 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
                         )}
                     </div>
                 </div>
+                // --- END OF THE RESPONSIVE FIX ---
             )}
             {error && <p className="error text-xs text-red-600">{error}</p>}
         </div>
