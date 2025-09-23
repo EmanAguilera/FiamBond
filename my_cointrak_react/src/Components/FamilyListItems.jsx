@@ -70,25 +70,28 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
                     <button type="button" onClick={() => setIsEditing(false)} className="secondary-btn-sm">Cancel</button>
                 </form>
             ) : (
-                // --- START OF THE RESPONSIVE FIX ---
-
-                // This container will be a vertical column on mobile, and a horizontal row on screens 'sm' and larger.
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                    
-                    {/* The text container. The min-w-0 and break-words are still needed for the sm: layout. */}
                     <div className="min-w-0"> 
                         <h3 className="font-semibold text-lg text-gray-700 break-words">{family.first_name}</h3>
                         <p className="text-xs text-gray-500 truncate">Owner: {family.owner?.full_name || 'Loading...'}</p>
                     </div>
                     
-                    {/* The button container. `flex-wrap` allows buttons to wrap if the screen is extra narrow. */}
-                    <div className="flex items-center gap-2 flex-wrap flex-shrink-0"> 
-                        <Link to={`/families/${family.id}`} className="primary-btn-sm">Manage</Link>
+                    {/* --- START OF THE BUTTON FIX --- */}
+
+                    {/* This container is now full-width on mobile, arranging its children in a row. */}
+                    <div className="flex w-full sm:w-auto items-center gap-2 flex-shrink-0"> 
+                        <Link 
+                            to={`/families/${family.id}`} 
+                            // On mobile, the button is a flex item that fills available width. On desktop, it's auto-sized.
+                            className="primary-btn-sm flex justify-center w-full sm:w-auto"
+                        >
+                            Manage
+                        </Link>
                         {isOwner && (
                             <>
                                 <button
                                     onClick={() => setIsEditing(true)}
-                                    className="secondary-btn-sm"
+                                    className="secondary-btn-sm flex justify-center w-full sm:w-auto"
                                     disabled={!canPerformActions}
                                     title={canPerformActions ? "Rename family" : getDisabledMessage()}
                                 >
@@ -96,7 +99,7 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
                                 </button>
                                 <button
                                     onClick={handleDelete}
-                                    className="danger-btn-sm"
+                                    className="danger-btn-sm flex justify-center w-full sm:w-auto"
                                     disabled={!canPerformActions}
                                     title={canPerformActions ? "Delete family" : getDisabledMessage()}
                                 >
@@ -105,13 +108,12 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
                             </>
                         )}
                     </div>
+                    {/* --- END OF THE BUTTON FIX --- */}
                 </div>
-                // --- END OF THE RESPONSIVE FIX ---
             )}
             {error && <p className="error text-xs text-red-600">{error}</p>}
         </div>
     );
 }
 
-// Wrap with memo for better performance on lists
 export default memo(FamilyListItem);
