@@ -1,8 +1,8 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, memo } from 'react'; // Import memo for performance
 import { Link } from 'react-router-dom';
 import { AppContext } from '../Context/AppContext.jsx';
 
-export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
+function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
     const { token, user } = useContext(AppContext);
     const [isEditing, setIsEditing] = useState(false);
     const [familyName, setFamilyName] = useState(family.first_name);
@@ -71,13 +71,17 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                 </form>
             ) : (
                 <div className="flex justify-between items-center gap-4">
-                    {/* --- THIS IS THE FIX --- */}
-                    <div className="min-w-0">
+                    {/* --- START OF THE FIX --- */}
+                    {/* 1. This wrapper is now allowed to shrink */}
+                    <div className="min-w-0"> 
+                        {/* 2. This text is now forced to wrap */}
                         <h3 className="font-semibold text-lg text-gray-700 break-words">{family.first_name}</h3>
                         <p className="text-xs text-gray-500 truncate">Owner: {family.owner?.full_name || 'Loading...'}</p>
                     </div>
                     
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* 3. This button group is prevented from shrinking */}
+                    <div className="flex items-center gap-2 flex-shrink-0"> 
+                    {/* --- END OF THE FIX --- */}
                         <Link to={`/families/${family.id}`} className="primary-btn-sm">Manage</Link>
                         {isOwner && (
                             <>
@@ -106,3 +110,6 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
         </div>
     );
 }
+
+// Wrap with memo for better performance on lists
+export default memo(FamilyListItem);
