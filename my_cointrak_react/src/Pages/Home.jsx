@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useCallback } from "react";
+import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
 
@@ -6,22 +6,54 @@ import { AppContext } from "../Context/AppContext.jsx";
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
-// --- WIDGET IMPORTS ---
-import Modal from "../Components/Modal";
-import GoalListsWidget from "../Components/GoalListsWidget";
-import CreateGoalWidget from "../Components/CreateGoalWidget";
-import RecentTransactionsWidget from "../Components/RecentTransactionsWidget";
-import CreateTransactionWidget from "../Components/CreateTransactionWidget";
-import FamilyManagementWidget from "../Components/FamilyManagementWidget";
-import CreateFamilyWidget from "../Components/CreateFamilyWidget";
+// --- WIDGET IMPORTS (Code Splitting with React.lazy) ---
+// These components will now be loaded only when they are needed, speeding up the initial page load.
+const Modal = lazy(() => import("../Components/Modal"));
+const GoalListsWidget = lazy(() => import("../Components/GoalListsWidget"));
+const CreateGoalWidget = lazy(() => import("../Components/CreateGoalWidget"));
+const RecentTransactionsWidget = lazy(() => import("../Components/RecentTransactionsWidget"));
+const CreateTransactionWidget = lazy(() => import("../Components/CreateTransactionWidget"));
+const FamilyManagementWidget = lazy(() => import("../Components/FamilyManagementWidget"));
+const CreateFamilyWidget = lazy(() => import("../Components/CreateFamilyWidget"));
 
 // Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+// --- SKELETON COMPONENT ---
+// This placeholder UI is shown immediately, preventing the "white screen flash"
+// and giving the user a sense of progress.
+const DashboardSkeleton = () => (
+  <div className="p-4 md:p-10 animate-pulse">
+    <header className="dashboard-header mb-8">
+      <div className="flex flex-wrap gap-4">
+        <div className="h-10 w-40 bg-slate-200 rounded"></div>
+        <div className="h-10 w-32 bg-slate-200 rounded"></div>
+        <div className="h-10 w-32 bg-slate-200 rounded"></div>
+      </div>
+    </header>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="h-32 bg-slate-200 rounded-lg p-4">
+        <div className="h-5 w-3/4 bg-slate-300 rounded"></div>
+        <div className="h-8 w-1/2 bg-slate-300 rounded mt-4"></div>
+      </div>
+      <div className="h-32 bg-slate-200 rounded-lg p-4">
+        <div className="h-5 w-3/4 bg-slate-300 rounded"></div>
+        <div className="h-8 w-1/4 bg-slate-300 rounded mt-4"></div>
+      </div>
+      <div className="h-32 bg-slate-200 rounded-lg p-4">
+        <div className="h-5 w-3/4 bg-slate-300 rounded"></div>
+        <div className="h-8 w-1/4 bg-slate-300 rounded mt-4"></div>
+      </div>
+    </div>
+    <div className="w-full h-96 bg-slate-200 rounded-lg"></div>
+  </div>
+);
+
+
 export default function Home() {
   const { user, token } = useContext(AppContext);
 
-  // State hooks for controlling modal visibility
+  // --- STATE FOR MODAL VISIBILITY ---
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
@@ -29,24 +61,20 @@ export default function Home() {
   const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
 
-  // --- STATE FOR THE DASHBOARD ---
+  // --- DATA & LOADING STATE ---
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [summaryData, setSummaryData] = useState(null);
-  const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState(null);
   const [activeGoalsCount, setActiveGoalsCount] = useState(0);
-  const [goalsCountLoading, setGoalsCountLoading] = useState(true);
   const [familyCount, setFamilyCount] = useState(0);
-  const [familyCountLoading, setFamilyCountLoading] = useState(true);
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(true);
   const [reportError, setReportError] = useState(null);
   const [period, setPeriod] = useState('monthly');
 
-  // --- DATA FETCHING ---
+  // --- DATA FETCHING FUNCTIONS (Using token from context) ---
   const getSummaryData = useCallback(async () => {
     if (!token) return;
-    setSummaryLoading(true);
-    setSummaryError(null);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/balance`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -57,14 +85,11 @@ export default function Home() {
     } catch (err) {
       console.error("Failed to fetch summary data:", err);
       setSummaryError("Network error. Please check your connection.");
-    } finally {
-      setSummaryLoading(false);
     }
   }, [token]);
   
   const getActiveGoalsCount = useCallback(async () => {
     if (!token) return;
-    setGoalsCountLoading(true);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/active-personal-count`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -75,14 +100,11 @@ export default function Home() {
       }
     } catch (error) {
         console.error("Error fetching active goals count:", error);
-    } finally {
-        setGoalsCountLoading(false);
     }
   }, [token]);
 
   const getFamilyCount = useCallback(async () => {
     if (!token) return;
-    setFamilyCountLoading(true);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries?page=1`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -93,8 +115,6 @@ export default function Home() {
       }
     } catch (error) { 
       console.error("Error fetching family count:", error); 
-    } finally {
-      setFamilyCountLoading(false);
     }
   }, [token]);
 
@@ -117,40 +137,50 @@ export default function Home() {
     }
   }, [token, period]);
 
-  // --- OPTIMIZED EFFECTS ---
+  // --- EFFECT FOR INITIAL DATA FETCHING ---
   useEffect(() => {
     if (token) {
-      getSummaryData();
-      getActiveGoalsCount();
-      getFamilyCount();
+      const fetchInitialData = async () => {
+        setIsInitialLoading(true);
+        // Promise.all fetches all data concurrently for better performance
+        await Promise.all([
+          getSummaryData(),
+          getActiveGoalsCount(),
+          getFamilyCount(),
+          getReport()
+        ]);
+        setIsInitialLoading(false);
+      };
+      fetchInitialData();
     } else {
-      setSummaryData(null);
-      setActiveGoalsCount(0);
-      setFamilyCount(0);
+      setIsInitialLoading(false);
     }
-  }, [token, getSummaryData, getActiveGoalsCount, getFamilyCount]);
+  }, [token, getSummaryData, getActiveGoalsCount, getFamilyCount, getReport]);
 
+  // --- EFFECT FOR PERIOD CHANGES ONLY ---
   useEffect(() => {
-    if (token) getReport();
-    else setReport(null);
-  }, [token, getReport]);
+    // This prevents re-fetching the report on the very first render
+    if (!isInitialLoading && token) {
+      getReport();
+    }
+  }, [period, isInitialLoading, token, getReport]);
 
   // --- SUCCESS HANDLERS ---
-  function handleTransactionSuccess() {
+  const handleTransactionSuccess = useCallback(() => {
     setIsCreateTransactionModalOpen(false);
     getSummaryData();
     getReport();
-  }
+  }, [getSummaryData, getReport]);
   
-  function handleGoalSuccess() {
+  const handleGoalSuccess = useCallback(() => {
     setIsCreateGoalModalOpen(false);
     getActiveGoalsCount();
-  }
+  }, [getActiveGoalsCount]);
 
-  function handleFamilySuccess() {
+  const handleFamilySuccess = useCallback(() => {
     setIsCreateFamilyModalOpen(false);
     getFamilyCount();
-  }
+  }, [getFamilyCount]);
 
   const chartOptions = {
     responsive: true,
@@ -169,67 +199,70 @@ export default function Home() {
   return (
     <>
       {user ? (
-        <div className="p-4 md:p-10">
-          <header className="dashboard-header">
-            <div className="flex flex-wrap gap-4">
-              <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
-              <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
-              <button onClick={() => setIsCreateFamilyModalOpen(true)} className="secondary-btn">+ Add Family</button>
-            </div>
-          </header>
+        // If logged in, show skeleton during initial load, then the dashboard
+        isInitialLoading ? <DashboardSkeleton /> : (
+          <div className="p-4 md:p-10">
+            <header className="dashboard-header">
+              <div className="flex flex-wrap gap-4">
+                <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
+                <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
+                <button onClick={() => setIsCreateFamilyModalOpen(true)} className="secondary-btn">+ Add Family</button>
+              </div>
+            </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
-              <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
-              {summaryLoading ? <div className="h-8 w-3/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
-               summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
-               summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
-              <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
-            </div>
-            
-            <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
-              <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
-              {goalsCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> : (<p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>)}
-              <span className="text-link text-sm mt-2">View Goals &rarr;</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
+                <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
+                {summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
+                 summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
+                <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
+              </div>
+              
+              <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
+                <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
+                <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
+                <span className="text-link text-sm mt-2">View Goals &rarr;</span>
+              </div>
+
+              <div className="dashboard-card-interactive" onClick={() => setIsFamilyModalOpen(true)} role="button" tabIndex="0">
+                <h4 className="font-bold text-gray-600">Your Families</h4>
+                <p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>
+                <span className="text-link text-sm mt-2">Manage Families &rarr;</span>
+              </div>
             </div>
 
-            <div className="dashboard-card-interactive" onClick={() => setIsFamilyModalOpen(true)} role="button" tabIndex="0">
-              <h4 className="font-bold text-gray-600">Your Families</h4>
-              {familyCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> : (<p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>)}
-              <span className="text-link text-sm mt-2">Manage Families &rarr;</span>
+            <div className="dashboard-section">
+              <div className="w-full mx-auto flex justify-center gap-4 mb-6">
+                <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
+                <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
+                <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
+              </div>
+              <div className="content-card font-mono text-slate-800">
+                {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
+                 reportError ? <p className="error text-center py-10">{reportError}</p> : 
+                 report ? (
+                  <>
+                    <div className="mb-8 relative" style={{ height: '350px' }}>
+                      {report.chartData?.datasets?.length > 0 ? (<Bar options={chartOptions} data={report.chartData} />) : (<div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>)}
+                    </div>
+                    <div className="space-y-3 text-sm">
+                      <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
+                      <hr className="border-dashed" />
+                      <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
+                      <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
+                      <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}</p>
+                      <hr className="border-dashed" />
+                      <p className="font-bold">Analysis:</p>
+                      <ul className="list-disc pl-6"><li>{report.transactionCount} individual transactions were logged in this period.</li></ul>
+                    </div>
+                  </>
+                ) : <p className="text-center py-10">No report data available.</p>}
+              </div>
             </div>
           </div>
-
-          <div className="dashboard-section">
-            <div className="w-full mx-auto flex justify-center gap-4 mb-6">
-              <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
-              <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
-              <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
-            </div>
-            <div className="content-card font-mono text-slate-800">
-              {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
-               reportError ? <p className="error text-center py-10">{reportError}</p> : 
-               report ? (
-                <>
-                  <div className="mb-8 relative" style={{ height: '350px' }}>
-                    {report.chartData?.datasets?.length > 0 ? (<Bar options={chartOptions} data={report.chartData} />) : (<div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>)}
-                  </div>
-                  <div className="space-y-3 text-sm">
-                    <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
-                    <hr className="border-dashed" />
-                    <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
-                    <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
-                    <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}</p>
-                    <hr className="border-dashed" />
-                    <p className="font-bold">Analysis:</p>
-                    <ul className="list-disc pl-6"><li>{report.transactionCount} individual transactions were logged in this period.</li></ul>
-                  </div>
-                </>
-              ) : <p className="text-center py-10">No report data available.</p>}
-            </div>
-          </div>
-        </div>
+        )
       ) : (
+        // If not logged in, show the hero section
         <div className="hero-section">
           <div className="hero-content">
             <div className="hero-text">
@@ -251,15 +284,17 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALS --- */}
-      <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><RecentTransactionsWidget /></Modal>
-      <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>
-      <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget /></Modal>
-      
-      {/* Action Modals */}
-      <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>
-      <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>
-      <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>
+      {/* --- MODALS (Lazy Loaded) --- */}
+      {/* Suspense provides a fallback while the modal's code is being downloaded */}
+      <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
+        {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><RecentTransactionsWidget /></Modal>}
+        {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
+        {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget /></Modal>}
+        
+        {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
+        {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
+        {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
+      </Suspense>
     </>
   );
 }
