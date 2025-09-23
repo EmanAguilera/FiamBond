@@ -233,6 +233,8 @@ export default function FamilyManagementWidget() {
     const [pagination, setPagination] = useState(null);
     const [listError, setListError] = useState(null);
     const [loadingList, setLoadingList] = useState(true);
+
+    
     
     const getFamilies = useCallback(async (page = 1) => {
         setLoadingList(true);
