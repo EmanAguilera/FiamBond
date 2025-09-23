@@ -18,7 +18,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 # Copy the Laravel app from the subfolder into the container's working directory
-COPY ./my_cointrak_api .
+COPY ./my_fiambond_api .
 
 # Tell Composer to run without a memory limit.
 ENV COMPOSER_MEMORY_LIMIT=-1

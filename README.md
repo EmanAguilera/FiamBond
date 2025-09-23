@@ -1,10 +1,10 @@
-# CoinTrak: Tracking Family and Personal Finances.
+# Fiambond: Tracking Family and Personal Finances.
 
-CoinTrak is a full stack financial tracking application to help people and families to manage their income, spending and financial goals. CoinTrak is an application built on an API that uses Laravel and a React frontend enabling you to experience a clear and transparent, **fully responsive, app interface, whether on a phone, tablet, or computer**, to keep track of your financial well-being.
+Fiambond is a full stack financial tracking application to help people and families to manage their income, spending and financial goals. Fiambond is an application built on an API that uses Laravel and a React frontend enabling you to experience a clear and transparent, **fully responsive, app interface, whether on a phone, tablet, or computer**, to keep track of your financial well-being.
 
 ### Live Application Link
 
-**https://cointrak.pages.dev**
+**https://fiambond.pages.dev**
 
 > **Disclaimer:** It is just a demo application. It is not about actual money transactions or actual money. Every information is purely demonstrative.
 
@@ -29,7 +29,7 @@ CoinTrak is a full stack financial tracking application to help people and famil
 
 ## Core Functionalities
 
-The following section summarizes the key features that CoinTrak has to offer over a logical user-flow.
+The following section summarizes the key features that Fiambond has to offer over a logical user-flow.
 
 ### 1. Opening Page
 
