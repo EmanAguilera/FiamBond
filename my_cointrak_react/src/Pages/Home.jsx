@@ -181,21 +181,35 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
               <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
-              {summaryLoading ? <div className="h-8 w-3/4 bg-slate-200 animate-pulse mt-2 rounded"></div> :
-               summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
-               summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
+              {summaryLoading ? <div className="h-8 w-3/4 mt-2 rounded skeleton-shimmer"></div> :
+               summaryError ? <p className="text-red-500 text-sm content-fade-in">{summaryError}</p> :
+               summaryData && (
+                <div className="content-fade-in">
+                  <p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                    ₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+               )}
               <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
             </div>
             
             <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
               <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
-              {goalsCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> : (<p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>)}
+              {goalsCountLoading ? <div className="h-8 w-1/4 mt-2 rounded skeleton-shimmer"></div> : (
+                <div className="content-fade-in">
+                  <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
+                </div>
+              )}
               <span className="text-link text-sm mt-2">View Goals &rarr;</span>
             </div>
 
             <div className="dashboard-card-interactive" onClick={() => setIsFamilyModalOpen(true)} role="button" tabIndex="0">
               <h4 className="font-bold text-gray-600">Your Families</h4>
-              {familyCountLoading ? <div className="h-8 w-1/4 bg-slate-200 animate-pulse mt-2 rounded"></div> : (<p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>)}
+              {familyCountLoading ? <div className="h-8 w-1/4 mt-2 rounded skeleton-shimmer"></div> : (
+                <div className="content-fade-in">
+                  <p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>
+                </div>
+              )}
               <span className="text-link text-sm mt-2">Manage Families &rarr;</span>
             </div>
           </div>
@@ -207,10 +221,19 @@ export default function Home() {
               <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
             </div>
             <div className="content-card font-mono text-slate-800">
-              {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
-               reportError ? <p className="error text-center py-10">{reportError}</p> : 
+              {reportLoading ? (
+                <div className="text-center py-10">
+                  <div className="financial-loader" aria-label="Generating financial report">
+                    <div className="bar"></div>
+                    <div className="bar"></div>
+                    <div className="bar"></div>
+                  </div>
+                  <p className="mt-4 text-slate-600 font-medium">Generating Your Financial Report...</p>
+                </div>
+              ) : 
+               reportError ? <p className="error text-center py-10 content-fade-in">{reportError}</p> : 
                report ? (
-                <>
+                <div className="content-fade-in">
                   <div className="mb-8 relative" style={{ height: '350px' }}>
                     {report.chartData?.datasets?.length > 0 ? (<Bar options={chartOptions} data={report.chartData} />) : (<div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>)}
                   </div>
@@ -224,7 +247,7 @@ export default function Home() {
                     <p className="font-bold">Analysis:</p>
                     <ul className="list-disc pl-6"><li>{report.transactionCount} individual transactions were logged in this period.</li></ul>
                   </div>
-                </>
+                </div>
               ) : <p className="text-center py-10">No report data available.</p>}
             </div>
           </div>
