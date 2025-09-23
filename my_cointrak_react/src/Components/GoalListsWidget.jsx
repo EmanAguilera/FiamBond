@@ -1,6 +1,54 @@
 import { useContext, useEffect, useState, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
+// --- SKELETON LOADER COMPONENT ---
+// This component renders a placeholder UI that perfectly mimics the layout of the goal lists.
+// It is shown instantly while the real data is being fetched in the background,
+// preventing any "whitespace" or jarring content pop-in.
+const GoalListsSkeleton = () => (
+    <div className="space-y-8 animate-pulse">
+      {/* Skeleton for Active Goals */}
+      <div>
+        <div className="h-7 w-1/3 bg-slate-200 rounded mb-4"></div>
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="p-4 bg-slate-100 border border-slate-200 rounded-md">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <div className="h-6 w-48 bg-slate-200 rounded"></div>
+                  <div className="h-4 w-24 bg-slate-200 rounded mt-2"></div>
+                </div>
+                <div className="h-7 w-28 bg-slate-200 rounded"></div>
+              </div>
+              <div className="flex justify-end mt-3 space-x-2">
+                <div className="h-7 w-28 bg-slate-200 rounded-md"></div>
+                <div className="h-7 w-20 bg-slate-200 rounded-md"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Skeleton for Completed Goals */}
+      <div>
+        <div className="h-7 w-1/2 bg-slate-200 rounded mb-4"></div>
+        <div className="space-y-3">
+            {[...Array(2)].map((_, i) => (
+                <div key={i} className="p-4 bg-slate-100 border border-slate-200 rounded-md">
+                    <div className="flex justify-between items-start gap-4">
+                        <div>
+                            <div className="h-6 w-56 bg-slate-200 rounded"></div>
+                            <div className="h-4 w-20 bg-slate-200 rounded mt-2"></div>
+                        </div>
+                        <div className="h-7 w-32 bg-slate-200 rounded"></div>
+                    </div>
+                </div>
+            ))}
+        </div>
+      </div>
+    </div>
+);
+
+
 export default function GoalListsWidget() {
   const { token } = useContext(AppContext);
 
@@ -53,6 +101,7 @@ export default function GoalListsWidget() {
     if (token) {
       setLoading(true);
       setListError(null);
+      // Promise.all fetches both lists concurrently for better performance
       Promise.all([getActiveGoals(), getCompletedGoals()]).finally(() => setLoading(false));
     }
   }, [token, getActiveGoals, getCompletedGoals]);
@@ -103,7 +152,12 @@ export default function GoalListsWidget() {
     }
   }
 
-  if (loading) return <p className="text-center py-10">Loading goals...</p>;
+  // --- RENDER LOGIC ---
+
+  // While fetching initial data, show the detailed skeleton loader.
+  if (loading) return <GoalListsSkeleton />;
+
+  // If an error occurs, show the error message.
   if (listError) return <p className="error text-center py-10">{listError}</p>;
 
   return (
@@ -115,19 +169,17 @@ export default function GoalListsWidget() {
           <div className="space-y-3">
             {activeGoals.map((goal) => (
               <div key={goal.id} className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                  {/* --- FIX START --- */}
                  <div className="flex justify-between items-start gap-4">
-                  <div className="min-w-0"> {/* Allow shrinking */}
-                    <h3 className="font-semibold text-lg text-gray-700 break-words">{goal.name}</h3> {/* Wrap long goal names */}
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-lg text-gray-700 break-words">{goal.name}</h3>
                     {goal.family ? (
                       <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full inline-block mt-1">For: {goal.family.first_name}</p>
                     ) : (
                       <p className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded-full inline-block mt-1">Personal Goal</p>
                     )}
                   </div>
-                  <p className="font-bold text-lg text-indigo-600 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p> {/* Prevent amount from shrinking */}
+                  <p className="font-bold text-lg text-indigo-600 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
-                {/* --- FIX END --- */}
                 <div className="text-right mt-3 space-x-2">
                   <button onClick={() => handleMarkAsComplete(goal.id)} className="success-btn-sm text-xs">Mark as Complete</button>
                   <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn-sm text-xs">Abandon</button>
@@ -154,15 +206,13 @@ export default function GoalListsWidget() {
           <div className="space-y-3">
             {completedGoals.map((goal) => (
               <div key={goal.id} className="p-4 bg-green-50 border border-green-200 rounded-md opacity-80">
-                {/* --- FIX START --- */}
                  <div className="flex justify-between items-start gap-4">
-                  <div className="min-w-0"> {/* Allow shrinking */}
-                    <h3 className="font-semibold text-lg text-green-800 break-words">{goal.name}</h3> {/* Wrap long goal names */}
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-lg text-green-800 break-words">{goal.name}</h3>
                     {goal.family ? (<p className="text-xs font-bold text-green-700">For Family: {goal.family.first_name}</p>) : (<p className="text-xs font-bold text-slate-600">Personal Goal</p>)}
                   </div>
-                  <p className="font-bold text-lg text-green-700 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p> {/* Prevent amount from shrinking */}
+                  <p className="font-bold text-lg text-green-700 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
-                {/* --- FIX END --- */}
               </div>
             ))}
           </div>
