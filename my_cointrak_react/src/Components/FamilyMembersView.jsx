@@ -1,7 +1,37 @@
-import { useState, useCallback, useContext, useEffect } from 'react';
+import { useState, useCallback, useContext, useEffect, memo } from 'react'; // Import memo
 import { AppContext } from '../Context/AppContext';
 
-export default function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
+// --- SKELETON LOADER COMPONENT ---
+// This placeholder mimics the entire layout of the members view.
+// It provides immediate visual feedback while family details are being fetched.
+const FamilyMembersSkeleton = () => (
+    <div className="animate-pulse space-y-8">
+        <div className="h-8 w-40 bg-slate-200 rounded-md"></div> {/* Back button */}
+
+        {/* Skeleton for Add Member section */}
+        <div>
+            <div className="h-7 w-2/3 bg-slate-200 rounded mb-4"></div>
+            <div className="h-10 w-full bg-slate-200 rounded-md mb-4"></div> {/* Input */}
+            <div className="h-10 w-32 bg-slate-200 rounded-md"></div> {/* Button */}
+        </div>
+
+        {/* Skeleton for Current Members section */}
+        <div>
+            <div className="h-7 w-1/2 bg-slate-200 rounded mb-4"></div>
+            <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                    <div key={i} className="p-4 bg-slate-100 border rounded-md">
+                        <div className="h-5 w-2/3 bg-slate-200 rounded"></div>
+                        <div className="h-4 w-1/2 bg-slate-200 rounded mt-2"></div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </div>
+);
+
+
+function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
     const { token } = useContext(AppContext);
     
     const [detailedFamily, setDetailedFamily] = useState(null);
@@ -14,7 +44,7 @@ export default function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
     const MAX_MEMBERS_PER_FAMILY = 10;
 
     const getFamilyDetails = useCallback(async () => {
-        setLoading(true);
+        setLoading(true); // Always set loading to true when starting fetch
         setError(null);
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}`, {
@@ -26,7 +56,7 @@ export default function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
         } catch (err) {
             setError(err.message);
         } finally {
-            setLoading(false);
+            setLoading(false); // Always set loading to false after fetch attempt
         }
     }, [token, family.id]);
 
@@ -53,8 +83,10 @@ export default function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
                 }
                 return;
             }
-            setDetailedFamily(data); 
-            onFamilyUpdate(data);
+            // Instead of refetching all details, optimistic update if possible or just get details
+            // For simplicity and correctness here, re-fetch details after successful add
+            getFamilyDetails(); // Refresh details to show new member
+            onFamilyUpdate(data); // Notify parent (FamilyManagementWidget)
             setNewMemberEmail("");
             setFormMessage({ type: 'success', text: "Member added successfully!" });
         } catch (err) {
@@ -63,8 +95,14 @@ export default function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
         }
     }
     
-    if (loading) return <p className="text-center py-4">Loading members...</p>;
-    if (error) return <p className="error text-center py-4">{error}</p>;
+    // --- RENDER LOGIC ---
+    if (loading) {
+        return <FamilyMembersSkeleton />;
+    }
+
+    if (error) {
+        return <p className="error text-center py-4">{error}</p>;
+    }
 
     const members = detailedFamily?.members || [];
 
@@ -106,3 +144,6 @@ export default function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
         </div>
     );
 };
+
+// Wrap the component in memo() for performance optimization.
+export default memo(FamilyMembersView);
