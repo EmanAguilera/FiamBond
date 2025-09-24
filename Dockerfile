@@ -1,3 +1,6 @@
+# Dockerfile for Fiambond API
+# REFRESH CACHE v1
+
 # Use an official PHP 8.2 image as a base
 FROM php:8.2-cli
 
