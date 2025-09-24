@@ -16,7 +16,7 @@ services:
     # --- THIS IS THE FIX ---
     # We run the migrate command before starting the server.
     # The '&&' means "if the first command succeeds, then run the second".
-    startCommand: php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=10000
+    startCommand: php artisan config:clear && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=10000
 
 databases:
   - name: fiambond-db
