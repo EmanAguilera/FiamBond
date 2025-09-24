@@ -278,7 +278,7 @@ export default function Home() {
               </div>
             </div>
             <div className="hero-visual">
-              <img src="/Fiambond_Image.png" alt="A family happily managing their finances on a tablet with an overlay of financial charts" className="rounded-xl shadow-2xl" />
+              <img src="/FiamBond_Image.png" alt="A family happily managing their finances on a tablet with an overlay of financial charts" className="rounded-xl shadow-2xl" />
             </div>
           </div>
         </div>
