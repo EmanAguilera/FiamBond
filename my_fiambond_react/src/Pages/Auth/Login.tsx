@@ -1,20 +1,42 @@
-import { useContext, useState } from "react";
+import { useContext, useState, FormEvent, ChangeEvent } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
+// Assuming AppContext is still a .jsx file. If it were .tsx, this import would be simpler.
 import { AppContext } from "../../Context/AppContext.jsx";
 
+// TS FIX: Define the shape of the form data
+interface LoginFormData {
+  email: string;
+  password: string;
+}
+
+// TS FIX: Define the shape of the validation errors object from the API
+interface ErrorState {
+  // This means an object with any string key, where the value is an array of strings
+  [key: string]: string[];
+}
+
+// TS FIX: Define a basic type for the context to avoid 'any' type.
+// You would ideally define this more completely in your AppContext file.
+interface AppContextType {
+  handleLogin: (user: any, token: string) => void;
+}
+
 export default function Login() {
-  const { handleLogin } = useContext(AppContext);
+  // TS FIX: Add the type assertion to useContext
+  const { handleLogin } = useContext(AppContext) as AppContextType;
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
+  // TS FIX: Provide types to the useState hooks
+  const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
   });
 
-  const [errors, setErrors] = useState({});
-  const [generalError, setGeneralError] = useState(null);
+  const [errors, setErrors] = useState<ErrorState>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
-  async function handleLoginSubmit(e) {
+  // TS FIX: Add the event type for the form submission
+  async function handleLoginSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrors({});
     setGeneralError(null);
@@ -29,8 +51,8 @@ export default function Login() {
         body: JSON.stringify(formData),
       });
 
+      const errorData = await res.json();
       if (!res.ok) {
-        const errorData = await res.json();
         if (res.status === 422) {
           setErrors(errorData.errors);
         } else {
@@ -40,22 +62,24 @@ export default function Login() {
         return;
       }
 
-      const data = await res.json();
-      if (data.token && data.user) {
-        handleLogin(data.user, data.token);
+      if (errorData.token && errorData.user) {
+        handleLogin(errorData.user, errorData.token);
         navigate("/");
       } else {
         setGeneralError('An unexpected error occurred during login.');
       }
 
     } catch (error) {
-      // --- THIS IS THE FIX ---
-      // Log the actual error to the console for debugging.
       console.error('Login network error:', error);
-      // --- END OF FIX ---
       setGeneralError('A network error occurred. Please check your connection and try again.');
     }
   }
+  
+  // TS FIX: A helper function to handle input changes with proper event typing
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
 
   return (
     <main className="login-wrapper">
@@ -69,7 +93,7 @@ export default function Login() {
               type="email"
               placeholder="john.doe@example.com"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={handleInputChange}
             />
             {errors.email && <p className="error">{errors.email[0]}</p>}
           </div>
@@ -81,7 +105,7 @@ export default function Login() {
               type="password"
               placeholder="••••••••"
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={handleInputChange}
             />
             {errors.password && <p className="error">{errors.password[0]}</p>}
           </div>

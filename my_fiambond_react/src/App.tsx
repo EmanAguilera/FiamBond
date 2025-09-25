@@ -1,8 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 import Layout from "./Pages/layout.jsx";
 import Home from "./Pages/Home.jsx";
-import Login from "./Pages/Auth/Login.jsx";
-import Register from "./Pages/Auth/Register.jsx";
+import Login from "./Pages/Auth/Login";
+import Register from "./Pages/Auth/Register";
 import Settings from "./Pages/Settings.jsx"; // Import the new Settings component
 import PrivateRoutes from "./Utils/PrivateRoutes.jsx"; // Import a guard for authenticated routes
 

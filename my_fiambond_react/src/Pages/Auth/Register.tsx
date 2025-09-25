@@ -1,12 +1,33 @@
-import { useContext, useState } from "react";
+import { useContext, useState, FormEvent, ChangeEvent } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { AppContext } from "../../Context/AppContext.jsx";
 
+// TS FIX: Define the shape of the form data
+interface RegisterFormData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+}
+
+// TS FIX: Define the shape of the validation errors object
+interface ErrorState {
+  [key: string]: string[];
+}
+
+// TS FIX: Define a basic type for the context
+interface AppContextType {
+  handleLogin: (user: any, token: string) => void;
+}
+
 export default function Register() {
-  const { handleLogin } = useContext(AppContext);
+  // TS FIX: Add the type assertion to useContext
+  const { handleLogin } = useContext(AppContext) as AppContextType;
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
+  // TS FIX: Provide types to the useState hooks
+  const [formData, setFormData] = useState<RegisterFormData>({
     first_name: "",
     last_name: "",
     email: "",
@@ -14,10 +35,11 @@ export default function Register() {
     password_confirmation: "",
   });
 
-  const [errors, setErrors] = useState({});
-  const [generalError, setGeneralError] = useState(null);
+  const [errors, setErrors] = useState<ErrorState>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
-  async function handleRegisterSubmit(e) {
+  // TS FIX: Add the event type for the form submission
+  async function handleRegisterSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrors({});
     setGeneralError(null);
@@ -31,23 +53,19 @@ export default function Register() {
         },
         body: JSON.stringify(formData),
       });
-
-      // It's better to parse the JSON body regardless of the response status
+      
       const data = await res.json();
 
       if (!res.ok) {
         if (res.status === 422) {
-          // Handle validation errors from the parsed data
           setErrors(data.errors);
         } else {
-          // Handle other server errors (e.g., 500)
           const message = data.message || 'Registration failed. Please try again later.';
           setGeneralError(message);
         }
-        return; // Stop execution after handling the error
+        return;
       }
 
-      // Handle the successful registration case
       if (data.token && data.user) {
         handleLogin(data.user, data.token);
         navigate("/");
@@ -55,13 +73,16 @@ export default function Register() {
         setGeneralError('An unknown error occurred during registration.');
       }
     } catch (error) {
-      // --- THIS IS THE FIX ---
-      // Log the actual network error to the console for debugging.
       console.error('Registration network error:', error);
-      // --- END OF FIX ---
       setGeneralError('A network error occurred. Please check your connection and try again.');
     }
   }
+
+  // TS FIX: A helper function to handle input changes with proper event typing
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
 
   return (
     <main className="login-wrapper">
@@ -76,7 +97,7 @@ export default function Register() {
               type="text"
               placeholder="John"
               value={formData.first_name}
-              onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+              onChange={handleInputChange}
             />
             {errors.first_name && <p className="error">{errors.first_name[0]}</p>}
           </div>
@@ -88,7 +109,7 @@ export default function Register() {
               type="text"
               placeholder="Doe"
               value={formData.last_name}
-              onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+              onChange={handleInputChange}
             />
             {errors.last_name && <p className="error">{errors.last_name[0]}</p>}
           </div>
@@ -100,7 +121,7 @@ export default function Register() {
               type="email"
               placeholder="john.doe@example.com"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={handleInputChange}
             />
             {errors.email && <p className="error">{errors.email[0]}</p>}
           </div>
@@ -112,7 +133,7 @@ export default function Register() {
               type="password"
               placeholder="••••••••"
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={handleInputChange}
             />
             {errors.password && <p className="error">{errors.password[0]}</p>}
           </div>
@@ -124,7 +145,7 @@ export default function Register() {
               type="password"
               placeholder="••••••••"
               value={formData.password_confirmation}
-              onChange={(e) => setFormData({ ...formData, password_confirmation: e.target.value })}
+              onChange={handleInputChange}
             />
             {errors.password_confirmation && <p className="error">{errors.password_confirmation[0]}</p>}
           </div>
