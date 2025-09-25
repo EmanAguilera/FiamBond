@@ -4,7 +4,7 @@ import Home from "./Pages/Home.jsx";
 import Login from "./Pages/Auth/Login.jsx";
 import Register from "./Pages/Auth/Register.jsx";
 import Settings from "./Pages/Settings.jsx"; // Import the new Settings component
-import PrivateRoutes from "./Utils/PrivateRoutes"; // Import a guard for authenticated routes
+import PrivateRoutes from "./Utils/PrivateRoutes.jsx"; // Import a guard for authenticated routes
 
 export default function App() {
   return (

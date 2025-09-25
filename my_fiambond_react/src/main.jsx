@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
+import App from './App.js';
 import AppProvider from './Context/AppContext.jsx';
 import './App.css'; // Assuming you have this for global styles
 
