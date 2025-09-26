@@ -3,12 +3,13 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+// The "ShouldQueue" contract has been removed from here
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
+// The "implements ShouldQueue" has been removed from the class definition
 class TwoFactorCodeMail extends Mailable
 {
     use Queueable, SerializesModels;
