@@ -1,5 +1,5 @@
 # Dockerfile for Fiambond API
-# REFRESH CACHE v4 - Fix Autoloader Conflict
+# REFRESH CACHE v5 - Correct Order of Operations
 
 # Use an official PHP 8.2 image as a base
 FROM php:8.2-cli
@@ -21,26 +21,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 # --- START OF FIX ---
-# This new multi-step copy process leverages Docker's layer caching.
-# If your composer dependencies don't change, Docker won't need to re-install them every time.
-
-# 1. Copy only the dependency definition files
-COPY ./my_fiambond_api/composer.json ./my_fiambond_api/composer.lock ./
-
-# 2. Install dependencies
-RUN composer install --no-interaction --no-dev --prefer-dist
-
-# 3. Copy the rest of the application code
+# 1. Copy the ENTIRE Laravel application into the container first.
+# This ensures that the 'artisan' file is present before composer needs it.
 COPY ./my_fiambond_api .
 
-# 4. CRUCIAL FIX: Optimize the autoloader.
-# This command generates a "class map" which is the definitive list of where
-# classes are. This will resolve the "class already in use" error and also
-# make your application faster in production.
-RUN composer dump-autoload --optimize
+# 2. Now, run composer install.
+# Any post-install scripts in composer.json (like 'artisan config:clear') will now work correctly.
+RUN composer install --no-interaction --no-dev --prefer-dist
 # --- END OF FIX ---
 
-# Bake the configuration, route, and view caches into the image.
+# Bake the final production caches into the image for speed and reliability.
 RUN php artisan config:cache
 RUN php artisan route:cache
 RUN php artisan view:cache
