@@ -1,5 +1,5 @@
 # Dockerfile for Fiambond API
-# REFRESH CACHE v5 - Correct Order of Operations
+# FINAL VERSION - Using Startup Script
 
 # Use an official PHP 8.2 image as a base
 FROM php:8.2-cli
@@ -20,20 +20,19 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set the working directory
 WORKDIR /app
 
-# --- START OF FIX ---
-# 1. Copy the ENTIRE Laravel application into the container first.
-# This ensures that the 'artisan' file is present before composer needs it.
+# Copy the entire Laravel application into the container.
 COPY ./my_fiambond_api .
 
-# 2. Now, run composer install.
-# Any post-install scripts in composer.json (like 'artisan config:clear') will now work correctly.
+# Run composer install to get all the dependencies.
 RUN composer install --no-interaction --no-dev --prefer-dist
-# --- END OF FIX ---
 
-# Bake the final production caches into the image for speed and reliability.
-RUN php artisan config:cache
-RUN php artisan route:cache
-RUN php artisan view:cache
+# --- START OF FINAL FIX ---
+# Copy the new startup script into the container.
+COPY start.sh .
+
+# Make the startup script executable.
+RUN chmod +x start.sh
+# --- END OF FINAL FIX ---
 
 # Set the correct permissions for storage and cache.
 RUN chown -R www-data:www-data storage bootstrap/cache
@@ -41,5 +40,5 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 # Expose the application port
 EXPOSE 10000
 
-# Start the server (includes running migrations on startup for the free tier)
-CMD sh -c "php artisan migrate --force && exec php artisan serve --host=0.0.0.0 --port=10000"
+# Set the startup command to our new script.
+CMD ["./start.sh"]
