@@ -2,84 +2,141 @@
 
 namespace App\Http\Controllers;
 
+// Import necessary classes
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Mail; // <-- IMPORT FACADES
-use App\Mail\TwoFactorCodeMail;
-use Carbon\Carbon;
+use App\Mail\TwoFactorCodeMail; // The mailable for sending the OTP
+use Carbon\Carbon; // Used for setting the OTP expiry time
 
 class AuthController extends Controller
 {
-    // ... register() and logout() methods remain the same
+    /**
+     * Handle a registration request.
+     * Creates a new user and immediately logs them in.
+     */
+    public function register(Request $request)
+    {
+        // Validate the incoming request data
+        $fields = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => ['required', 'confirmed', Password::defaults()],
+        ]);
 
+        // Create the new user in the database
+        $user = User::create([
+            'first_name' => $fields['first_name'],
+            'last_name' => $fields['last_name'],
+            'email' => $fields['email'],
+            'password' => Hash::make($fields['password']),
+        ]);
+
+        // Create an authentication token for the new user
+        $token = $user->createToken('auth-token')->plainTextToken;
+
+        // Return the user data and token
+        return response([
+            'user' => $user,
+            'token' => $token
+        ], 201); // 201 Created status
+    }
+
+    /**
+     * Handle the first step of a login request.
+     * Verifies credentials, generates a 2FA code, and sends it via email.
+     */
     public function login(Request $request)
     {
+        // Validate the email and password
         $fields = $request->validate([
             'email' => 'required|string|email',
             'password' => 'required|string'
         ]);
 
-        // Find the user by email
+        // Find the user by their email address
         $user = User::where('email', $fields['email'])->first();
 
-        // Check if user exists and password is correct
+        // Check if a user was found and if the provided password is correct
         if (!$user || !Hash::check($fields['password'], $user->password)) {
+            // If not, throw a validation exception with an error message
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials do not match our records.'],
             ]);
         }
 
-        // --- 2FA Logic ---
-        // Generate a random 6-digit code
+        // Generate a random 6-digit One-Time Password (OTP)
         $otp = random_int(100000, 999999);
 
-        // Set the code and expiry time on the user model
+        // Store the OTP and set an expiry time (e.g., 10 minutes from now)
         $user->otp_code = $otp;
         $user->otp_expires_at = Carbon::now()->addMinutes(10);
         $user->save();
 
-        // Send the email with the code
-        Mail::to($user->email)->send(new TwoFactorCodeMail($otp));
+        // Send the OTP to the user's email address
+        Mail::to($user->email)->send(new TwoFactorCodeMail((string)$otp));
 
-        // Return a response indicating 2FA is required
-        // The frontend will use this response to show the OTP input form
+        // Return a response indicating that 2FA is required
         return response([
             'message' => 'A 2FA code has been sent to your email.',
-            'user_id' => $user->id // Send user_id to frontend for the next step
+            'user_id' => $user->id // Send user_id for the frontend to use in the next step
         ]);
     }
 
+    /**
+     * Handle the second step of a login request (verifying the 2FA code).
+     */
     public function verifyTwoFactor(Request $request)
     {
+        // Validate the user_id and the submitted OTP code
         $fields = $request->validate([
             'user_id' => 'required|exists:users,id',
             'otp_code' => 'required|string',
         ]);
 
+        // Find the user
         $user = User::find($fields['user_id']);
 
-        // Check if the code is correct and not expired
+        // Check if the submitted code is incorrect or if the code has expired
         if ($user->otp_code !== $fields['otp_code'] || Carbon::now()->gt($user->otp_expires_at)) {
+            // If the code is invalid, return an error response
             return response([
                 'message' => 'The provided code is invalid or has expired.'
-            ], 422); // Unprocessable Entity
+            ], 422); // 422 Unprocessable Entity status
         }
 
-        // Clear the OTP fields
+        // The code is valid, so clear the OTP fields in the database
         $user->otp_code = null;
         $user->otp_expires_at = null;
         $user->save();
 
-        // The code is correct, create the auth token
+        // Create the final authentication token
         $token = $user->createToken('auth-token')->plainTextToken;
 
+        // Return the authenticated user data and the token
         return response([
             'user' => $user,
             'token' => $token
+        ]);
+    }
+
+    /**
+     * Handle a logout request.
+     * Deletes the user's current access token.
+     */
+    public function logout(Request $request)
+    {
+        // Revoke the token that was used to authenticate the current request
+        $request->user()->currentAccessToken()->delete();
+
+        // Return a success message
+        return response([
+            'message' => 'You have been successfully logged out.'
         ]);
     }
 }
