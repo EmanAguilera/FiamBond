@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Mail; // <-- IMPORT THE MAIL FACADE
+use App\Mail\WelcomeEmail;             // <-- IMPORT YOUR NEW MAILABLE CLASS
 
 class AuthController extends Controller
 {
@@ -20,14 +22,17 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        // --- THE FIX ---
-        // We will explicitly hash the password here to guarantee it's done correctly.
         $user = User::create([
             'first_name' => $fields['first_name'],
             'last_name' => $fields['last_name'],
             'email' => $fields['email'],
             'password' => Hash::make($fields['password']),
         ]);
+
+        // --- SEND THE WELCOME EMAIL ---
+        // This line sends the email to the new user's email address.
+        Mail::to($user->email)->send(new WelcomeEmail($user));
+        // ------------------------------
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -39,16 +44,13 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        // ... (login method remains the same)
         $fields = $request->validate([
             'email' => 'required|string|email',
             'password' => 'required|string'
         ]);
 
-        // --- THE FIX ---
-        // Use Laravel's built-in Auth::attempt(). It automatically finds the user
-        // and securely checks the hashed password in one step. This is the standard.
         if (!Auth::attempt($fields)) {
-            // This will automatically return a 422 response with the correct error message.
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials do not match our records.'],
             ]);
@@ -65,6 +67,7 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        // ... (logout method remains the same)
         $request->user()->currentAccessToken()->delete();
 
         return response([
