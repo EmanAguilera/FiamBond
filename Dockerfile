@@ -1,50 +1,55 @@
 # Dockerfile for Fiambond API
-# REFRESH CACHE v3 - Free Tier Compatible
+# REFRESH CACHE v4 - Fix Autoloader Conflict
 
 # Use an official PHP 8.2 image as a base
 FROM php:8.2-cli
 
-# Install system libraries needed for Composer packages and database connection
+# Install system libraries
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     libzip-dev \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the required PHP extensions (PostgreSQL and Zip)
+# Install the required PHP extensions
 RUN docker-php-ext-install pdo pdo_pgsql zip
 
-# Install Composer (PHP's package manager)
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set the working directory inside the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the Laravel app from the subfolder into the container's working directory
-COPY ./my_fiambond_api .
+# --- START OF FIX ---
+# This new multi-step copy process leverages Docker's layer caching.
+# If your composer dependencies don't change, Docker won't need to re-install them every time.
 
-# Tell Composer to run without a memory limit.
-ENV COMPOSER_MEMORY_LIMIT=-1
+# 1. Copy only the dependency definition files
+COPY ./my_fiambond_api/composer.json ./my_fiambond_api/composer.lock ./
 
-# Run composer install.
+# 2. Install dependencies
 RUN composer install --no-interaction --no-dev --prefer-dist
 
-# Bake the configuration, route, and view caches directly into the Docker image.
-# This makes your application much faster and uses the .env from Render.
+# 3. Copy the rest of the application code
+COPY ./my_fiambond_api .
+
+# 4. CRUCIAL FIX: Optimize the autoloader.
+# This command generates a "class map" which is the definitive list of where
+# classes are. This will resolve the "class already in use" error and also
+# make your application faster in production.
+RUN composer dump-autoload --optimize
+# --- END OF FIX ---
+
+# Bake the configuration, route, and view caches into the image.
 RUN php artisan config:cache
 RUN php artisan route:cache
 RUN php artisan view:cache
 
-# Set the correct permissions for the storage and cache folders.
+# Set the correct permissions for storage and cache.
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# Expose the port that Render will use to talk to your app
+# Expose the application port
 EXPOSE 10000
 
-# --- START OF FINAL FIX ---
-# This command runs when your container starts up.
-# 1. It runs database migrations. The `--force` is needed for production.
-# 2. If migrations succeed (`&&`), it starts the web server.
-# This is the correct way to handle migrations on the free tier.
+# Start the server (includes running migrations on startup for the free tier)
 CMD sh -c "php artisan migrate --force && exec php artisan serve --host=0.0.0.0 --port=10000"
-# --- END OF FINAL FIX ---
