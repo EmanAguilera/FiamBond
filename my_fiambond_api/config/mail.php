@@ -29,14 +29,12 @@ return [
             'transport' => 'smtp',
             'host' => env('MAIL_HOST', 'smtp.mailgun.org'),
             'port' => env('MAIL_PORT', 587),
-            'encryption' => env('MAIL_ENCRYPTION', 'tls'), // <-- THIS IS THE KEY ADDITION
+            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ],
-
-        // ... other mailers like ses, postmark, etc. remain the same
 
         'ses' => [
             'transport' => 'ses',
@@ -73,10 +71,7 @@ return [
             'retry_after' => 60,
         ],
 
-        'brevo' => [
-        'transport' => 'brevo',
-        'key' => env('BREVO_API_KEY'),
-    ],
+        // The 'brevo' mailer block has been removed from here.
 
     ],
 
