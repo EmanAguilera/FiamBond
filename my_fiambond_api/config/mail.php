@@ -7,11 +7,13 @@ return [
     | Default Mailer
     |--------------------------------------------------------------------------
     |
-    | This option controls the default mailer used by the application.
+    | This option controls the default mailer used by the application. By
+    | default, we will use the 'brevo' mailer to send emails via their
+    | API, bypassing any potential SMTP port blocks on the server.
     |
     */
 
-    'default' => env('MAIL_MAILER', 'smtp'),
+    'default' => env('MAIL_MAILER', 'brevo'),
 
     /*
     |--------------------------------------------------------------------------
@@ -68,10 +70,14 @@ return [
                 'smtp',
                 'log',
             ],
-            'retry_after' => 60,
         ],
-
-        // The 'brevo' mailer block has been removed from here.
+        
+        // This is the configuration for our Brevo API mailer.
+        // It tells Laravel how to use the 'brevo' transport.
+        'brevo' => [
+            'transport' => 'brevo',
+            'key' => env('BREVO_API_KEY'),
+        ],
 
     ],
 
