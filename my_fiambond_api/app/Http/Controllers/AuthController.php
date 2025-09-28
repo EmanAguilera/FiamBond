@@ -17,7 +17,7 @@ class AuthController extends Controller
 {
     /**
      * Handle a registration request.
-     * Creates a new user and immediately logs them in.
+     * Creates a new user and returns a success message.
      */
     public function register(Request $request)
     {
@@ -30,21 +30,21 @@ class AuthController extends Controller
         ]);
 
         // Create the new user in the database
-        $user = User::create([
+        User::create([
             'first_name' => $fields['first_name'],
             'last_name' => $fields['last_name'],
             'email' => $fields['email'],
             'password' => Hash::make($fields['password']),
         ]);
 
-        // Create an authentication token for the new user
-        $token = $user->createToken('auth-token')->plainTextToken;
+        // --- CHANGE START ---
+        // OLD: The controller created a token and returned it, logging the user in.
+        // NEW: Return a success message instead, prompting the user to proceed to login.
 
-        // Return the user data and token
         return response([
-            'user' => $user,
-            'token' => $token
+            'message' => 'Registration successful. Please log in.'
         ], 201); // 201 Created status
+        // --- CHANGE END ---
     }
 
     /**
