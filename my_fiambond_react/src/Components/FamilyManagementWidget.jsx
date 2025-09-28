@@ -35,7 +35,6 @@ export default function FamilyManagementWidget() {
     const [listError, setListError] = useState(null);
     const [loadingList, setLoadingList] = useState(true);
 
-    // --- START: MODIFIED LOGIC ---
     const handleFamilyUpdated = useCallback((updatedFamily) => {
         setFamilies(currentFamilies => currentFamilies.map(f => (f.id === updatedFamily.id ? updatedFamily : f)));
         setSelectedFamily(current => (current?.id === updatedFamily.id ? updatedFamily : current));
@@ -55,7 +54,6 @@ export default function FamilyManagementWidget() {
             const { data: _, ...paginationData } = data;
             setPagination(paginationData);
 
-            // Data Enrichment: Concurrently fetch full details for any families missing owner info.
             const familiesToEnrich = data.data.filter(f => !f.owner);
             if (familiesToEnrich.length > 0) {
                 Promise.all(familiesToEnrich.map(family =>
@@ -76,7 +74,6 @@ export default function FamilyManagementWidget() {
             setLoadingList(false);
         }
     }, [token, handleFamilyUpdated]);
-    // --- END: MODIFIED LOGIC ---
 
     useEffect(() => { getFamilies(); }, [getFamilies]);
 
@@ -105,19 +102,18 @@ export default function FamilyManagementWidget() {
                     <h2 className="font-bold text-xl mb-4 text-gray-800">Your Families</h2>
                     {families.length > 0 ? (
                         <div className="space-y-4">
+                            {/* --- START: MODIFIED LOGIC --- */}
                             {families.map((family) => (
-                                <div key={family.id} className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                                    <FamilyListItem
-                                        family={family}
-                                        onFamilyUpdated={handleFamilyUpdated}
-                                        onFamilyDeleted={handleFamilyDeleted}
-                                    />
-                                    <div className="flex flex-wrap gap-2 mt-3 border-t border-gray-200 pt-3">
-                                        <button onClick={() => handleViewMembers(family)} className="secondary-btn-sm">Manage Members</button>
-                                        <button onClick={() => handleViewLedger(family)} className="secondary-btn-sm">View Ledger</button>
-                                    </div>
-                                </div>
+                                <FamilyListItem
+                                    key={family.id}
+                                    family={family}
+                                    onFamilyUpdated={handleFamilyUpdated}
+                                    onFamilyDeleted={handleFamilyDeleted}
+                                    onViewMembers={handleViewMembers}
+                                    onViewLedger={handleViewLedger}
+                                />
                             ))}
+                            {/* --- END: MODIFIED LOGIC --- */}
                             {pagination && pagination.last_page > 1 && (
                                 <div className="flex justify-between items-center mt-6">
                                     <button onClick={() => getFamilies(pagination.current_page - 1)} disabled={pagination.current_page === 1} className="pagination-btn">&larr; Previous</button>
