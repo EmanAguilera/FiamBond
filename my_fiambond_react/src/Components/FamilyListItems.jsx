@@ -1,5 +1,4 @@
 import { useState, useContext, memo } from 'react'; // Import memo for performance
-import { Link } from 'react-router-dom';
 import { AppContext } from '../Context/AppContext.jsx';
 
 function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
@@ -77,16 +76,8 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
                     </div>
                     
                     {/* --- START OF THE BUTTON FIX --- */}
-
-                    {/* This container is now full-width on mobile, arranging its children in a row. */}
                     <div className="flex w-full sm:w-auto items-center gap-2 flex-shrink-0"> 
-                        <Link 
-                            to={`/families/${family.id}`} 
-                            // On mobile, the button is a flex item that fills available width. On desktop, it's auto-sized.
-                            className="primary-btn-sm flex justify-center w-full sm:w-auto"
-                        >
-                            Manage
-                        </Link>
+                        {/* The "Manage" <Link> component has been removed from here. */}
                         {isOwner && (
                             <>
                                 <button
