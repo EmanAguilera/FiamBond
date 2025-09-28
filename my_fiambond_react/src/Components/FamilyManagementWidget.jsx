@@ -35,6 +35,12 @@ export default function FamilyManagementWidget() {
     const [listError, setListError] = useState(null);
     const [loadingList, setLoadingList] = useState(true);
 
+    // --- START: MODIFIED LOGIC ---
+    const handleFamilyUpdated = useCallback((updatedFamily) => {
+        setFamilies(currentFamilies => currentFamilies.map(f => (f.id === updatedFamily.id ? updatedFamily : f)));
+        setSelectedFamily(current => (current?.id === updatedFamily.id ? updatedFamily : current));
+    }, []);
+
     const getFamilies = useCallback(async (page = 1) => {
         setLoadingList(true);
         setListError(null);
@@ -43,25 +49,36 @@ export default function FamilyManagementWidget() {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error("Could not load your families.");
+            
             const data = await res.json();
             setFamilies(data.data);
             const { data: _, ...paginationData } = data;
             setPagination(paginationData);
+
+            // Data Enrichment: Concurrently fetch full details for any families missing owner info.
+            const familiesToEnrich = data.data.filter(f => !f.owner);
+            if (familiesToEnrich.length > 0) {
+                Promise.all(familiesToEnrich.map(family =>
+                    fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}`, { headers: { Authorization: `Bearer ${token}` } })
+                        .then(res => res.ok ? res.json() : null)
+                        .then(detailedFamily => {
+                            if (detailedFamily) {
+                                handleFamilyUpdated(detailedFamily);
+                            }
+                        })
+                        .catch(err => console.error(`Failed to enrich family ${family.id}:`, err))
+                ));
+            }
+
         } catch (error) {
             setListError(error.message);
         } finally {
             setLoadingList(false);
         }
-    }, [token]);
+    }, [token, handleFamilyUpdated]);
+    // --- END: MODIFIED LOGIC ---
 
     useEffect(() => { getFamilies(); }, [getFamilies]);
-
-    function handleFamilyUpdated(updatedFamily) {
-        setFamilies(currentFamilies => currentFamilies.map(f => (f.id === updatedFamily.id ? updatedFamily : f)));
-        if (selectedFamily?.id === updatedFamily.id) {
-            setSelectedFamily(updatedFamily);
-        }
-    }
 
     function handleFamilyDeleted() {
         const currentPage = pagination?.current_page || 1;
