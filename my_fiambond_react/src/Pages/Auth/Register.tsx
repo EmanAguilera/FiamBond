@@ -16,13 +16,14 @@ interface ErrorState {
   [key: string]: string[];
 }
 
-// TS FIX: Define a basic type for the context
+// NOTE: The context type is simplified as handleLogin is no longer used here.
+// You might have a broader context type in your actual application.
 interface AppContextType {
   handleLogin: (user: any, token: string) => void;
 }
 
 export default function Register() {
-  // TS FIX: Add the type assertion to useContext
+  // NOTE: handleLogin is kept for type consistency, but is no longer called in this component.
   const { handleLogin } = useContext(AppContext) as AppContextType;
   const navigate = useNavigate();
 
@@ -56,6 +57,8 @@ export default function Register() {
       
       const data = await res.json();
 
+      // --- CHANGE START ---
+      // If the response is not OK (e.g., status 422, 500), handle errors.
       if (!res.ok) {
         if (res.status === 422) {
           setErrors(data.errors);
@@ -63,15 +66,14 @@ export default function Register() {
           const message = data.message || 'Registration failed. Please try again later.';
           setGeneralError(message);
         }
-        return;
+        return; // Stop execution
       }
 
-      if (data.token && data.user) {
-        handleLogin(data.user, data.token);
-        navigate("/");
-      } else {
-        setGeneralError('An unknown error occurred during registration.');
-      }
+      // If the response is OK (status 201), registration was successful.
+      // Instead of logging in, navigate to the login page.
+      navigate("/login");
+      // --- CHANGE END ---
+
     } catch (error) {
       console.error('Registration network error:', error);
       setGeneralError('A network error occurred. Please check your connection and try again.');
