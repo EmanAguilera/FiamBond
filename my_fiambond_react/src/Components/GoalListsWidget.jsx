@@ -167,25 +167,43 @@ export default function GoalListsWidget() {
         <h2 className="font-bold text-xl mb-4 text-gray-800">Your Active Goals</h2>
         {activeGoals.length > 0 ? (
           <div className="space-y-3">
-            {activeGoals.map((goal) => (
-              <div key={goal.id} className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                 <div className="flex justify-between items-start gap-4">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-lg text-gray-700 break-words">{goal.name}</h3>
-                    {goal.family ? (
-                      <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full inline-block mt-1">For: {goal.family.first_name}</p>
-                    ) : (
-                      <p className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded-full inline-block mt-1">Personal Goal</p>
-                    )}
+            {activeGoals.map((goal) => {
+              // --- START: OVERDUE GOAL NOTIFICATION LOGIC ---
+              const isOverdue = goal.target_date && new Date() > new Date(goal.target_date);
+
+              return (
+                <div key={goal.id} className="p-4 bg-gray-50 border border-gray-200 rounded-md">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-lg text-gray-700 break-words">{goal.name}</h3>
+                      {goal.family ? (
+                        <p className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full inline-block mt-1">For: {goal.family.first_name}</p>
+                      ) : (
+                        <p className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded-full inline-block mt-1">Personal Goal</p>
+                      )}
+                    </div>
+                    <p className="font-bold text-lg text-indigo-600 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
-                  <p className="font-bold text-lg text-indigo-600 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+
+                  {isOverdue ? (
+                    <div className="mt-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded-r-md">
+                      <p className="text-sm font-bold">Deadline Passed</p>
+                      <p className="text-xs mb-3">The target date for this goal has passed. What would you like to do?</p>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleMarkAsComplete(goal.id)} className="success-btn-sm text-xs">Mark as Complete</button>
+                        <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn-sm text-xs">Abandon</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-right mt-3 space-x-2">
+                      <button onClick={() => handleMarkAsComplete(goal.id)} className="success-btn-sm text-xs">Mark as Complete</button>
+                      <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn-sm text-xs">Abandon</button>
+                    </div>
+                  )}
+                  {/* --- END: OVERDUE GOAL NOTIFICATION LOGIC --- */}
                 </div>
-                <div className="text-right mt-3 space-x-2">
-                  <button onClick={() => handleMarkAsComplete(goal.id)} className="success-btn-sm text-xs">Mark as Complete</button>
-                  <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn-sm text-xs">Abandon</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : <p className="text-gray-600 italic">You have no active goals yet.</p>}
         
