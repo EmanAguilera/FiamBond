@@ -1,7 +1,7 @@
 import { useContext, useState, useEffect, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
-// This is the conflict modal, it can remain self-contained here.
+// This is the conflict modal, it is fully included here.
 function CoinTossModal({ goal, onAbandon, onAcknowledge }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -32,11 +32,15 @@ export default function CreateTransactionWidget({ onSuccess }) {
     description: "", amount: "", type: "expense", family_id: ""
   });
   
+  // State to hold the selected file
+  const [attachment, setAttachment] = useState(null);
+
   const [deductImmediately, setDeductImmediately] = useState(false);
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
   const [conflict, setConflict] = useState(null);
   const [families, setFamilies] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const getFamilies = useCallback(async () => {
     try {
@@ -61,23 +65,48 @@ export default function CreateTransactionWidget({ onSuccess }) {
     if (!showDeductCheckbox) setDeductImmediately(false);
   }, [showDeductCheckbox]);
 
+  // Function to handle file selection
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setAttachment(e.target.files[0]);
+    } else {
+      setAttachment(null);
+    }
+  };
+
+  // The main submission logic using FormData for file uploads
   async function handleCreateTransaction(e, force = false) {
     if (e) e.preventDefault();
     setErrors({});
     setFormError(null);
+    setLoading(true);
+
+    const payload = new FormData();
+    payload.append('description', formData.description);
+    payload.append('amount', formData.amount);
+    payload.append('type', formData.type);
     
-    const bodyPayload = { ...formData };
-    if (force) bodyPayload.force_creation = true;
-    if (bodyPayload.family_id === "") delete bodyPayload.family_id;
-    if (showDeductCheckbox && deductImmediately) bodyPayload.deduct_immediately = true;
+    if (force) {
+      payload.append('force_creation', 'true');
+    }
+    if (formData.family_id) {
+      payload.append('family_id', formData.family_id);
+    }
+    if (showDeductCheckbox && deductImmediately) {
+      payload.append('deduct_immediately', 'true');
+    }
+    if (attachment) {
+      payload.append('attachment', attachment);
+    }
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
         method: "post",
         headers: {
-          Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
         },
-        body: JSON.stringify(bodyPayload),
+        body: payload,
       });
 
       const data = await res.json();
@@ -94,7 +123,10 @@ export default function CreateTransactionWidget({ onSuccess }) {
         return;
       }
       
-      // Instead of navigating, call the onSuccess callback to close the modal and refresh data.
+      setFormData({ description: "", amount: "", type: "expense", family_id: "" });
+      setAttachment(null);
+      if (e) e.target.reset();
+
       if (onSuccess) {
         onSuccess();
       }
@@ -102,21 +134,24 @@ export default function CreateTransactionWidget({ onSuccess }) {
     } catch (err) {
       console.error('Failed to create transaction:', err);
       setFormError('A network error occurred. Please check your connection.');
+    } finally {
+        setLoading(false);
     }
   }
 
   async function handleAbandon() {
+    setLoading(true);
     try {
       await fetch(`${import.meta.env.VITE_API_URL}/api/goals/${conflict.id}`, {
         method: 'delete',
         headers: { Authorization: `Bearer ${token}` }
       });
-      // If abandoning succeeds, proceed to create the transaction
       handleCreateTransaction(null, true); 
     } catch (err) {
       console.error(err);
       setFormError("Could not abandon the goal. Please try again.");
       setConflict(null);
+      setLoading(false);
     }
   }
 
@@ -134,7 +169,6 @@ export default function CreateTransactionWidget({ onSuccess }) {
         />
       )}
 
-      {/* The main title is removed from here as the Modal will provide it. */}
       <div className="w-full">
         <form onSubmit={handleCreateTransaction} className="space-y-6">
           <div className="flex justify-center gap-8 text-gray-700">
@@ -180,6 +214,22 @@ export default function CreateTransactionWidget({ onSuccess }) {
             {errors.amount && <p className="error">{errors.amount[0]}</p>}
           </div>
 
+          <div>
+            <label htmlFor="attachment" className="block text-sm font-medium text-gray-700 mb-1">Attach Receipt (Optional)</label>
+            <input
+              id="attachment"
+              type="file"
+              onChange={handleFileChange}
+              className="w-full text-sm text-slate-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-indigo-50 file:text-indigo-700
+                hover:file:bg-indigo-100"
+            />
+            {errors.attachment && <p className="error">{errors.attachment[0]}</p>}
+          </div>
+
           {showDeductCheckbox && (
             <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-md transition-all">
               <label className="flex items-center space-x-3 cursor-pointer">
@@ -193,7 +243,9 @@ export default function CreateTransactionWidget({ onSuccess }) {
           )}
 
           {formError && <p className="error">{formError}</p>}
-          <button type="submit" className="primary-btn w-full">Save Transaction</button>
+          <button type="submit" className="primary-btn w-full" disabled={loading}>
+            {loading ? 'Saving...' : 'Save Transaction'}
+          </button>
         </form>
       </div>
     </>
