@@ -7,5 +7,5 @@
     "allowJs": true,
     "noEmit": true // <-- ADD THIS LINE
   },
-  "include": ["vite.config.js"]
+  "include": ["vite.config.ts"]
 }
