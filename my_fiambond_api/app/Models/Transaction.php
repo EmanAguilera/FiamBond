@@ -16,6 +16,7 @@ class Transaction extends Model
         'amount',
         'type',
         'is_system_generated',
+        'attachment_path',
     ];
 
     public function user()

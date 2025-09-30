@@ -6,6 +6,7 @@ use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 
 class TransactionController extends Controller
 {
@@ -37,8 +38,21 @@ class TransactionController extends Controller
                 Rule::exists('family_user', 'family_id')->where('user_id', $user->id),
             ],
             'deduct_immediately' => 'nullable|boolean',
+            'attachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
         ]);
+
+         // --- START: NEW FILE UPLOAD LOGIC ---
+         if ($request->hasFile('attachment')) {
+        // The 'store' method will automatically generate a unique name
+        // and place the file in the 'attachments' directory in your S3 bucket.
+        // It returns the full path to the file.
+        $path = $request->file('attachment')->store('attachments', 's3');
         
+        // Add the file path to the data that will be saved in the database.
+        $fields['attachment_path'] = $path;
+    }
+    // --- END: NEW FILE UPLOAD LOGIC ---
+
         // --- START OF FIX: SMARTER GOAL CONFLICT LOGIC ---
         $activeGoal = null;
         // Only check for a conflict if the transaction is an expense and it's the first attempt.
