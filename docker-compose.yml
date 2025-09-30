@@ -16,7 +16,7 @@ services:
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_DEFAULT_REGION=us-east-1
-      - AWS_BUCKET=my-local-bucket
+      - AWS_BUCKET=my-fiambond-files
       - AWS_ENDPOINT=http://localstack:4566
       - AWS_USE_PATH_STYLE_ENDPOINT=true
       # --- Laravel Environment ---
