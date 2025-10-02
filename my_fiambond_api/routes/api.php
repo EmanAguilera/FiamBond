@@ -6,16 +6,17 @@ use App\Http\Controllers\FamilyController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\LoanController; // <-- ADDED: Import the new controller
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-// Publicly accessible routes
+// --- Publicly accessible routes ---
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::post('/verify-2fa', [AuthController::class, 'verifyTwoFactor']);
 
-// Routes that require user authentication
+// --- Routes that require user authentication ---
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -24,30 +25,40 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::put('/user', [UserController::class, 'update']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Family Routes
+    // --- Family Routes ---
     Route::get('/families/summaries', [FamilyController::class, 'summaries']);
     Route::post('/families/{family}/members', [FamilyController::class, 'addMember']);
     Route::get('/families/{family}/report', [FamilyController::class, 'monthlyReport']);
+    // This provides the main CRUD endpoints for families.
     Route::apiResource('families', FamilyController::class);
+    // Preserving your explicit update and delete routes as requested.
+    Route::put('/families/{family}', [FamilyController::class, 'update']);
+    Route::delete('/families/{family}', [FamilyController::class, 'destroy']);
 
-    // Goal Routes
+
+    // --- NEW: Family Lending (Loan) Routes ---
+    // These routes are required for the peer-to-peer lending feature.
+    Route::get('/families/{family}/loans', [LoanController::class, 'index']);   // Gets all loans within a family.
+    Route::post('/families/{family}/loans', [LoanController::class, 'store']);   // Creates a new loan between members.
+    Route::post('/loans/{loan}/repayments', [LoanController::class, 'repay']); // Records a repayment against a loan.
+    // --- END OF NEW ROUTES ---
+
+
+    // --- Goal Routes ---
     Route::get('/goals/active-personal-count', [GoalController::class, 'getActivePersonalCount']);
     Route::put('/goals/{goal}/complete', [GoalController::class, 'markAsCompleted']);
     Route::apiResource('goals', GoalController::class)->except(['show', 'update']);
+    // Preserving your explicit delete route as requested.
+    Route::delete('/goals/{goal}', [GoalController::class, 'destroy']);
     
-    // Transaction Routes
+    // --- Transaction Routes ---
     Route::apiResource('transactions', TransactionController::class);
 
-    // --- START OF FIX ---
-    // The route is corrected to /reports to match the frontend API call.
-    // The auth middleware is added to protect the route.
-    Route::get('/reports', [ReportController::class, 'generateMonthlyReport'])->middleware('auth:sanctum');
-    // --- END OF FIX ---
+    // --- Report and Balance Routes ---
+    // The personal financial report for the logged-in user.
+    Route::get('/reports', [ReportController::class, 'generatePersonalReport']);
     
-    Route::get('/user/balance', [ReportController::class, 'getUserBalance']);
-
+    // The route for the user's current balance. The duplicate pointing to ReportController has been removed to fix the conflict.
     Route::get('/user/balance', [App\Http\Controllers\UserController::class, 'getBalance']);
-    Route::put('/families/{family}', [FamilyController::class, 'update']); // Add this for updating
-    Route::delete('/families/{family}', [FamilyController::class, 'destroy']); // Add this for deleting
-    Route::delete('/goals/{goal}', [GoalController::class, 'destroy']);
+
 });

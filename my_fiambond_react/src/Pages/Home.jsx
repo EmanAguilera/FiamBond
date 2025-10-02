@@ -7,7 +7,6 @@ import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
 // --- WIDGET IMPORTS (Code Splitting with React.lazy) ---
-// These components will now be loaded only when they are needed, speeding up the initial page load.
 const Modal = lazy(() => import("../Components/Modal"));
 const GoalListsWidget = lazy(() => import("../Components/GoalListsWidget"));
 const CreateGoalWidget = lazy(() => import("../Components/CreateGoalWidget"));
@@ -15,6 +14,10 @@ const RecentTransactionsWidget = lazy(() => import("../Components/RecentTransact
 const CreateTransactionWidget = lazy(() => import("../Components/CreateTransactionWidget"));
 const FamilyManagementWidget = lazy(() => import("../Components/FamilyManagementWidget"));
 const CreateFamilyWidget = lazy(() => import("../Components/CreateFamilyWidget"));
+
+// --- NEW REALM IMPORT ---
+// This is the new component for the shared family view.
+const FamilyRealm = lazy(() => import('../Components/FamilyRealm'));
 
 // Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -60,6 +63,9 @@ export default function Home() {
   const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false);
   const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
+
+  // --- NEW STATE FOR VIEW MANAGEMENT ---
+  const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
 
   // --- DATA & LOADING STATE ---
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -142,7 +148,6 @@ export default function Home() {
     if (token) {
       const fetchInitialData = async () => {
         setIsInitialLoading(true);
-        // Promise.all fetches all data concurrently for better performance
         await Promise.all([
           getSummaryData(),
           getActiveGoalsCount(),
@@ -159,7 +164,6 @@ export default function Home() {
 
   // --- EFFECT FOR PERIOD CHANGES ONLY ---
   useEffect(() => {
-    // This prevents re-fetching the report on the very first render
     if (!isInitialLoading && token) {
       getReport();
     }
@@ -182,6 +186,16 @@ export default function Home() {
     getFamilyCount();
   }, [getFamilyCount]);
 
+  // --- NEW HANDLERS FOR FAMILY REALM NAVIGATION ---
+  const handleEnterFamilyRealm = (family) => {
+    setActiveFamilyRealm(family);
+    setIsFamilyModalOpen(false); // Close the management modal after entering a realm
+  };
+  
+  const handleExitFamilyRealm = () => {
+    setActiveFamilyRealm(null);
+  };
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -198,8 +212,28 @@ export default function Home() {
 
   return (
     <>
-      {user ? (
-        // If logged in, show skeleton during initial load, then the dashboard
+      {/* --- MODALS (Lazy Loaded) --- */}
+      {/* Suspense provides a fallback while the modal's code is being downloaded */}
+      <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
+        {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><RecentTransactionsWidget /></Modal>}
+        {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
+        
+        {/* The Family Management modal now gets a prop to handle entering a realm */}
+        {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget onEnterRealm={handleEnterFamilyRealm} /></Modal>}
+        
+        {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
+        {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
+        {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
+      </Suspense>
+
+      {/* --- MAIN VIEW LOGIC: Conditionally render Family Realm or Personal Dashboard --- */}
+      {activeFamilyRealm ? (
+        // RENDER THE FAMILY REALM VIEW IF A FAMILY IS SELECTED
+        <Suspense fallback={<DashboardSkeleton />}>
+            <FamilyRealm family={activeFamilyRealm} onBack={handleExitFamilyRealm} />
+        </Suspense>
+      ) : user ? (
+        // RENDER THE PERSONAL DASHBOARD IF LOGGED IN AND NO REALM IS ACTIVE
         isInitialLoading ? <DashboardSkeleton /> : (
           <div className="p-4 md:p-10">
             <header className="dashboard-header">
@@ -262,7 +296,7 @@ export default function Home() {
           </div>
         )
       ) : (
-        // If not logged in, show the hero section
+        // RENDER THE HERO SECTION IF NOT LOGGED IN
         <div className="hero-section">
           <div className="hero-content">
             <div className="hero-text">
@@ -283,18 +317,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* --- MODALS (Lazy Loaded) --- */}
-      {/* Suspense provides a fallback while the modal's code is being downloaded */}
-      <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
-        {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><RecentTransactionsWidget /></Modal>}
-        {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
-        {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget /></Modal>}
-        
-        {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
-        {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
-        {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
-      </Suspense>
     </>
   );
 }
