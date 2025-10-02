@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Family;
 use App\Models\Loan;
-use App\Models\User;
+// Make sure User model is imported
+use App\Models\User; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -21,15 +22,20 @@ class LoanController extends Controller
             return response(['message' => 'You are not a member of this family.'], 403);
         }
 
-        // Fetch loans for the family, eager-loading the creditor and debtor relationships
-        // to prevent N+1 query issues.
+        // --- START OF THE FIX ---
+        // We remove the specific column selections from the `with` clause.
+        // This makes the query more robust by loading the entire related objects,
+        // which allows accessor attributes like `full_name` to work correctly.
         $loans = Loan::where('family_id', $family->id)
-            ->with(['creditor:id,full_name', 'debtor:id,full_name'])
+            ->with(['creditor', 'debtor']) // Simplified and more reliable
             ->latest()
             ->paginate(10);
+        // --- END OF THE FIX ---
 
         return response($loans);
     }
+    
+    // ... all other methods (store, repay) remain the same ...
 
     /**
      * Store a new loan and create the corresponding double-entry transactions.
