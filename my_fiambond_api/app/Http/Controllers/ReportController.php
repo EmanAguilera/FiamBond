@@ -8,16 +8,19 @@ use Illuminate\Support\Carbon;
 class ReportController extends Controller
 {
     /**
-     * Generate a financial report for the authenticated user.
+     * Generate a financial report (weekly, monthly, yearly) for the authenticated user's personal transactions.
      */
-    public function generateMonthlyReport(Request $request)
+    public function generatePersonalReport(Request $request)
     {
         $user = $request->user();
+        
+        // 1. Validate the 'period' query parameter
         $period = $request->query('period', 'monthly');
         if (!in_array($period, ['weekly', 'monthly', 'yearly'])) {
             $period = 'monthly';
         }
 
+        // 2. Determine the date range based on the period
         $now = Carbon::now();
         if ($period === 'weekly') {
             $startDate = $now->copy()->startOfWeek();
@@ -33,35 +36,33 @@ class ReportController extends Controller
             $title = $now->format('F Y');
         }
 
-        // --- START OF FIX ---
-        // Fetch ALL transactions belonging to the user for the target period,
-        // including both personal (family_id is null) and family transactions.
-        $transactions = $user->transactions()
-        ->whereNull('family_id') // Add this line
-        ->whereBetween('created_at', [$startDate, $endDate])
-        ->get();
-        // --- END OF FIX ---
+        // 3. Fetch ONLY personal transactions for the period (where family_id is null)
+        $transactionsForPeriod = $user->transactions()
+            ->whereNull('family_id') // This is the key difference from the FamilyController
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->get();
 
-        $inflow = $transactions->where('type', 'income')->sum('amount');
-        $outflow = $transactions->where('type', 'expense')->sum('amount');
+        // 4. Calculate totals
+        $inflow = $transactionsForPeriod->where('type', 'income')->sum('amount');
+        $outflow = $transactionsForPeriod->where('type', 'expense')->sum('amount');
+        
+        // 5. Prepare data for the chart
+        $chartData = $this->prepareChartData($transactionsForPeriod, $period, $startDate);
 
-        // Prepare data for the bar chart
-        $chartData = $this->prepareChartData($transactions, $period, $startDate);
-
+        // 6. Return the complete report as a JSON response
         return response([
             'reportTitle' => $title,
             'totalInflow' => $inflow,
             'totalOutflow' => $outflow,
             'netPosition' => $inflow - $outflow,
-            'transactionCount' => $transactions->count(),
+            'transactionCount' => $transactionsForPeriod->count(),
             'chartData' => $chartData,
-            'transactions' => $transactions, // For potential detailed views
         ]);
     }
 
     /**
-     * Helper function to format transaction data for chart.js.
-     * This is the same helper from FamilyController for consistency.
+     * Helper function to format transaction data for Chart.js.
+     * This is the same function used in your FamilyController.
      */
     private function prepareChartData($transactions, $period, Carbon $startDate)
     {
@@ -83,13 +84,13 @@ class ReportController extends Controller
                 }
             }
         } else {
-            $daysInMonth = $startDate->daysInMonth;
-            $groupFormat = ($period === 'yearly') ? 'n' : 'j';
+            $groupFormat = ($period === 'yearly') ? 'n' : 'j'; // 'n' for month number, 'j' for day of month
 
             if ($period === 'yearly') {
                 $labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 $labelCount = 12;
-            } else {
+            } else { // monthly
+                $daysInMonth = $startDate->daysInMonth;
                 $labels = range(1, $daysInMonth);
                 $labelCount = $daysInMonth;
             }
