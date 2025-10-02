@@ -4,8 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Family;
 use App\Models\Loan;
-// Make sure User model is imported
-use App\Models\User; 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -13,52 +12,36 @@ use Illuminate\Validation\Rule;
 class LoanController extends Controller
 {
     /**
-     * Display a listing of the loans for a specific family.
+     * This method powers the "Family Lending" widget. It fetches directly from the 'loans' table.
      */
     public function index(Request $request, Family $family)
     {
-        // Authorization: Ensure the current user is a member of the family.
         if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
             return response(['message' => 'You are not a member of this family.'], 403);
         }
 
-        // --- START OF THE FIX ---
-        // We remove the specific column selections from the `with` clause.
-        // This makes the query more robust by loading the entire related objects,
-        // which allows accessor attributes like `full_name` to work correctly.
         $loans = Loan::where('family_id', $family->id)
-            ->with(['creditor', 'debtor']) // Simplified and more reliable
+            ->with(['creditor', 'debtor']) // Eager load user details
             ->latest()
             ->paginate(10);
-        // --- END OF THE FIX ---
 
         return response($loans);
     }
-    
-    // ... all other methods (store, repay) remain the same ...
 
     /**
-     * Store a new loan and create the corresponding double-entry transactions.
-     * This entire operation is wrapped in a database transaction to ensure data integrity.
+     * This method creates the loan record AND the two linked transaction records,
+     * ensuring the 'loan_id' is saved on each transaction.
      */
     public function store(Request $request, Family $family)
     {
         $lender = $request->user();
 
-        // Authorization: Ensure the lender is a member of the family.
         if (!$family->members()->where('user_id', $lender->id)->exists()) {
             return response(['message' => 'You must be a member of this family to lend money.'], 403);
         }
 
         $fields = $request->validate([
-            'debtor_id' => [
-                'required',
-                'integer',
-                Rule::exists('users', 'id'),
-                Rule::notIn([$lender->id]), // Cannot lend to yourself
-                // Ensure the debtor is also a member of the family
-                Rule::exists('family_user', 'user_id')->where('family_id', $family->id),
-            ],
+            'debtor_id' => ['required', 'integer', Rule::exists('users', 'id'), Rule::notIn([$lender->id]), Rule::exists('family_user', 'user_id')->where('family_id', $family->id)],
             'amount' => 'required|numeric|min:0.01',
             'description' => 'required|string|max:255',
         ]);
@@ -66,7 +49,6 @@ class LoanController extends Controller
         $debtor = User::find($fields['debtor_id']);
 
         try {
-            // Use a DB transaction to ensure all records are created or none are.
             $loan = DB::transaction(function () use ($family, $lender, $debtor, $fields) {
                 // 1. Create the Loan record
                 $loan = Loan::create([
@@ -77,22 +59,22 @@ class LoanController extends Controller
                     'description' => $fields['description'],
                 ]);
 
-                // 2. Create the lender's expense transaction
+                // 2. Create the lender's expense transaction, linked to the loan
                 $lender->transactions()->create([
                     'description' => "Loan to {$debtor->full_name}: " . $fields['description'],
                     'amount'      => $fields['amount'],
                     'type'        => 'expense',
                     'family_id'   => $family->id,
-                    'loan_id'     => $loan->id, // Link transaction to the loan
+                    'loan_id'     => $loan->id, // This link is crucial
                 ]);
 
-                // 3. Create the borrower's income transaction
+                // 3. Create the borrower's income transaction, linked to the loan
                 $debtor->transactions()->create([
                     'description' => "Loan from {$lender->full_name}: " . $fields['description'],
                     'amount'      => $fields['amount'],
                     'type'        => 'income',
                     'family_id'   => $family->id,
-                    'loan_id'     => $loan->id, // Link transaction to the loan
+                    'loan_id'     => $loan->id, // This link is crucial
                 ]);
 
                 return $loan;
@@ -101,7 +83,6 @@ class LoanController extends Controller
             return response($loan->load(['creditor', 'debtor']), 201);
 
         } catch (\Exception $e) {
-            // If anything goes wrong, the transaction will be rolled back.
             return response(['message' => 'Failed to record the loan due to a server error.'], 500);
         }
     }

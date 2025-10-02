@@ -1,9 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\Transaction;
-use App\Models\Family; // Make sure the Family model is imported
+use App\Models\Family;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Validation\Rule;
@@ -12,39 +11,41 @@ use Illuminate\Support\Facades\Storage;
 class TransactionController extends Controller
 {
     /**
-     * Display a listing of the PERSONAL resource.
+     * Display a listing of PERSONAL transactions, excluding loans.
      */
     public function index(Request $request)
     {
-        // This method is for PERSONAL transactions only and should also be filtered.
-        return $request->user()->transactions()->whereNull('loan_id')->whereNull('family_id')->latest()->paginate(10);
+        // Fetch personal transactions where family_id is NULL AND loan_id is NULL.
+        return $request->user()->transactions()
+            ->whereNull('family_id')
+            ->whereNull('loan_id') // Filter out personal loan-related transactions
+            ->latest()
+            ->paginate(10);
     }
 
     /**
-     * Display a paginated listing of transactions for a specific family.
+     * Display a paginated listing of transactions for a specific family, excluding loans.
      */
     public function indexForFamily(Request $request, Family $family)
     {
-        // 1. Authorization: Ensure the user is a member of this family.
+        // Authorization: Ensure the user is a member of this family.
         if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
             return response(['message' => 'Unauthorized'], 403);
         }
 
-        // --- START OF THE FIX ---
-        // We add `whereNull('loan_id')` to the query.
-        // This tells Laravel to fetch only the transactions that are NOT linked to a loan,
-        // effectively hiding all loan-related entries from this list.
+        // --- THE KEY FIX ---
+        // Fetch family transactions where loan_id is NULL. This hides all loan activity from this list.
         return $family->transactions()
             ->whereNull('loan_id')
             ->with('user')
             ->latest()
             ->paginate(10);
-        // --- END OF THE FIX ---
     }
 
-    // ... The rest of your controller (store, show, destroy, etc.) remains exactly the same.
-    // The store method correctly creates transactions with a `loan_id`, so it doesn't need to change.
-    
+    /**
+     * Store a newly created resource in storage.
+     * This method does not need changes as it correctly handles transactions with or without a loan_id.
+     */
     public function store(Request $request)
     {
         $user = $request->user();
@@ -94,6 +95,7 @@ class TransactionController extends Controller
                 $conflictingGoalQuery->whereNull('family_id');
             }
             $conflictingGoal = $conflictingGoalQuery->first();
+
             if ($conflictingGoal) {
                 $date = Carbon::now()->toFormattedDateString();
                 $newNote = "On {$date}, the integrity of this goal was compromised by an expense of {$fields['amount']}.";
@@ -116,11 +118,17 @@ class TransactionController extends Controller
         return response($transaction, 201);
     }
     
+    /**
+     * Display the specified resource.
+     */
     public function show(Transaction $transaction)
     {
         return $transaction;
     }
     
+    /**
+     * Remove the specified resource from storage.
+     */
     public function destroy(Transaction $transaction)
     {
         $transaction->delete();
