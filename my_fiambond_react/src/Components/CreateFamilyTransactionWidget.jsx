@@ -22,7 +22,7 @@ const TransactionListSkeleton = () => (
 
 export default function FamilyTransactionsWidget({ family }) {
   const { token } = useContext(AppContext);
-  const [transactions, setTransactions] =useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,6 +44,7 @@ export default function FamilyTransactionsWidget({ family }) {
       const { data: _, ...paginationData } = data;
       setPagination(paginationData);
     } catch (err) {
+      console.error("Error fetching family transactions:", err);
       setError(err.message);
     } finally {
       setLoading(false);
