@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Family;
 
 class TransactionController extends Controller
 {
@@ -16,7 +17,7 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         // E.g., paginate by 10 transactions per page.
-    return $request->user()->transactions()->whereNull('family_id')->latest()->paginate(5);
+    return $request->user()->transactions()->whereNull('family_id')->latest()->paginate(10);
     }
 
     /**
@@ -119,6 +120,17 @@ class TransactionController extends Controller
         }
 
         return response($transaction, 201);
+    }
+
+    public function indexForFamily(Request $request, Family $family)
+    {
+        // 1. Authorization: Ensure the user is a member of this family.
+        if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        // 2. Fetch and return the paginated transactions for the family.
+        return $family->transactions()->with('user:id,full_name')->latest()->paginate(10);
     }
 
     /**

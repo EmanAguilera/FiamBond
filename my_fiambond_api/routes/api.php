@@ -59,6 +59,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     
     // --- Transaction Routes ---
     Route::apiResource('transactions', TransactionController::class);
+    Route::get('/families/{family}/transactions', [TransactionController::class, 'indexForFamily']);
 
     // --- Report and Balance Routes ---
     // The personal financial report for the logged-in user.

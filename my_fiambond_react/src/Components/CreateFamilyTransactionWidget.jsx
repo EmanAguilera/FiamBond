@@ -1,72 +1,93 @@
-import { useContext, useState } from "react";
+// src/Components/FamilyTransactionsWidget.jsx
+
+import { useContext, useEffect, useState, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
-export default function CreateFamilyTransactionWidget({ family, onSuccess }) {
+// Reusable Skeleton Loader
+const TransactionListSkeleton = () => (
+  <div className="animate-pulse">
+    <div className="dashboard-card p-0">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="flex justify-between items-center p-4 border-b last:border-b-0 border-slate-100">
+          <div>
+            <div className="h-5 w-48 bg-slate-200 rounded"></div>
+            <div className="h-4 w-24 bg-slate-200 rounded mt-2"></div>
+          </div>
+          <div className="h-6 w-28 bg-slate-200 rounded"></div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+export default function FamilyTransactionsWidget({ family }) {
   const { token } = useContext(AppContext);
+  const [transactions, setTransactions] =useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [formData, setFormData] = useState({ description: "", amount: "", type: "expense" });
-  const [errors, setErrors] = useState({});
-  const [formError, setFormError] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  async function handleCreateTransaction(e) {
-    e.preventDefault();
-    setErrors({});
-    setFormError(null);
-    setLoading(true);
-
-    const payload = new FormData();
-    payload.append('description', formData.description);
-    payload.append('amount', formData.amount);
-    payload.append('type', formData.type);
-    payload.append('family_id', family.id); // The family_id is automatically included
+  const getTransactions = useCallback(async (page = 1) => {
+    if (!token) return;
+    if (page === 1) setLoading(true);
+    setError(null);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
-        method: "post",
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        body: payload,
+      // Use the new API endpoint for fetching family-specific transactions
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/transactions?page=${page}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 422) setErrors(data.errors);
-        else setFormError(data.message || "An unexpected error occurred.");
-        return;
-      }
+      if (!res.ok) throw new Error("Could not load family transactions.");
       
-      if (onSuccess) onSuccess();
-
+      const data = await res.json();
+      setTransactions(data.data || []);
+      const { data: _, ...paginationData } = data;
+      setPagination(paginationData);
     } catch (err) {
-      // --- THIS IS THE FIX ---
-      // We now log the actual error to the console for better debugging.
-      console.error('Failed to create family transaction:', err);
-      // --- END OF FIX ---
-      setFormError('A network error occurred. Please check your connection.');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  }
+  }, [token, family.id]);
+
+  useEffect(() => {
+    getTransactions(1);
+  }, [getTransactions]);
+
+  if (loading) return <TransactionListSkeleton />;
+  if (error) return <p className="error text-center py-4">{error}</p>;
 
   return (
-    <div className="w-full">
-      <form onSubmit={handleCreateTransaction} className="space-y-6">
-        <div className="flex justify-center gap-8 text-gray-700">
-          <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="type" value="expense" checked={formData.type === "expense"} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="h-4 w-4 text-indigo-600"/>Expense</label>
-          <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="type" value="income" checked={formData.type === "income"} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="h-4 w-4 text-indigo-600"/>Income</label>
+    <div>
+      <div className="dashboard-card p-0">
+        {transactions.length > 0 ? (
+          transactions.map((transaction) => (
+            <div key={transaction.id} className="transaction-item border-b last:border-b-0 border-gray-100">
+              <div className="min-w-0 pr-4">
+                <p className="transaction-description break-words">{transaction.description}</p>
+                <small className="transaction-date">
+                  {new Date(transaction.created_at).toLocaleDateString()}
+                  {/* Display which member made the transaction */}
+                  {transaction.user && ` • By: ${transaction.user.full_name}`}
+                </small>
+              </div>
+              <p className={`transaction-amount flex-shrink-0 ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>
+                {transaction.type === 'income' ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          ))
+        ) : (
+          <div className="p-4 text-center text-gray-600 italic">This family has no transactions yet.</div>
+        )}
+      </div>
+      
+      {pagination && pagination.last_page > 1 && (
+        <div className="flex justify-between items-center mt-6">
+          <button onClick={() => getTransactions(pagination.current_page - 1)} disabled={pagination.current_page === 1} className="pagination-btn">&larr; Previous</button>
+          <span className="pagination-text">Page {pagination.current_page} of {pagination.last_page}</span>
+          <button onClick={() => getTransactions(pagination.current_page + 1)} disabled={pagination.current_page === pagination.last_page} className="pagination-btn">Next &rarr;</button>
         </div>
-        <div>
-          <input type="text" placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full p-2 border rounded-md"/>
-          {errors.description && <p className="error">{errors.description[0]}</p>}
-        </div>
-        <div>
-          <input type="number" placeholder="Amount" step="0.01" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} className="w-full p-2 border rounded-md"/>
-          {errors.amount && <p className="error">{errors.amount[0]}</p>}
-        </div>
-        {formError && <p className="error">{formError}</p>}
-        <button type="submit" className="primary-btn w-full" disabled={loading}>{loading ? 'Saving...' : 'Save Transaction'}</button>
-      </form>
+      )}
     </div>
   );
 }
