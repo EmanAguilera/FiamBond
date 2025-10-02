@@ -49,7 +49,7 @@ const GoalListsSkeleton = () => (
 );
 
 
-export default function GoalListsWidget() {
+export default function GoalListsWidget({ family }) {
   const { token } = useContext(AppContext);
 
   // State for the lists and their pagination
@@ -66,10 +66,17 @@ export default function GoalListsWidget() {
   const getActiveGoals = useCallback(async (page = 1) => {
     if (!token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals?status=active&page=${page}`, {
+      let url = `${import.meta.env.VITE_API_URL}/api/goals?status=active&page=${page}`;
+      // If a family object is passed as a prop, add it as a query parameter
+      if (family) {
+        url += `&family_id=${family.id}`;
+      }
+
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Could not load your active goals.");
+      
       const data = await res.json();
       setActiveGoals(data.data || []);
       const { data: _, ...paginationData } = data;
@@ -77,16 +84,23 @@ export default function GoalListsWidget() {
     } catch (err) {
       setListError(err.message);
     }
-  }, [token]);
+  }, [token, family]); // Add `family` to the dependency array
   
   // Fetches a page of COMPLETED goals
   const getCompletedGoals = useCallback(async (page = 1) => {
     if (!token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals?status=completed&page=${page}`, {
+      let url = `${import.meta.env.VITE_API_URL}/api/goals?status=completed&page=${page}`;
+      // If a family object is passed as a prop, add it as a query parameter
+      if (family) {
+        url += `&family_id=${family.id}`;
+      }
+
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Could not load your completed goals.");
+      
       const data = await res.json();
       setCompletedGoals(data.data || []);
       const { data: _, ...paginationData } = data;
@@ -94,14 +108,13 @@ export default function GoalListsWidget() {
     } catch (err) {
       setListError(err.message);
     }
-  }, [token]);
+  }, [token, family]); // Add `family` to the dependency array
 
   // Initial data load for both lists
   useEffect(() => {
     if (token) {
       setLoading(true);
       setListError(null);
-      // Promise.all fetches both lists concurrently for better performance
       Promise.all([getActiveGoals(), getCompletedGoals()]).finally(() => setLoading(false));
     }
   }, [token, getActiveGoals, getCompletedGoals]);
@@ -153,11 +166,7 @@ export default function GoalListsWidget() {
   }
 
   // --- RENDER LOGIC ---
-
-  // While fetching initial data, show the detailed skeleton loader.
   if (loading) return <GoalListsSkeleton />;
-
-  // If an error occurs, show the error message.
   if (listError) return <p className="error text-center py-10">{listError}</p>;
 
   return (
@@ -168,9 +177,7 @@ export default function GoalListsWidget() {
         {activeGoals.length > 0 ? (
           <div className="space-y-3">
             {activeGoals.map((goal) => {
-              // --- START: OVERDUE GOAL NOTIFICATION LOGIC ---
               const isOverdue = goal.target_date && new Date() > new Date(goal.target_date);
-
               return (
                 <div key={goal.id} className="p-4 bg-gray-50 border border-gray-200 rounded-md">
                   <div className="flex justify-between items-start gap-4">
@@ -184,7 +191,6 @@ export default function GoalListsWidget() {
                     </div>
                     <p className="font-bold text-lg text-indigo-600 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
-
                   {isOverdue ? (
                     <div className="mt-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded-r-md">
                       <p className="text-sm font-bold">Deadline Passed</p>
@@ -200,7 +206,6 @@ export default function GoalListsWidget() {
                       <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn-sm text-xs">Abandon</button>
                     </div>
                   )}
-                  {/* --- END: OVERDUE GOAL NOTIFICATION LOGIC --- */}
                 </div>
               );
             })}
