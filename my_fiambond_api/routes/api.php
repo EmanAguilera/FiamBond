@@ -29,6 +29,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/families/summaries', [FamilyController::class, 'summaries']);
     Route::post('/families/{family}/members', [FamilyController::class, 'addMember']);
     Route::get('/families/{family}/report', [FamilyController::class, 'monthlyReport']);
+
+    // --- START: NEW FAMILY DASHBOARD ROUTES ---
+    Route::get('/families/{family}/balance', [FamilyController::class, 'getBalance']);
+    Route::get('/families/{family}/active-goals-count', [GoalController::class, 'getActiveFamilyCount']);
+    // --- END: NEW FAMILY DASHBOARD ROUTES ---
+
     // This provides the main CRUD endpoints for families.
     Route::apiResource('families', FamilyController::class);
     // Preserving your explicit update and delete routes as requested.

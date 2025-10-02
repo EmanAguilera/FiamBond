@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Goal;
 use App\Models\Transaction;
+use App\Models\Family;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule; // Make sure this line is present and not commented out.
 
@@ -117,4 +118,19 @@ class GoalController extends Controller
 
         return ['message' => 'The goal has been abandoned.'];
     }
+
+    public function getActiveFamilyCount(Request $request, Family $family)
+    {
+        // Authorization: Check if the user is part of the family
+        if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        $count = Goal::where('family_id', $family->id)
+            ->where('status', 'active')
+            ->count();
+
+        return response()->json(['count' => $count]);
+    }
 }
+

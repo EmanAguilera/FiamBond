@@ -136,6 +136,20 @@ class FamilyController extends Controller
         return response(['message' => 'Family has been deleted successfully.']);
     }
 
+     public function getBalance(Request $request, Family $family)
+    {
+        // Authorization: Ensure the user is a member of the family.
+        if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        $inflow = $family->transactions()->where('type', 'income')->sum('amount');
+        $outflow = $family->transactions()->where('type', 'expense')->sum('amount');
+        $netPosition = $inflow - $outflow;
+
+        return response()->json(['netPosition' => $netPosition]);
+    }
+
     public function monthlyReport(Request $request, Family $family)
     {
         if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
