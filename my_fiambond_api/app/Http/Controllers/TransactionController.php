@@ -16,8 +16,8 @@ class TransactionController extends Controller
      */
     public function index(Request $request)
     {
-        // This method is for PERSONAL transactions only.
-        return $request->user()->transactions()->whereNull('family_id')->latest()->paginate(10);
+        // This method is for PERSONAL transactions only and should also be filtered.
+        return $request->user()->transactions()->whereNull('loan_id')->whereNull('family_id')->latest()->paginate(10);
     }
 
     /**
@@ -31,16 +31,20 @@ class TransactionController extends Controller
         }
 
         // --- START OF THE FIX ---
-        // We change `with('user:id,full_name')` to `with('user')`.
-        // This loads the full user object, allowing the 'full_name' accessor
-        // from the User model to be appended correctly in the JSON response.
-        return $family->transactions()->with('user')->latest()->paginate(10);
+        // We add `whereNull('loan_id')` to the query.
+        // This tells Laravel to fetch only the transactions that are NOT linked to a loan,
+        // effectively hiding all loan-related entries from this list.
+        return $family->transactions()
+            ->whereNull('loan_id')
+            ->with('user')
+            ->latest()
+            ->paginate(10);
         // --- END OF THE FIX ---
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    // ... The rest of your controller (store, show, destroy, etc.) remains exactly the same.
+    // The store method correctly creates transactions with a `loan_id`, so it doesn't need to change.
+    
     public function store(Request $request)
     {
         $user = $request->user();
@@ -51,8 +55,7 @@ class TransactionController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'type' => 'required|in:income,expense',
             'family_id' => [
-                'nullable',
-                'integer',
+                'nullable', 'integer',
                 Rule::exists('families', 'id'),
                 Rule::exists('family_user', 'family_id')->where('user_id', $user->id),
             ],
@@ -91,7 +94,6 @@ class TransactionController extends Controller
                 $conflictingGoalQuery->whereNull('family_id');
             }
             $conflictingGoal = $conflictingGoalQuery->first();
-
             if ($conflictingGoal) {
                 $date = Carbon::now()->toFormattedDateString();
                 $newNote = "On {$date}, the integrity of this goal was compromised by an expense of {$fields['amount']}.";
@@ -100,37 +102,25 @@ class TransactionController extends Controller
                 ]);
             }
         }
-
         $transaction = $user->transactions()->create($fields);
 
-        if (
-            $fields['type'] === 'income' &&
-            isset($fields['family_id']) &&
-            $request->input('deduct_immediately') === true
-        ) {
+        if ($fields['type'] === 'income' && isset($fields['family_id']) && $request->input('deduct_immediately') === true) {
             $user->transactions()->create([
                 'description' => 'Contribution to family for: ' . $fields['description'],
-                'amount'      => $fields['amount'],
-                'type'        => 'expense',
-                'family_id'   => null,
-                'user_id'     => $user->id,
+                'amount' => $fields['amount'],
+                'type' => 'expense',
+                'family_id' => null,
+                'user_id' => $user->id,
             ]);
         }
-
         return response($transaction, 201);
     }
-
-    /**
-     * Display the specified resource.
-     */
+    
     public function show(Transaction $transaction)
     {
         return $transaction;
     }
-
-    /**
-     * Remove the specified resource from storage.
-     */
+    
     public function destroy(Transaction $transaction)
     {
         $transaction->delete();
