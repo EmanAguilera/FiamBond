@@ -3,13 +3,13 @@ import { AppContext } from '../Context/AppContext.jsx';
 
 // --- LAZY LOADED COMPONENTS ---
 const Modal = lazy(() => import('./Modal.jsx'));
-const FamilyLedgerView = lazy(() => import('./FamilyLedgerView.jsx'));
+const FamilyReportChartWidget = lazy(() => import('./FamilyReportChartWidget.jsx'));
 const LoanTrackingWidget = lazy(() => import('./LoanTrackingWidget.jsx'));
 const GoalListsWidget = lazy(() => import("../Components/GoalListsWidget"));
 const CreateLoanWidget = lazy(() => import('./CreateLoanWidget.jsx'));
 const CreateFamilyTransactionWidget = lazy(() => import('./CreateFamilyTransactionWidget.jsx'));
 const CreateFamilyGoalWidget = lazy(() => import('./CreateFamilyGoalWidget.jsx'));
-const FamilyTransactionsWidget = lazy(() => import('./FamilyTransactionsWidget.jsx')); // Widget to view family transactions
+const FamilyTransactionsWidget = lazy(() => import('./FamilyTransactionsWidget.jsx'));
 
 // --- SKELETON LOADER FOR THE DASHBOARD ---
 const FamilyRealmSkeleton = () => (
@@ -81,15 +81,12 @@ export default function FamilyRealm({ family, onBack }) {
 
     // --- SUCCESS HANDLERS ---
     const handleSuccess = () => {
-        // This function will be called after any successful creation.
-        // It closes all creation modals and triggers a re-fetch of all dashboard data
-        // and a re-render of child components like the ledger and loan list.
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
         getFamilyBalance();
         getFamilyActiveGoalsCount();
-        setKey(Date.now()); // This is the magic key to force re-renders
+        setKey(Date.now()); // Force-refresh child components like the chart and loan list
     };
     
     if (loading) return <FamilyRealmSkeleton />;
@@ -127,8 +124,8 @@ export default function FamilyRealm({ family, onBack }) {
                 </div>
 
                 <div className="dashboard-section">
-                    <Suspense fallback={<p>Loading Ledger...</p>}>
-                        <FamilyLedgerView key={key} family={family} onBack={() => {}} />
+                    <Suspense fallback={<p className="text-center py-10">Loading Report...</p>}>
+                        <FamilyReportChartWidget family={family} key={key} />
                     </Suspense>
                 </div>
             </div>
@@ -136,16 +133,14 @@ export default function FamilyRealm({ family, onBack }) {
             {/* --- MODALS --- */}
             <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
                 {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Add Transaction for ${family.first_name}`}><CreateFamilyTransactionWidget family={family} onSuccess={handleSuccess} /></Modal>}
+                
                 {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Add Goal for ${family.first_name}`}><CreateFamilyGoalWidget family={family} onSuccess={handleSuccess} /></Modal>}
+                
                 {isLoanModalOpen && <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Lend Money to a Family Member"><CreateLoanWidget family={family} onSuccess={handleSuccess} /></Modal>}
                 
-                {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.first_name}`}> <GoalListsWidget family={family} /> </Modal>}
-
-                {isFamilyTransactionsModalOpen && 
-                    <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.first_name}`}>
-                        <FamilyTransactionsWidget family={family} />
-                    </Modal>
-                }
+                {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.first_name}`}><GoalListsWidget family={family} /></Modal>}
+                
+                {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.first_name}`}><FamilyTransactionsWidget family={family} /></Modal>}
             </Suspense>
         </>
     );
