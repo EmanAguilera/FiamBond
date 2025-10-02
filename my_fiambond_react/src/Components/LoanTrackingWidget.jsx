@@ -1,14 +1,16 @@
-// LoanTrackingWidget.jsx
+// src/Components/LoanTrackingWidget.jsx
+
 import { useContext, useState, useEffect, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
-const LoanItem = ({ loan, onRepay }) => {
+// A self-contained component for displaying a single loan's details.
+const LoanItem = ({ loan }) => {
     const { user } = useContext(AppContext);
     const isBorrower = user.id === loan.debtor.id;
     const outstanding = parseFloat(loan.amount) - parseFloat(loan.repaid_amount);
 
     return (
-        <div className="p-3 border rounded-md bg-gray-50">
+        <div className="p-3 border-b last:border-b-0 border-gray-100">
             <p className="font-semibold text-gray-800 break-words">{loan.description}</p>
             <small className="text-xs text-gray-500">
                 From: {loan.creditor.full_name} To: {loan.debtor.full_name}
@@ -20,7 +22,12 @@ const LoanItem = ({ loan, onRepay }) => {
                 </p>
             </div>
             {isBorrower && outstanding > 0 && (
-                <button onClick={() => onRepay(loan)} className="secondary-btn-sm w-full mt-2">Make Repayment</button>
+                <button 
+                    onClick={() => alert('Repayment functionality would go here.')} 
+                    className="secondary-btn-sm w-full mt-2"
+                >
+                    Make Repayment
+                </button>
             )}
         </div>
     );
@@ -34,14 +41,18 @@ export default function LoanTrackingWidget({ family }) {
 
   const getLoans = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/loans`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Could not fetch loans.");
+      if (!res.ok) throw new Error("Could not fetch loan activity.");
+      
       const data = await res.json();
-      setLoans(data.loans || []);
-    } catch (err) {
+      setLoans(data.data || []); // Use data.data for paginated API responses
+    } catch (err)
+    {
+      console.error("Failed to fetch loans:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -52,22 +63,16 @@ export default function LoanTrackingWidget({ family }) {
     getLoans();
   }, [getLoans]);
 
-  const handleRepay = (loan) => {
-      const outstanding = loan.amount - loan.repaid_amount;
-      alert(`This would open a repayment modal for the loan regarding "${loan.description}" with an outstanding balance of ₱${outstanding.toFixed(2)}.`);
-      // After a successful repayment, you would call getLoans() again to refresh the list.
-  };
-
-  if (loading) return <p className="text-center py-4">Loading loans...</p>;
+  if (loading) return <p className="text-center text-sm text-gray-500 py-4">Loading loan activity...</p>;
   if (error) return <p className="error text-center py-4">{error}</p>;
 
   return (
-    <div className="space-y-3">
-        <h3 className="font-bold text-lg text-gray-800">Family Lending</h3>
+    <div className="space-y-2">
+        <h3 className="font-bold text-lg text-gray-800 px-3 pt-3">Family Lending</h3>
         {loans.length > 0 ? (
-            loans.map(loan => <LoanItem key={loan.id} loan={loan} onRepay={handleRepay} />)
+            loans.map(loan => <LoanItem key={loan.id} loan={loan} />)
         ) : (
-            <p className="text-center italic text-gray-500 py-4">No lending activity in this family yet.</p>
+            <p className="text-center italic text-gray-500 py-4 px-3">No lending activity in this family yet.</p>
         )}
     </div>
   );
