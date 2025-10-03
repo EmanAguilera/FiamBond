@@ -166,7 +166,7 @@ export default function FamilyRealm({ family, onBack }) {
                 <header className="dashboard-header mb-8">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         {/* Left Side: Back Button & Title */}
-                        <div className="flex items-center gap-4 flex-shrink-0 mr-auto">
+                        <div className="flex items-center gap-4 flex-shrink-0">
                             <button onClick={onBack} className="secondary-btn-sm">&larr; Back</button>
                             <h1 className="text-2xl font-bold text-slate-800">{family.first_name}: Family Realm</h1>
                         </div>
