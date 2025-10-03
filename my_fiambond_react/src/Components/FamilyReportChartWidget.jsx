@@ -1,5 +1,4 @@
-import { useState, useCallback, useContext, useEffect, memo } from 'react';
-import { AppContext } from '../Context/AppContext';
+import { memo } from 'react';
 
 // --- CHART IMPORTS ---
 import { Bar } from 'react-chartjs-2';
@@ -7,56 +6,9 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-// --- SKELETON LOADER (RE-INTRODUCED) ---
-const ChartSkeleton = () => (
-    <div className="animate-pulse">
-        <div className="w-full mx-auto flex justify-center gap-4 mb-6">
-            <div className="h-9 w-20 bg-slate-200 rounded"></div>
-            <div className="h-9 w-20 bg-slate-200 rounded"></div>
-            <div className="h-9 w-20 bg-slate-200 rounded"></div>
-        </div>
-        <div className="mb-8 h-[350px] w-full bg-slate-200 rounded-lg"></div>
-        <div className="space-y-3 text-sm">
-            <div className="h-5 w-1/2 bg-slate-200 rounded"></div>
-            <hr className="border-dashed" />
-            <div className="h-5 w-full bg-slate-200 rounded"></div>
-            <div className="h-5 w-full bg-slate-200 rounded"></div>
-            <div className="h-6 w-full bg-slate-200 rounded mt-1"></div>
-        </div>
-    </div>
-);
-
-// MODIFIED: Component no longer needs the onLoadingChange prop
-function FamilyReportChartWidget({ family }) {
-    const { token } = useContext(AppContext);
-    const [report, setReport] = useState(null);
-    const [loading, setLoading] = useState(true); // RE-INTRODUCED: Local loading state
-    const [error, setError] = useState(null);
-    const [period, setPeriod] = useState('monthly');
-
-    const getReport = useCallback(async () => {
-        setLoading(true); // MODIFIED: Use local setLoading
-        setError(null);
-        try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/report?period=${period}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => null);
-                throw new Error(errorData?.message || "Could not process the report request.");
-            }
-            setReport(await res.json());
-        } catch (err) {
-            console.error('Failed to fetch family report:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false); // MODIFIED: Use local setLoading
-        }
-    }, [token, family.id, period]); // MODIFIED: Removed onLoadingChange from dependencies
-
-    useEffect(() => {
-        getReport();
-    }, [getReport, period]);
+// This is now a simple "presentational" component.
+// It receives data via props and renders it without managing its own state.
+function FamilyReportChartWidget({ family, report }) {
     
     const chartOptions = {
         responsive: true,
@@ -67,17 +19,11 @@ function FamilyReportChartWidget({ family }) {
         },
     };
     
-    // RE-INTRODUCED: The component now shows its own skeleton when loading
-    if (loading) return <ChartSkeleton />;
-    if (error) return <p className="error text-center py-10">{error}</p>;
+    // No more loading, error, or data fetching logic here. The parent handles it all.
 
     return (
         <div className="dashboard-card">
-            <div className="w-full mx-auto flex justify-center gap-4 mb-6">
-                <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
-                <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
-                <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
-            </div>
+            {/* The period buttons have been moved to the FamilyRealm parent component */}
             
             {report ? (
                 <>
@@ -85,20 +31,34 @@ function FamilyReportChartWidget({ family }) {
                         {report.chartData?.datasets?.length > 0 ? (
                             <Bar options={chartOptions} data={report.chartData} />
                         ) : (
-                            <div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>
+                            <div className="flex items-center justify-center h-full">
+                                <p>Not enough data for a chart.</p>
+                            </div>
                         )}
                     </div>
                     <div className="space-y-3 text-sm font-mono">
                         <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
                         <hr className="border-dashed" />
-                        <p className="flex justify-between"><span>Total Inflow:</span> <span className="text-green-600 font-semibold">+₱{parseFloat(report.totalInflow).toFixed(2)}</span></p>
-                        <p className="flex justify-between"><span>Total Outflow:</span> <span className="text-red-500 font-semibold">-₱{parseFloat(report.totalOutflow).toFixed(2)}</span></p>
-                        <p className={`flex justify-between font-bold text-base ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}><span>Net Position:</span> <span>₱{parseFloat(report.netPosition).toFixed(2)}</span></p>
+                        <p className="flex justify-between">
+                            <span>Total Inflow:</span> 
+                            <span className="text-green-600 font-semibold">+₱{parseFloat(report.totalInflow).toFixed(2)}</span>
+                        </p>
+                        <p className="flex justify-between">
+                            <span>Total Outflow:</span> 
+                            <span className="text-red-500 font-semibold">-₱{parseFloat(report.totalOutflow).toFixed(2)}</span>
+                        </p>
+                        <p className={`flex justify-between font-bold text-base ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            <span>Net Position:</span> 
+                            <span>₱{parseFloat(report.netPosition).toFixed(2)}</span>
+                        </p>
                     </div>
                 </>
-            ) : <p className="text-center py-10">No report data available.</p>}
+            ) : (
+                <p className="text-center py-10">No report data available.</p>
+            )}
         </div>
     );
 };
 
+// Use memo to prevent re-rendering if the props haven't changed.
 export default memo(FamilyReportChartWidget);

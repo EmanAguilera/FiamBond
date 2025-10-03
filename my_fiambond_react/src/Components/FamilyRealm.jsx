@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useContext, useCallback, useEffect } from 'react';
+import { useState, lazy, Suspense, useContext, useCallback, useEffect, useRef } from 'react';
 import { AppContext } from '../Context/AppContext.jsx';
 
 // --- LAZY LOADED COMPONENTS ---
@@ -45,15 +45,23 @@ export default function FamilyRealm({ family, onBack }) {
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
     const [activeLoansCount, setActiveLoansCount] = useState(0);
-    const [key, setKey] = useState(Date.now());
 
-    // --- DATA FETCHING ---
+    // --- STATE LIFTED UP FROM CHART WIDGET ---
+    const [report, setReport] = useState(null);
+    const [reportLoading, setReportLoading] = useState(true);
+    const [reportError, setReportError] = useState(null);
+    const [period, setPeriod] = useState('monthly');
+
+    const isInitialMount = useRef(true); // FIXED: Add ref to track initial mount
+
+
+    // --- DATA FETCHING (Summary Cards) ---
     const getFamilyBalance = useCallback(async () => {
         if (!token || !family) return;
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/balance`, {
                 headers: { Authorization: `Bearer ${token}` },
-                cache: 'no-store' // FIXED: Prevents browser from caching this request
+                cache: 'no-store'
             });
             if (res.ok) setSummaryData(await res.json());
         } catch (error) { console.error("Failed to fetch family balance", error); }
@@ -64,7 +72,7 @@ export default function FamilyRealm({ family, onBack }) {
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/active-goals-count`, {
                 headers: { Authorization: `Bearer ${token}` },
-                cache: 'no-store' // FIXED: Prevents browser from caching this request
+                cache: 'no-store'
             });
             if (res.ok) {
                 const data = await res.json();
@@ -78,7 +86,7 @@ export default function FamilyRealm({ family, onBack }) {
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/active-loans-count`, {
                 headers: { Authorization: `Bearer ${token}` },
-                cache: 'no-store' // FIXED: Prevents browser from caching this request
+                cache: 'no-store'
             });
             if (res.ok) {
                 const data = await res.json();
@@ -87,6 +95,29 @@ export default function FamilyRealm({ family, onBack }) {
         } catch (error) { console.error("Failed to fetch family loan count", error); }
     }, [token, family]);
 
+    // --- DATA FETCHING LIFTED UP FROM CHART WIDGET ---
+    const getFamilyReport = useCallback(async () => {
+        if (!token || !family) return;
+        setReportLoading(true);
+        setReportError(null);
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/report?period=${period}`, {
+                headers: { Authorization: `Bearer ${token}` },
+                cache: 'no-store'
+            });
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => null);
+                throw new Error(errorData?.message || "Could not process the report request.");
+            }
+            setReport(await res.json());
+        } catch (err) {
+            console.error('Failed to fetch family report:', err);
+            setReportError(err.message);
+        } finally {
+            setReportLoading(false);
+        }
+    }, [token, family, period]);
+
     // --- INITIAL DATA LOAD ---
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -94,29 +125,38 @@ export default function FamilyRealm({ family, onBack }) {
             await Promise.all([
                 getFamilyBalance(),
                 getFamilyActiveGoalsCount(),
-                getFamilyActiveLoansCount()
+                getFamilyActiveLoansCount(),
+                getFamilyReport()
             ]);
             setLoading(false);
         };
         fetchDashboardData();
-    }, [family.id, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount]);
+    }, [family.id, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport]);
+
+    // --- EFFECT FOR PERIOD CHANGES ONLY ---
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+        } else {
+            // This code will only run on subsequent renders when dependencies change
+            getFamilyReport();
+        }
+    }, [period, getFamilyReport]);
 
     // --- SUCCESS HANDLERS ---
     const handleSuccess = () => {
-        // This function is called after any successful creation.
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
         
-        // Re-fetch all summary data to update the dashboard cards.
+        // Re-fetch all summary data AND the report
         getFamilyBalance();
         getFamilyActiveGoalsCount();
         getFamilyActiveLoansCount();
-        
-        // Update the key to force-refresh the chart widget.
-        setKey(Date.now());
+        getFamilyReport();
     };
     
+    // Show skeleton for the entire page ONLY on the very first load
     if (loading) return <FamilyRealmSkeleton />;
 
     return (
@@ -154,9 +194,23 @@ export default function FamilyRealm({ family, onBack }) {
                 </div>
 
                 <div className="dashboard-section">
-                    <Suspense fallback={<p className="text-center py-10">Loading Report...</p>}>
-                        <FamilyReportChartWidget family={family} key={key} />
-                    </Suspense>
+                    <div className="w-full mx-auto flex justify-center gap-4 mb-6">
+                        <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
+                        <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
+                        <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
+                    </div>
+                    
+                    {reportLoading ? (
+                        <div className="w-full h-96 bg-slate-100 rounded-lg flex justify-center items-center">
+                           <p className="text-slate-500">Generating Family Report...</p>
+                        </div>
+                    ) : reportError ? (
+                        <p className="error text-center py-10">{reportError}</p>
+                    ) : (
+                        <Suspense fallback={<div className="h-96 bg-slate-100 rounded-lg"></div>}>
+                            <FamilyReportChartWidget family={family} report={report} />
+                        </Suspense>
+                    )}
                 </div>
             </div>
 
