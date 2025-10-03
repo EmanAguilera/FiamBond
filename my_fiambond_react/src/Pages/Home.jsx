@@ -213,14 +213,10 @@ export default function Home() {
   return (
     <>
       {/* --- MODALS (Lazy Loaded) --- */}
-      {/* Suspense provides a fallback while the modal's code is being downloaded */}
       <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
         {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><RecentTransactionsWidget /></Modal>}
         {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
-        
-        {/* The Family Management modal now gets a prop to handle entering a realm */}
         {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget onEnterRealm={handleEnterFamilyRealm} /></Modal>}
-        
         {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
         {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
         {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
@@ -228,12 +224,10 @@ export default function Home() {
 
       {/* --- MAIN VIEW LOGIC: Conditionally render Family Realm or Personal Dashboard --- */}
       {activeFamilyRealm ? (
-        // RENDER THE FAMILY REALM VIEW IF A FAMILY IS SELECTED
         <Suspense fallback={<DashboardSkeleton />}>
             <FamilyRealm family={activeFamilyRealm} onBack={handleExitFamilyRealm} />
         </Suspense>
       ) : user ? (
-        // RENDER THE PERSONAL DASHBOARD IF LOGGED IN AND NO REALM IS ACTIVE
         isInitialLoading ? <DashboardSkeleton /> : (
           <div className="p-4 md:p-10">
             <header className="dashboard-header">
@@ -265,18 +259,19 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="dashboard-section">
-              <div className="w-full mx-auto flex justify-center gap-4 mb-6">
-                <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
-                <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
-                <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
-              </div>
-              <div className="content-card font-mono text-slate-800">
+            {/* --- MODIFIED CHART SECTION --- */}
+            <div className="grid grid-cols-1 gap-6 mb-8">
+              <div className="content-card font-mono text-slate-800 p-4 md:p-6">
+                <div className="w-full mx-auto flex justify-center gap-4 mb-6">
+                  <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
+                  <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
+                  <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
+                </div>
                 {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
                  reportError ? <p className="error text-center py-10">{reportError}</p> : 
                  report ? (
                   <>
-                    <div className="mb-8 relative" style={{ height: '350px' }}>
+                    <div className="mb-8 relative" style={{ height: '400px' }}>
                       {report.chartData?.datasets?.length > 0 ? (<Bar options={chartOptions} data={report.chartData} />) : (<div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>)}
                     </div>
                     <div className="space-y-3 text-sm">
@@ -293,10 +288,11 @@ export default function Home() {
                 ) : <p className="text-center py-10">No report data available.</p>}
               </div>
             </div>
+            {/* --- END OF MODIFIED SECTION --- */}
+
           </div>
         )
       ) : (
-        // RENDER THE HERO SECTION IF NOT LOGGED IN
         <div className="hero-section">
           <div className="hero-content">
             <div className="hero-text">
