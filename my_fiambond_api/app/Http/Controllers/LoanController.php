@@ -142,4 +142,19 @@ class LoanController extends Controller
             return response(['message' => 'Failed to process repayment due to a server error.'], 500);
         }
     }
+
+    public function getActiveLoanCount(Request $request, Family $family)
+    {
+        // Authorization: Ensure the user is a member of the family.
+        if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
+            return response(['message' => 'Unauthorized'], 403);
+        }
+
+        // An active loan is one where the original amount is greater than the repaid amount.
+        $count = Loan::where('family_id', $family->id)
+            ->where('amount', '>', DB::raw('repaid_amount'))
+            ->count();
+
+        return response()->json(['count' => $count]);
+    }
 }
