@@ -41,6 +41,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::put('/families/{family}', [FamilyController::class, 'update']);
     Route::delete('/families/{family}', [FamilyController::class, 'destroy']);
 
+    Route::get('/families/{family}/active-loans-count', [LoanController::class, 'getActiveLoanCount']);
 
     // --- NEW: Family Lending (Loan) Routes ---
     // These routes are required for the peer-to-peer lending feature.

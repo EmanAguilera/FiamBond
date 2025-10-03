@@ -33,16 +33,18 @@ export default function FamilyRealm({ family, onBack }) {
     const { token } = useContext(AppContext);
 
     // --- STATE FOR MODALS ---
-    const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
-    const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-    const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-    const [isGoalsListModalOpen, setIsGoalsListModalOpen] = useState(false);
-    const [isFamilyTransactionsModalOpen, setIsFamilyTransactionsModalOpen] = useState(false);
+    const [isLoanModalOpen, setIsLoanModalOpen] = useState(false); // For creating a loan
+    const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false); // For creating a transaction
+    const [isGoalModalOpen, setIsGoalModalOpen] = useState(false); // For creating a goal
+    const [isGoalsListModalOpen, setIsGoalsListModalOpen] = useState(false); // For viewing the list of goals
+    const [isFamilyTransactionsModalOpen, setIsFamilyTransactionsModalOpen] = useState(false); // For viewing the list of transactions
+    const [isLoanListModalOpen, setIsLoanListModalOpen] = useState(false); // For viewing the list of loans
 
     // --- STATE FOR DASHBOARD DATA ---
     const [loading, setLoading] = useState(true);
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
+    const [activeLoansCount, setActiveLoansCount] = useState(0);
     const [key, setKey] = useState(Date.now()); // Key to force-refresh child components
 
     // --- DATA FETCHING ---
@@ -69,24 +71,45 @@ export default function FamilyRealm({ family, onBack }) {
         } catch (error) { console.error("Failed to fetch family goal count", error); }
     }, [token, family]);
 
+    const getFamilyActiveLoansCount = useCallback(async () => {
+        if (!token || !family) return;
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/active-loans-count`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setActiveLoansCount(data.count || 0);
+            }
+        } catch (error) { console.error("Failed to fetch family loan count", error); }
+    }, [token, family]);
+
     // --- INITIAL DATA LOAD ---
     useEffect(() => {
         const fetchDashboardData = async () => {
             setLoading(true);
-            await Promise.all([getFamilyBalance(), getFamilyActiveGoalsCount()]);
+            await Promise.all([
+                getFamilyBalance(),
+                getFamilyActiveGoalsCount(),
+                getFamilyActiveLoansCount()
+            ]);
             setLoading(false);
         };
         fetchDashboardData();
-    }, [family.id, getFamilyBalance, getFamilyActiveGoalsCount]);
+    }, [family.id, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount]);
 
     // --- SUCCESS HANDLERS ---
     const handleSuccess = () => {
+        // This function is called after any successful creation (transaction, goal, or loan).
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
+        // Re-fetch all summary data to update the dashboard cards.
         getFamilyBalance();
         getFamilyActiveGoalsCount();
-        setKey(Date.now()); // Force-refresh child components like the chart and loan list
+        getFamilyActiveLoansCount();
+        // Update the key to force-refresh any child components that depend on this data.
+        setKey(Date.now());
     };
     
     if (loading) return <FamilyRealmSkeleton />;
@@ -118,8 +141,10 @@ export default function FamilyRealm({ family, onBack }) {
                         <span className="text-link text-sm mt-2">View Goals &rarr;</span>
                     </div>
                     
-                    <div className="dashboard-card">
-                         <LoanTrackingWidget key={key} family={family} />
+                    <div className="dashboard-card-interactive" onClick={() => setIsLoanListModalOpen(true)} role="button" tabIndex="0">
+                        <h4 className="font-bold text-gray-600">Family Lending</h4>
+                        <p className="text-3xl font-bold text-slate-800 mt-2">{activeLoansCount}</p>
+                        <span className="text-link text-sm mt-2">Manage Lending &rarr;</span>
                     </div>
                 </div>
 
@@ -132,15 +157,19 @@ export default function FamilyRealm({ family, onBack }) {
 
             {/* --- MODALS --- */}
             <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
+                {/* --- Modals for CREATING new items --- */}
                 {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Add Transaction for ${family.first_name}`}><CreateFamilyTransactionWidget family={family} onSuccess={handleSuccess} /></Modal>}
                 
                 {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Add Goal for ${family.first_name}`}><CreateFamilyGoalWidget family={family} onSuccess={handleSuccess} /></Modal>}
                 
                 {isLoanModalOpen && <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Lend Money to a Family Member"><CreateLoanWidget family={family} onSuccess={handleSuccess} /></Modal>}
                 
-                {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.first_name}`}><GoalListsWidget family={family} /></Modal>}
-                
+                {/* --- Modals for VIEWING lists of items --- */}
                 {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.first_name}`}><FamilyTransactionsWidget family={family} /></Modal>}
+                
+                {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.first_name}`}><GoalListsWidget family={family} /></Modal>}
+
+                {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Lending Activity for ${family.first_name}`}><LoanTrackingWidget family={family} /></Modal>}
             </Suspense>
         </>
     );
