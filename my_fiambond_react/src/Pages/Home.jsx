@@ -265,35 +265,34 @@ export default function Home() {
               </div>
             </div>
 
-           <div className="grid grid-cols-1 gap-6 mb-8"> 
-    <div className="content-card font-mono text-slate-800 p-4 md:p-6"> {/* Added padding for consistency */}
-        <div className="w-full mx-auto flex justify-center gap-4 mb-6">
-            <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
-            <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
-            <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
-        </div>
-        
-        {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
-            reportError ? <p className="error text-center py-10">{reportError}</p> : 
-            report ? (
-            <>
-                <div className="mb-8 relative" style={{ height: '400px' }}> {/* Increased height for better visibility */}
-                    {report.chartData?.datasets?.length > 0 ? (<Bar options={chartOptions} data={report.chartData} />) : (<div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>)}
-                </div>
-                <div className="space-y-3 text-sm">
-                    <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
-                    <hr className="border-dashed" />
-                    <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
-                    <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
-                    <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}</p>
-                    <hr className="border-dashed" />
-                    <p className="font-bold">Analysis:</p>
-                    <ul className="list-disc pl-6"><li>{report.transactionCount} individual transactions were logged in this period.</li></ul>
-                </div>
-            </>
-        ) : <p className="text-center py-10">No report data available.</p>}
-    </div>
-</div>
+            <div className="dashboard-section">
+              <div className="w-full mx-auto flex justify-center gap-4 mb-6">
+                <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
+                <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
+                <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
+              </div>
+              <div className="content-card font-mono text-slate-800">
+                {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
+                 reportError ? <p className="error text-center py-10">{reportError}</p> : 
+                 report ? (
+                  <>
+                    <div className="mb-8 relative" style={{ height: '350px' }}>
+                      {report.chartData?.datasets?.length > 0 ? (<Bar options={chartOptions} data={report.chartData} />) : (<div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>)}
+                    </div>
+                    <div className="space-y-3 text-sm">
+                      <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
+                      <hr className="border-dashed" />
+                      <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
+                      <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
+                      <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}</p>
+                      <hr className="border-dashed" />
+                      <p className="font-bold">Analysis:</p>
+                      <ul className="list-disc pl-6"><li>{report.transactionCount} individual transactions were logged in this period.</li></ul>
+                    </div>
+                  </>
+                ) : <p className="text-center py-10">No report data available.</p>}
+              </div>
+            </div>
           </div>
         )
       ) : (
