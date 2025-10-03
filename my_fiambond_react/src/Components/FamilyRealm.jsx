@@ -42,13 +42,14 @@ export default function FamilyRealm({ family, onBack }) {
 
     // --- STATE FOR DASHBOARD DATA ---
     const [loading, setLoading] = useState(true); // For initial card data
-    const [isChartLoading, setIsChartLoading] = useState(true); // <-- ADDED: New state for the chart's loading status
+    // REMOVED: No longer need to track chart loading state here
+    // const [isChartLoading, setIsChartLoading] = useState(true); 
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
     const [activeLoansCount, setActiveLoansCount] = useState(0);
     const [key, setKey] = useState(Date.now());
 
-    // --- DATA FETCHING ---
+    // --- DATA FETCHING (No changes here) ---
     const getFamilyBalance = useCallback(async () => {
         if (!token || !family) return;
         try {
@@ -94,7 +95,7 @@ export default function FamilyRealm({ family, onBack }) {
                 getFamilyActiveGoalsCount(),
                 getFamilyActiveLoansCount()
             ]);
-            setLoading(false); // This only sets the card loading to false
+            setLoading(false);
         };
         fetchDashboardData();
     }, [family.id, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount]);
@@ -104,16 +105,14 @@ export default function FamilyRealm({ family, onBack }) {
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
-        // Re-fetch all summary data to update the dashboard cards.
         getFamilyBalance();
         getFamilyActiveGoalsCount();
         getFamilyActiveLoansCount();
-        // Update the key to force-refresh any child components that depend on this data.
         setKey(Date.now());
     };
     
-    // MODIFIED: Show skeleton if either the initial data OR the chart is loading
-    if (loading || isChartLoading) return <FamilyRealmSkeleton />;
+    // MODIFIED: Show skeleton ONLY for the initial page load
+    if (loading) return <FamilyRealmSkeleton />;
 
     return (
         <>
@@ -130,6 +129,7 @@ export default function FamilyRealm({ family, onBack }) {
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    {/* ... cards ... */}
                     <div className="dashboard-card-interactive" onClick={() => setIsFamilyTransactionsModalOpen(true)} role="button" tabIndex="0">
                         <h4 className="font-bold text-gray-600">Family Money (Net)</h4>
                         {summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
@@ -150,27 +150,20 @@ export default function FamilyRealm({ family, onBack }) {
                 </div>
 
                 <div className="dashboard-section">
+                    {/* MODIFIED: Removed the onLoadingChange prop */}
                     <Suspense fallback={<p className="text-center py-10">Loading Report...</p>}>
-                        {/* MODIFIED: Pass the loading state handler to the child component */}
-                        <FamilyReportChartWidget family={family} key={key} onLoadingChange={setIsChartLoading} />
+                        <FamilyReportChartWidget family={family} key={key} />
                     </Suspense>
                 </div>
             </div>
 
-            {/* --- MODALS --- */}
+            {/* --- MODALS (No changes here) --- */}
             <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
-                {/* --- Modals for CREATING new items --- */}
                 {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Add Transaction for ${family.first_name}`}><CreateFamilyTransactionWidget family={family} onSuccess={handleSuccess} /></Modal>}
-                
                 {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Add Goal for ${family.first_name}`}><CreateFamilyGoalWidget family={family} onSuccess={handleSuccess} /></Modal>}
-                
                 {isLoanModalOpen && <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Lend Money to a Family Member"><CreateLoanWidget family={family} onSuccess={handleSuccess} /></Modal>}
-                
-                {/* --- Modals for VIEWING lists of items --- */}
                 {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.first_name}`}><FamilyTransactionsWidget family={family} /></Modal>}
-                
                 {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.first_name}`}><GoalListsWidget family={family} /></Modal>}
-
                 {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Lending Activity for ${family.first_name}`}><LoanTrackingWidget family={family} /></Modal>}
             </Suspense>
         </>
