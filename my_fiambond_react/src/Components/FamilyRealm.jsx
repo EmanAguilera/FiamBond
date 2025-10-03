@@ -162,14 +162,21 @@ export default function FamilyRealm({ family, onBack }) {
     return (
         <>
             <div className="p-4 md:p-10">
-                <header className="dashboard-header">
-                    <button onClick={onBack} className="secondary-btn-sm mb-2">&larr; Back to Personal Dashboard</button>
-                    <h1 className="text-2xl font-bold text-slate-800 mb-6">{family.first_name}: Family Realm</h1>
+                {/* --- MODIFIED HEADER --- */}
+                <header className="dashboard-header mb-8">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        {/* Left Side: Back Button & Title */}
+                        <div className="flex items-center gap-4">
+                            <button onClick={onBack} className="secondary-btn-sm">&larr; Back</button>
+                            <h1 className="text-2xl font-bold text-slate-800">{family.first_name}: Family Realm</h1>
+                        </div>
 
-                    <div className="flex flex-wrap gap-4">
-                        <button onClick={() => setIsTransactionModalOpen(true)} className="primary-btn">+ Add Family Transaction</button>
-                        <button onClick={() => setIsGoalModalOpen(true)} className="secondary-btn">+ Add Family Goal</button>
-                        <button onClick={() => setIsLoanModalOpen(true)} className="secondary-btn">+ Record a Loan</button>
+                        {/* Right Side: Action Buttons */}
+                        <div className="flex flex-wrap gap-4">
+                            <button onClick={() => setIsTransactionModalOpen(true)} className="primary-btn">+ Add Family Transaction</button>
+                            <button onClick={() => setIsGoalModalOpen(true)} className="secondary-btn">+ Add Family Goal</button>
+                            <button onClick={() => setIsLoanModalOpen(true)} className="secondary-btn">+ Record a Loan</button>
+                        </div>
                     </div>
                 </header>
 
