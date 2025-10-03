@@ -33,20 +33,20 @@ export default function FamilyRealm({ family, onBack }) {
     const { token } = useContext(AppContext);
 
     // --- STATE FOR MODALS ---
-    const [isLoanModalOpen, setIsLoanModalOpen] = useState(false); // For creating a loan
-    const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false); // For creating a transaction
-    const [isGoalModalOpen, setIsGoalModalOpen] = useState(false); // For creating a goal
-    const [isGoalsListModalOpen, setIsGoalsListModalOpen] = useState(false); // For viewing the list of goals
-    const [isFamilyTransactionsModalOpen, setIsFamilyTransactionsModalOpen] = useState(false); // For viewing the list of transactions
-    const [isLoanListModalOpen, setIsLoanListModalOpen] = useState(false); // For viewing the list of loans
+    const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
+    const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+    const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+    const [isGoalsListModalOpen, setIsGoalsListModalOpen] = useState(false);
+    const [isFamilyTransactionsModalOpen, setIsFamilyTransactionsModalOpen] = useState(false);
+    const [isLoanListModalOpen, setIsLoanListModalOpen] = useState(false);
 
     // --- STATE FOR DASHBOARD DATA ---
-    const [loading, setLoading] = useState(true);
-    const [isChartLoading, setIsChartLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // For initial card data
+    const [isChartLoading, setIsChartLoading] = useState(true); // <-- ADDED: New state for the chart's loading status
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
     const [activeLoansCount, setActiveLoansCount] = useState(0);
-    const [key, setKey] = useState(Date.now()); // Key to force-refresh child components
+    const [key, setKey] = useState(Date.now());
 
     // --- DATA FETCHING ---
     const getFamilyBalance = useCallback(async () => {
@@ -94,14 +94,13 @@ export default function FamilyRealm({ family, onBack }) {
                 getFamilyActiveGoalsCount(),
                 getFamilyActiveLoansCount()
             ]);
-            setLoading(false);
+            setLoading(false); // This only sets the card loading to false
         };
         fetchDashboardData();
     }, [family.id, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount]);
 
     // --- SUCCESS HANDLERS ---
     const handleSuccess = () => {
-        // This function is called after any successful creation (transaction, goal, or loan).
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
@@ -113,6 +112,7 @@ export default function FamilyRealm({ family, onBack }) {
         setKey(Date.now());
     };
     
+    // MODIFIED: Show skeleton if either the initial data OR the chart is loading
     if (loading || isChartLoading) return <FamilyRealmSkeleton />;
 
     return (
@@ -151,6 +151,7 @@ export default function FamilyRealm({ family, onBack }) {
 
                 <div className="dashboard-section">
                     <Suspense fallback={<p className="text-center py-10">Loading Report...</p>}>
+                        {/* MODIFIED: Pass the loading state handler to the child component */}
                         <FamilyReportChartWidget family={family} key={key} onLoadingChange={setIsChartLoading} />
                     </Suspense>
                 </div>
