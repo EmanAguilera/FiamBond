@@ -41,20 +41,19 @@ export default function FamilyRealm({ family, onBack }) {
     const [isLoanListModalOpen, setIsLoanListModalOpen] = useState(false);
 
     // --- STATE FOR DASHBOARD DATA ---
-    const [loading, setLoading] = useState(true); // For initial card data
-    // REMOVED: No longer need to track chart loading state here
-    // const [isChartLoading, setIsChartLoading] = useState(true); 
+    const [loading, setLoading] = useState(true);
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
     const [activeLoansCount, setActiveLoansCount] = useState(0);
     const [key, setKey] = useState(Date.now());
 
-    // --- DATA FETCHING (No changes here) ---
+    // --- DATA FETCHING ---
     const getFamilyBalance = useCallback(async () => {
         if (!token || !family) return;
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/balance`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                cache: 'no-store' // FIXED: Prevents browser from caching this request
             });
             if (res.ok) setSummaryData(await res.json());
         } catch (error) { console.error("Failed to fetch family balance", error); }
@@ -64,7 +63,8 @@ export default function FamilyRealm({ family, onBack }) {
         if (!token || !family) return;
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/active-goals-count`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                cache: 'no-store' // FIXED: Prevents browser from caching this request
             });
             if (res.ok) {
                 const data = await res.json();
@@ -77,7 +77,8 @@ export default function FamilyRealm({ family, onBack }) {
         if (!token || !family) return;
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/active-loans-count`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                cache: 'no-store' // FIXED: Prevents browser from caching this request
             });
             if (res.ok) {
                 const data = await res.json();
@@ -102,16 +103,20 @@ export default function FamilyRealm({ family, onBack }) {
 
     // --- SUCCESS HANDLERS ---
     const handleSuccess = () => {
+        // This function is called after any successful creation.
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
+        
+        // Re-fetch all summary data to update the dashboard cards.
         getFamilyBalance();
         getFamilyActiveGoalsCount();
         getFamilyActiveLoansCount();
+        
+        // Update the key to force-refresh the chart widget.
         setKey(Date.now());
     };
     
-    // MODIFIED: Show skeleton ONLY for the initial page load
     if (loading) return <FamilyRealmSkeleton />;
 
     return (
@@ -129,7 +134,6 @@ export default function FamilyRealm({ family, onBack }) {
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    {/* ... cards ... */}
                     <div className="dashboard-card-interactive" onClick={() => setIsFamilyTransactionsModalOpen(true)} role="button" tabIndex="0">
                         <h4 className="font-bold text-gray-600">Family Money (Net)</h4>
                         {summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
@@ -150,14 +154,13 @@ export default function FamilyRealm({ family, onBack }) {
                 </div>
 
                 <div className="dashboard-section">
-                    {/* MODIFIED: Removed the onLoadingChange prop */}
                     <Suspense fallback={<p className="text-center py-10">Loading Report...</p>}>
                         <FamilyReportChartWidget family={family} key={key} />
                     </Suspense>
                 </div>
             </div>
 
-            {/* --- MODALS (No changes here) --- */}
+            {/* --- MODALS --- */}
             <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
                 {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Add Transaction for ${family.first_name}`}><CreateFamilyTransactionWidget family={family} onSuccess={handleSuccess} /></Modal>}
                 {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Add Goal for ${family.first_name}`}><CreateFamilyGoalWidget family={family} onSuccess={handleSuccess} /></Modal>}
