@@ -235,8 +235,8 @@ export default function Home() {
       ) : user ? (
         // RENDER THE PERSONAL DASHBOARD IF LOGGED IN AND NO REALM IS ACTIVE
         isInitialLoading ? <DashboardSkeleton /> : (
-          <div className="space-y-8">
-            <header className="dashboard-header p-4 md:px-10 md:pt-10">
+          <div className="p-4 md:p-10">
+            <header className="dashboard-header">
               <div className="flex flex-wrap gap-4">
                 <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
                 <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
@@ -244,7 +244,7 @@ export default function Home() {
               </div>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-4 md:px-10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
                 <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
                 {summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
@@ -271,7 +271,7 @@ export default function Home() {
                 <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
                 <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
               </div>
-              <div className="content-card font-mono text-slate-800 p-4 md:p-6">
+              <div className="content-card font-mono text-slate-800">
                 {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
                  reportError ? <p className="error text-center py-10">{reportError}</p> : 
                  report ? (
