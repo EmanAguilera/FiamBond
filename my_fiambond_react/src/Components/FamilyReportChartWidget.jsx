@@ -7,16 +7,35 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-// MODIFIED: Component now accepts `onLoadingChange` prop
-function FamilyReportChartWidget({ family, onLoadingChange }) {
+// --- SKELETON LOADER (RE-INTRODUCED) ---
+const ChartSkeleton = () => (
+    <div className="animate-pulse">
+        <div className="w-full mx-auto flex justify-center gap-4 mb-6">
+            <div className="h-9 w-20 bg-slate-200 rounded"></div>
+            <div className="h-9 w-20 bg-slate-200 rounded"></div>
+            <div className="h-9 w-20 bg-slate-200 rounded"></div>
+        </div>
+        <div className="mb-8 h-[350px] w-full bg-slate-200 rounded-lg"></div>
+        <div className="space-y-3 text-sm">
+            <div className="h-5 w-1/2 bg-slate-200 rounded"></div>
+            <hr className="border-dashed" />
+            <div className="h-5 w-full bg-slate-200 rounded"></div>
+            <div className="h-5 w-full bg-slate-200 rounded"></div>
+            <div className="h-6 w-full bg-slate-200 rounded mt-1"></div>
+        </div>
+    </div>
+);
+
+// MODIFIED: Component no longer needs the onLoadingChange prop
+function FamilyReportChartWidget({ family }) {
     const { token } = useContext(AppContext);
     const [report, setReport] = useState(null);
+    const [loading, setLoading] = useState(true); // RE-INTRODUCED: Local loading state
     const [error, setError] = useState(null);
     const [period, setPeriod] = useState('monthly');
-    // REMOVED: Local loading state is no longer needed
 
     const getReport = useCallback(async () => {
-        onLoadingChange(true); // MODIFIED: Signal to parent that loading has started
+        setLoading(true); // MODIFIED: Use local setLoading
         setError(null);
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/report?period=${period}`, {
@@ -31,9 +50,9 @@ function FamilyReportChartWidget({ family, onLoadingChange }) {
             console.error('Failed to fetch family report:', err);
             setError(err.message);
         } finally {
-            onLoadingChange(false); // MODIFIED: Signal to parent that loading has finished
+            setLoading(false); // MODIFIED: Use local setLoading
         }
-    }, [token, family.id, period, onLoadingChange]); // MODIFIED: Added onLoadingChange to dependency array
+    }, [token, family.id, period]); // MODIFIED: Removed onLoadingChange from dependencies
 
     useEffect(() => {
         getReport();
@@ -48,7 +67,8 @@ function FamilyReportChartWidget({ family, onLoadingChange }) {
         },
     };
     
-    // REMOVED: Parent component now handles the main loading skeleton
+    // RE-INTRODUCED: The component now shows its own skeleton when loading
+    if (loading) return <ChartSkeleton />;
     if (error) return <p className="error text-center py-10">{error}</p>;
 
     return (
