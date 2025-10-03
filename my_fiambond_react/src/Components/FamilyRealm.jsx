@@ -42,6 +42,7 @@ export default function FamilyRealm({ family, onBack }) {
 
     // --- STATE FOR DASHBOARD DATA ---
     const [loading, setLoading] = useState(true);
+    const [isChartLoading, setIsChartLoading] = useState(true);
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
     const [activeLoansCount, setActiveLoansCount] = useState(0);
@@ -112,7 +113,7 @@ export default function FamilyRealm({ family, onBack }) {
         setKey(Date.now());
     };
     
-    if (loading) return <FamilyRealmSkeleton />;
+    if (loading || isChartLoading) return <FamilyRealmSkeleton />;
 
     return (
         <>
@@ -150,7 +151,7 @@ export default function FamilyRealm({ family, onBack }) {
 
                 <div className="dashboard-section">
                     <Suspense fallback={<p className="text-center py-10">Loading Report...</p>}>
-                        <FamilyReportChartWidget family={family} key={key} />
+                        <FamilyReportChartWidget family={family} key={key} onLoadingChange={setIsChartLoading} />
                     </Suspense>
                 </div>
             </div>
