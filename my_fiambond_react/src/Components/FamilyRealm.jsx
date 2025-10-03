@@ -166,13 +166,13 @@ export default function FamilyRealm({ family, onBack }) {
                 <header className="dashboard-header mb-8">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         {/* Left Side: Back Button & Title */}
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 flex-shrink-0">
                             <button onClick={onBack} className="secondary-btn-sm">&larr; Back</button>
                             <h1 className="text-2xl font-bold text-slate-800">{family.first_name}: Family Realm</h1>
                         </div>
 
                         {/* Right Side: Action Buttons */}
-                        <div className="flex flex-wrap gap-4">
+                        <div className="flex items-center flex-wrap gap-4">
                             <button onClick={() => setIsTransactionModalOpen(true)} className="primary-btn">+ Add Family Transaction</button>
                             <button onClick={() => setIsGoalModalOpen(true)} className="secondary-btn">+ Add Family Goal</button>
                             <button onClick={() => setIsLoanModalOpen(true)} className="secondary-btn">+ Record a Loan</button>
