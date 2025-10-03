@@ -6,8 +6,13 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-// This is now a simple "presentational" component.
-// It receives data via props and renders it without managing its own state.
+/**
+ * A memoized presentational component that displays a family's financial report chart and summary.
+ * It receives all data and state via props from a parent component.
+ * @param {object} props - The component props.
+ * @param {object} props.family - The family member's data.
+ * @param {object} props.report - The financial report data to display.
+ */
 function FamilyReportChartWidget({ family, report }) {
     
     const chartOptions = {
@@ -19,11 +24,11 @@ function FamilyReportChartWidget({ family, report }) {
         },
     };
     
-    // No more loading, error, or data fetching logic here. The parent handles it all.
+    // Parent component now handles loading, error, and data fetching logic.
 
     return (
-        <div className="dashboard-card">
-            {/* The period buttons have been moved to the FamilyRealm parent component */}
+        <div className="dashboard-card font-mono text-slate-800">
+            {/* The period buttons have been moved to the parent component */}
             
             {report ? (
                 <>
@@ -36,21 +41,20 @@ function FamilyReportChartWidget({ family, report }) {
                             </div>
                         )}
                     </div>
-                    <div className="space-y-3 text-sm font-mono">
+                    {/* This summary section is now styled to match Home.jsx for consistency */}
+                    <div className="space-y-3 text-sm">
                         <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
                         <hr className="border-dashed" />
-                        <p className="flex justify-between">
-                            <span>Total Inflow:</span> 
-                            <span className="text-green-600 font-semibold">+₱{parseFloat(report.totalInflow).toFixed(2)}</span>
+                        <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
+                        <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
+                        <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}
                         </p>
-                        <p className="flex justify-between">
-                            <span>Total Outflow:</span> 
-                            <span className="text-red-500 font-semibold">-₱{parseFloat(report.totalOutflow).toFixed(2)}</span>
-                        </p>
-                        <p className={`flex justify-between font-bold text-base ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                            <span>Net Position:</span> 
-                            <span>₱{parseFloat(report.netPosition).toFixed(2)}</span>
-                        </p>
+                        <hr className="border-dashed" />
+                        <p className="font-bold">Analysis:</p>
+                        <ul className="list-disc pl-6">
+                            <li>{report.transactionCount} individual transactions were logged in this period.</li>
+                        </ul>
                     </div>
                 </>
             ) : (
@@ -60,5 +64,5 @@ function FamilyReportChartWidget({ family, report }) {
     );
 };
 
-// Use memo to prevent re-rendering if the props haven't changed.
+// Use React.memo to prevent unnecessary re-renders if props have not changed.
 export default memo(FamilyReportChartWidget);
