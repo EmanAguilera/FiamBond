@@ -28,7 +28,7 @@ const ChartSkeleton = () => (
     </div>
 );
 
-function FamilyReportChartWidget({ family }) {
+function FamilyReportChartWidget({ family, onLoadingChange }) {
     const { token } = useContext(AppContext);
     const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -51,9 +51,9 @@ function FamilyReportChartWidget({ family }) {
             console.error('Failed to fetch family report:', err);
             setError(err.message);
         } finally {
-            setLoading(false);
+            onLoadingChange(false);
         }
-    }, [token, family.id, period]);
+    }, [token, family.id, period, onLoadingChange]);
 
     useEffect(() => {
         getReport();
