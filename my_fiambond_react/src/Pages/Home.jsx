@@ -271,7 +271,7 @@ export default function Home() {
                 <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
                 <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
               </div>
-              <div className="content-card font-mono text-slate-800">
+              <div className="content-card font-mono text-slate-800 w-full h-96">
                 {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
                  reportError ? <p className="error text-center py-10">{reportError}</p> : 
                  report ? (
