@@ -1,10 +1,8 @@
+// src/pages/Home.jsx
+
 import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
-
-// --- CHART IMPORTS ---
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
 // --- WIDGET IMPORTS (Code Splitting with React.lazy) ---
 const Modal = lazy(() => import("../Components/Modal"));
@@ -14,14 +12,15 @@ const RecentTransactionsWidget = lazy(() => import("../Components/RecentTransact
 const CreateTransactionWidget = lazy(() => import("../Components/CreateTransactionWidget"));
 const FamilyManagementWidget = lazy(() => import("../Components/FamilyManagementWidget"));
 const CreateFamilyWidget = lazy(() => import("../Components/CreateFamilyWidget"));
-
-// --- NEW REALM IMPORT ---
 const FamilyRealm = lazy(() => import('../Components/FamilyRealm'));
 
-// Register the chart components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+// --- NEWLY SEPARATED CHART COMPONENT ---
+// Ensure you have created this component file as described previously
+const PersonalReportChartWidget = lazy(() => import('../Components/PersonalReportChartWidget.jsx'));
+
 
 // --- SKELETON COMPONENT ---
+// This placeholder UI is shown during the initial full-page data load.
 const DashboardSkeleton = () => (
   <div className="p-4 md:p-10 animate-pulse">
     <header className="dashboard-header mb-8">
@@ -60,11 +59,11 @@ export default function Home() {
   const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false);
   const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
-
-  // --- NEW STATE FOR VIEW MANAGEMENT ---
+  
+  // --- STATE FOR VIEW MANAGEMENT ---
   const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
 
-  // --- DATA & LOADING STATE ---
+  // --- STATE FOR DATA & LOADING ---
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [summaryData, setSummaryData] = useState(null);
   const [summaryError, setSummaryError] = useState(null);
@@ -161,50 +160,37 @@ export default function Home() {
 
   // --- EFFECT FOR PERIOD CHANGES ONLY ---
   useEffect(() => {
+    // Avoid re-fetching on the initial load, as the first useEffect already handles it
     if (!isInitialLoading && token) {
       getReport();
     }
   }, [period, isInitialLoading, token, getReport]);
 
-  // --- SUCCESS HANDLERS ---
+  // --- SUCCESS HANDLERS (for child components) ---
   const handleTransactionSuccess = useCallback(() => {
     setIsCreateTransactionModalOpen(false);
-    getSummaryData();
-    getReport();
+    getSummaryData(); // Re-fetch balance
+    getReport();      // Re-fetch report
   }, [getSummaryData, getReport]);
   
   const handleGoalSuccess = useCallback(() => {
     setIsCreateGoalModalOpen(false);
-    getActiveGoalsCount();
+    getActiveGoalsCount(); // Re-fetch goal count
   }, [getActiveGoalsCount]);
 
   const handleFamilySuccess = useCallback(() => {
     setIsCreateFamilyModalOpen(false);
-    getFamilyCount();
+    getFamilyCount(); // Re-fetch family count
   }, [getFamilyCount]);
 
-  // --- NEW HANDLERS FOR FAMILY REALM NAVIGATION ---
+  // --- HANDLERS FOR FAMILY REALM NAVIGATION ---
   const handleEnterFamilyRealm = (family) => {
     setActiveFamilyRealm(family);
-    setIsFamilyModalOpen(false);
+    setIsFamilyModalOpen(false); // Close modal after selection
   };
   
   const handleExitFamilyRealm = () => {
     setActiveFamilyRealm(null);
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { position: 'top' },
-      title: { display: true, text: 'Personal Inflow vs. Outflow' },
-    },
-    scales: {
-      y: {
-        beginAtZero: true
-      }
-    }
   };
 
   return (
@@ -221,77 +207,64 @@ export default function Home() {
 
       {/* --- MAIN VIEW LOGIC --- */}
       {activeFamilyRealm ? (
+        // RENDER THE FAMILY REALM VIEW IF A FAMILY IS SELECTED
         <Suspense fallback={<DashboardSkeleton />}>
             <FamilyRealm family={activeFamilyRealm} onBack={handleExitFamilyRealm} />
         </Suspense>
       ) : user ? (
+        // RENDER THE PERSONAL DASHBOARD IF LOGGED IN
         isInitialLoading ? <DashboardSkeleton /> : (
-          // Use a React Fragment to avoid a single wrapper div
-          <>
-            {/* START CHANGE: This div now only wraps the top content */}
-            <div className="p-4 md:p-10">
-              <header className="dashboard-header">
-                <div className="flex flex-wrap gap-4">
-                  <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
-                  <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
-                  <button onClick={() => setIsCreateFamilyModalOpen(true)} className="secondary-btn">+ Add Family</button>
-                </div>
-              </header>
+          <div className="p-4 md:p-10">
+            <header className="dashboard-header">
+              <div className="flex flex-wrap gap-4">
+                <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
+                <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
+                <button onClick={() => setIsCreateFamilyModalOpen(true)} className="secondary-btn">+ Add Family</button>
+              </div>
+            </header>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
-                  <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
-                  {summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
-                  summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
-                  <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
-                </div>
-                
-                <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
-                  <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
-                  <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
-                  <span className="text-link text-sm mt-2">View Goals &rarr;</span>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
+                <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
+                {summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
+                 summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
+                <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
+              </div>
+              
+              <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
+                <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
+                <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
+                <span className="text-link text-sm mt-2">View Goals &rarr;</span>
+              </div>
 
-                <div className="dashboard-card-interactive" onClick={() => setIsFamilyModalOpen(true)} role="button" tabIndex="0">
-                  <h4 className="font-bold text-gray-600">Your Families</h4>
-                  <p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>
-                  <span className="text-link text-sm mt-2">Manage Families &rarr;</span>
-                </div>
+              <div className="dashboard-card-interactive" onClick={() => setIsFamilyModalOpen(true)} role="button" tabIndex="0">
+                <h4 className="font-bold text-gray-600">Your Families</h4>
+                <p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>
+                <span className="text-link text-sm mt-2">Manage Families &rarr;</span>
               </div>
             </div>
-            {/* END CHANGE: End of the top content wrapper */}
-            
-            {/* START CHANGE: The chart section is now a sibling, with horizontal padding */}
-            <div className="dashboard-section px-4 md:px-10">
+
+            {/* --- REFACTORED REPORT SECTION --- */}
+            <div className="dashboard-section">
               <div className="w-full mx-auto flex justify-center gap-4 mb-6">
                 <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
                 <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
                 <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
               </div>
-              {/* Added w-full to the content-card to ensure it fills the new padded section */}
-              <div className="content-card font-mono text-slate-800 w-full">
-                {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
-                 reportError ? <p className="error text-center py-10">{reportError}</p> : 
-                 report ? (
-                  <>
-                    <div className="mb-8 relative" style={{ height: '350px' }}>
-                      {report.chartData?.datasets?.length > 0 ? (<Bar options={chartOptions} data={report.chartData} />) : (<div className="flex items-center justify-center h-full"><p>Not enough data for a chart.</p></div>)}
-                    </div>
-                    <div className="space-y-3 text-sm">
-                      <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
-                      <hr className="border-dashed" />
-                      <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
-                      <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
-                      <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}</p>
-                      <hr className="border-dashed" />
-                      <p className="font-bold">Analysis:</p>
-                      <ul className="list-disc pl-6"><li>{report.transactionCount} individual transactions were logged in this period.</li></ul>
-                    </div>
-                  </>
-                ) : <p className="text-center py-10">No report data available.</p>}
-              </div>
+              
+              {reportLoading ? (
+                  <div className="w-full h-96 bg-slate-100 rounded-lg flex justify-center items-center">
+                      <p className="text-slate-500">Generating Your Financial Report...</p>
+                  </div>
+              ) : reportError ? (
+                  <p className="error text-center py-10">{reportError}</p>
+              ) : (
+                  <Suspense fallback={<div className="h-96 bg-slate-100 rounded-lg"></div>}>
+                      <PersonalReportChartWidget report={report} />
+                  </Suspense>
+              )}
             </div>
-          </>
+          </div>
         )
       ) : (
         // RENDER THE HERO SECTION IF NOT LOGGED IN
