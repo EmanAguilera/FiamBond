@@ -183,7 +183,7 @@
     }
 
     .dashboard-section {
-        width: 100vw; /* 100% of the Viewport Width */
+        width: 200vw; /* 100% of the Viewport Width */
         position: relative;
         left: 50%;
         transform: translateX(-50%);
