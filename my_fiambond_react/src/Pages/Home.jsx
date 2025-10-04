@@ -16,15 +16,12 @@ const FamilyManagementWidget = lazy(() => import("../Components/FamilyManagement
 const CreateFamilyWidget = lazy(() => import("../Components/CreateFamilyWidget"));
 
 // --- NEW REALM IMPORT ---
-// This is the new component for the shared family view.
 const FamilyRealm = lazy(() => import('../Components/FamilyRealm'));
 
 // Register the chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 // --- SKELETON COMPONENT ---
-// This placeholder UI is shown immediately, preventing the "white screen flash"
-// and giving the user a sense of progress.
 const DashboardSkeleton = () => (
   <div className="p-4 md:p-10 animate-pulse">
     <header className="dashboard-header mb-8">
@@ -189,7 +186,7 @@ export default function Home() {
   // --- NEW HANDLERS FOR FAMILY REALM NAVIGATION ---
   const handleEnterFamilyRealm = (family) => {
     setActiveFamilyRealm(family);
-    setIsFamilyModalOpen(false); // Close the management modal after entering a realm
+    setIsFamilyModalOpen(false);
   };
   
   const handleExitFamilyRealm = () => {
@@ -213,65 +210,66 @@ export default function Home() {
   return (
     <>
       {/* --- MODALS (Lazy Loaded) --- */}
-      {/* Suspense provides a fallback while the modal's code is being downloaded */}
       <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
         {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><RecentTransactionsWidget /></Modal>}
         {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
-        
-        {/* The Family Management modal now gets a prop to handle entering a realm */}
         {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget onEnterRealm={handleEnterFamilyRealm} /></Modal>}
-        
         {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
         {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
         {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
       </Suspense>
 
-      {/* --- MAIN VIEW LOGIC: Conditionally render Family Realm or Personal Dashboard --- */}
+      {/* --- MAIN VIEW LOGIC --- */}
       {activeFamilyRealm ? (
-        // RENDER THE FAMILY REALM VIEW IF A FAMILY IS SELECTED
         <Suspense fallback={<DashboardSkeleton />}>
             <FamilyRealm family={activeFamilyRealm} onBack={handleExitFamilyRealm} />
         </Suspense>
       ) : user ? (
-        // RENDER THE PERSONAL DASHBOARD IF LOGGED IN AND NO REALM IS ACTIVE
         isInitialLoading ? <DashboardSkeleton /> : (
-          <div className="p-4 md:p-10">
-            <header className="dashboard-header">
-              <div className="flex flex-wrap gap-4">
-                <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
-                <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
-                <button onClick={() => setIsCreateFamilyModalOpen(true)} className="secondary-btn">+ Add Family</button>
-              </div>
-            </header>
+          // Use a React Fragment to avoid a single wrapper div
+          <>
+            {/* START CHANGE: This div now only wraps the top content */}
+            <div className="p-4 md:p-10">
+              <header className="dashboard-header">
+                <div className="flex flex-wrap gap-4">
+                  <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
+                  <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
+                  <button onClick={() => setIsCreateFamilyModalOpen(true)} className="secondary-btn">+ Add Family</button>
+                </div>
+              </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
-                <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
-                {summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
-                 summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
-                <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
-              </div>
-              
-              <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
-                <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
-                <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
-                <span className="text-link text-sm mt-2">View Goals &rarr;</span>
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
+                  <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
+                  {summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
+                  summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
+                  <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
+                </div>
+                
+                <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
+                  <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
+                  <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
+                  <span className="text-link text-sm mt-2">View Goals &rarr;</span>
+                </div>
 
-              <div className="dashboard-card-interactive" onClick={() => setIsFamilyModalOpen(true)} role="button" tabIndex="0">
-                <h4 className="font-bold text-gray-600">Your Families</h4>
-                <p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>
-                <span className="text-link text-sm mt-2">Manage Families &rarr;</span>
+                <div className="dashboard-card-interactive" onClick={() => setIsFamilyModalOpen(true)} role="button" tabIndex="0">
+                  <h4 className="font-bold text-gray-600">Your Families</h4>
+                  <p className="text-3xl font-bold text-slate-800 mt-2">{familyCount}</p>
+                  <span className="text-link text-sm mt-2">Manage Families &rarr;</span>
+                </div>
               </div>
             </div>
-
-            <div className="dashboard-section">
+            {/* END CHANGE: End of the top content wrapper */}
+            
+            {/* START CHANGE: The chart section is now a sibling, with horizontal padding */}
+            <div className="dashboard-section px-4 md:px-10">
               <div className="w-full mx-auto flex justify-center gap-4 mb-6">
                 <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
                 <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
                 <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
               </div>
-              <div className="content-card font-mono text-slate-800">
+              {/* Added w-full to the content-card to ensure it fills the new padded section */}
+              <div className="content-card font-mono text-slate-800 w-full">
                 {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
                  reportError ? <p className="error text-center py-10">{reportError}</p> : 
                  report ? (
@@ -293,7 +291,7 @@ export default function Home() {
                 ) : <p className="text-center py-10">No report data available.</p>}
               </div>
             </div>
-          </div>
+          </>
         )
       ) : (
         // RENDER THE HERO SECTION IF NOT LOGGED IN
