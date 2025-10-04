@@ -183,7 +183,11 @@
     }
 
     .dashboard-section {
-        @apply mb-12;
+        width: 100vw; /* 100% of the Viewport Width */
+        position: relative;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 3rem; /* This is your original mb-12 */
     }
     .dashboard-header {
         @apply flex flex-col items-start md:flex-row md:items-center md:justify-between mb-8 gap-4;

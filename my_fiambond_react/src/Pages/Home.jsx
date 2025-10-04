@@ -265,13 +265,13 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="w-full">
+            <div className="dashboard-section">
               <div className="w-full mx-auto flex justify-center gap-4 mb-6">
                 <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
                 <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
                 <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
               </div>
-              <div className="content-card font-mono text-slate-800 w-full">
+              <div className="content-card font-mono text-slate-800">
                 {reportLoading ? <p className="text-center py-10">Generating Your Financial Report...</p> : 
                  reportError ? <p className="error text-center py-10">{reportError}</p> : 
                  report ? (
