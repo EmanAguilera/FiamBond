@@ -19,8 +19,9 @@ function PersonalReportChartWidget({ report }) {
     };
 
     return (
-        // This outer div uses the same classes for consistent styling
-        <div className="content-card font-mono text-slate-800">
+        // --- THIS IS THE FIX ---
+        // Changed "content-card" to "dashboard-card" to match the family chart's style.
+        <div className="dashboard-card font-mono text-slate-800">
             {report ? (
                 <>
                     <div className="mb-8 relative" style={{ height: '350px' }}>
