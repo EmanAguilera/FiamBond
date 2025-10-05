@@ -27,7 +27,7 @@ const TransactionListSkeleton = () => (
 );
 
 
-export default function RecentTransactionsWidget() {
+export default function PersonalTransactionsWidget() {
   const { token } = useContext(AppContext);
   const [transactions, setTransactions] = useState([]);
   const [pagination, setPagination] = useState(null);
