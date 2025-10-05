@@ -8,7 +8,7 @@ import { AppContext } from "../Context/AppContext.jsx";
 const Modal = lazy(() => import("../Components/Modal"));
 const GoalListsWidget = lazy(() => import("../Components/GoalListsWidget"));
 const CreateGoalWidget = lazy(() => import("../Components/CreateGoalWidget"));
-const RecentTransactionsWidget = lazy(() => import("../Components/RecentTransactionsWidget"));
+const PersonalTransactionsWidget = lazy(() => import("../Components/PersonalTransactionsWidget.jsx"));
 const CreateTransactionWidget = lazy(() => import("../Components/CreateTransactionWidget"));
 const FamilyManagementWidget = lazy(() => import("../Components/FamilyManagementWidget"));
 const CreateFamilyWidget = lazy(() => import("../Components/CreateFamilyWidget"));
@@ -197,7 +197,7 @@ export default function Home() {
     <>
       {/* --- MODALS (Lazy Loaded) --- */}
       <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
-        {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><RecentTransactionsWidget /></Modal>}
+        {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><PersonalTransactionsWidget /></Modal>}
         {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
         {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget onEnterRealm={handleEnterFamilyRealm} /></Modal>}
         {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
