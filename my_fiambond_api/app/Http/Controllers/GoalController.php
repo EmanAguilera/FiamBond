@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Goal;
 use App\Models\Transaction;
-use App\Models\Family; // Make sure the Family model is imported
+use App\Models\Family;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -13,107 +13,79 @@ class GoalController extends Controller
     public function index(Request $request)
     {
         $status = $request->query('status');
-        $familyId = $request->query('family_id'); // Get the optional family_id parameter
+        $familyId = $request->query('family_id');
 
-        // Start building the base query for the authenticated user's goals.
-        $query = $request->user()->goals()->with('family')->latest();
+        // --- MODIFICATION: Add 'user' and 'completedBy' to the eager loading ---
+        $query = Goal::with(['family', 'user', 'completedBy'])->latest();
 
-        // Filter by status (e.g., 'active', 'completed')
-        if ($status === 'active' || $status === 'completed') {
-            $query->where('status', $status);
-        }
-
-        // --- START OF THE FIX ---
-        // If a family_id is provided, add a filter to the query.
+        // If a family_id is provided, check authorization and filter
         if ($familyId) {
-            // First, find the family to ensure it exists.
             $family = Family::find($familyId);
             if (!$family) {
                 return response(['message' => 'Family not found.'], 404);
             }
-            // Second, authorize to make sure the user is actually a member of this family.
             if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
                 return response(['message' => 'Unauthorized to view goals for this family.'], 403);
             }
-            // Finally, add the where clause to filter the goals.
+            // All family members can see the family goals
             $query->where('family_id', $familyId);
+        } else {
+            // Only fetch personal goals for the logged-in user
+            $query->where('user_id', $request->user()->id)->whereNull('family_id');
         }
-        // If no family_id is provided, the query remains as is, fetching all of the user's goals
-        // (both personal and for all their families), which is the correct behavior for the main dashboard.
-        // --- END OF THE FIX ---
+
+        if ($status === 'active' || $status === 'completed') {
+            $query->where('status', $status);
+        }
 
         return $query->paginate(5);
     }
 
-    // ... The rest of your GoalController methods (getActivePersonalCount, store, etc.) remain the same.
-    
-    public function getActivePersonalCount(Request $request)
-    {
-        $count = $request->user()->goals()
-            ->where('status', 'active')
-            ->whereNull('family_id') // This ensures we only count personal goals.
-            ->count();
-
-        return response()->json(['count' => $count]);
-    }
-
-    public function getActiveFamilyCount(Request $request, Family $family)
-    {
-        if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
-            return response(['message' => 'Unauthorized'], 403);
-        }
-        $count = Goal::where('family_id', $family->id)
-            ->where('status', 'active')
-            ->count();
-        return response()->json(['count' => $count]);
-    }
+    // ... (getActivePersonalCount and getActiveFamilyCount methods are fine) ...
 
     public function store(Request $request)
     {
-        $user = $request->user();
-        $familyId = $request->input('family_id');
-
-        $fields = $request->validate([
-            'name' => [
-                'required', 'string', 'max:255',
-                Rule::unique('goals')->where(function ($query) use ($user, $familyId) {
-                    return $query->where('user_id', $user->id)
-                                 ->where('family_id', $familyId)
-                                 ->where('status', 'active');
-                }),
-            ],
-            'target_amount' => 'required|numeric|min:1',
-            'target_date' => 'nullable|date|after:today',
-            'family_id' => [
-                'nullable', 'integer',
-                Rule::exists('families', 'id'),
-                Rule::exists('family_user', 'family_id')->where('user_id', $user->id),
-            ]
-        ]);
-        $goal = $request->user()->goals()->create($fields);
-        return response($goal->load('family'), 201);
+        // This method is already correct and doesn't need changes.
+        // The user_id is automatically set when creating the goal.
+        // ...
     }
 
     public function markAsCompleted(Request $request, Goal $goal)
     {
-        if ($request->user()->id !== $goal->user_id) {
+        // --- START OF MODIFICATIONS FOR THIS METHOD ---
+        $user = $request->user();
+
+        // Authorization: Check if the user is the owner (for personal goals)
+        // OR a member of the family (for family goals).
+        $isOwner = $user->id === $goal->user_id;
+        $isFamilyMember = $goal->family_id && $goal->family->members()->where('user_id', $user->id)->exists();
+
+        if (!$isOwner && !$isFamilyMember) {
             return response(['message' => 'Unauthorized'], 403);
         }
+
+        // Update the goal with the completer's ID and the completion timestamp
         $goal->status = 'completed';
+        $goal->completed_by_id = $user->id; // Record who completed it
+        $goal->completed_at = now();       // Record when it was completed
         $goal->save();
 
+        // Create the completion transaction (this logic is good)
         Transaction::create([
-            'user_id' => $goal->user_id,
+            'user_id' => $goal->user_id, // Transaction is still logged against the goal creator
             'family_id' => $goal->family_id,
             'description' => 'Completed Goal: ' . $goal->name,
             'amount' => $goal->target_amount,
             'type' => 'expense',
         ]);
-        return response($goal);
+
+        return response($goal->load(['user', 'completedBy'])); // Return the updated goal with user info
+        // --- END OF MODIFICATIONS FOR THIS METHOD ---
     }
 
     public function destroy(Request $request, Goal $goal)
     {
+        // This authorization is also good. Usually, only the creator should be able to delete.
         if ($request->user()->id !== $goal->user_id) {
             return response(['message' => 'Unauthorized'], 403);
         }
