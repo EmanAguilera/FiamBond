@@ -1,4 +1,3 @@
-// CreateLoanWidget.jsx
 import { useContext, useState, useEffect } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
@@ -7,6 +6,7 @@ export default function CreateLoanWidget({ family, onSuccess }) {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [debtorId, setDebtorId] = useState("");
+  const [deadline, setDeadline] = useState(""); // State for the deadline
   const [members, setMembers] = useState([]);
   const [error, setError] = useState(null);
 
@@ -18,7 +18,6 @@ export default function CreateLoanWidget({ family, onSuccess }) {
         });
         if (res.ok) {
           const data = await res.json();
-          // The current user (lender) can't lend to themselves, so filter them out.
           setMembers(data.members.filter(member => member.id !== user.id));
         }
       } catch (err) {
@@ -37,6 +36,7 @@ export default function CreateLoanWidget({ family, onSuccess }) {
       debtor_id: parseInt(debtorId),
       amount: parseFloat(amount),
       description,
+      deadline: deadline || null, // Include deadline in the request
     };
 
     try {
@@ -76,6 +76,11 @@ export default function CreateLoanWidget({ family, onSuccess }) {
       <div>
         <label htmlFor="description" className="block text-sm font-medium text-gray-700">Reason / Description</label>
         <input id="description" type="text" placeholder="e.g., Lunch money" value={description} onChange={(e) => setDescription(e.target.value)} required className="w-full p-2 border border-gray-300 rounded-md" />
+      </div>
+      {/* New Deadline Field */}
+      <div>
+        <label htmlFor="deadline" className="block text-sm font-medium text-gray-700">Repayment Deadline (Optional)</label>
+        <input id="deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" />
       </div>
       {error && <p className="error">{error}</p>}
       <button type="submit" className="primary-btn w-full">Confirm & Lend Money</button>
