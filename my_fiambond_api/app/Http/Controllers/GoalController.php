@@ -78,7 +78,8 @@ class GoalController extends Controller
                 'required', 'string', 'max:255',
                 Rule::unique('goals')->where(function ($query) use ($user, $familyId) {
                     return $query->where('user_id', $user->id)
-                                 ->where('family_id', $familyId);
+                                 ->where('family_id', $familyId)
+                                 ->where('status', 'active');
                 }),
             ],
             'target_amount' => 'required|numeric|min:1',
