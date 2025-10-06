@@ -10,6 +10,7 @@ const CreateLoanWidget = lazy(() => import('./CreateLoanWidget.jsx'));
 const CreateFamilyTransactionWidget = lazy(() => import('./CreateFamilyTransactionWidget.jsx'));
 const CreateFamilyGoalWidget = lazy(() => import('./CreateFamilyGoalWidget.jsx'));
 const FamilyTransactionsWidget = lazy(() => import('./FamilyTransactionsWidget.jsx'));
+const FamilyMembersView = lazy(() => import('./FamilyMembersView.jsx')); // Import FamilyMembersView
 
 // --- SKELETON LOADER FOR THE DASHBOARD ---
 const FamilyRealmSkeleton = () => (
@@ -19,6 +20,7 @@ const FamilyRealmSkeleton = () => (
             <div className="h-10 w-48 bg-slate-200 rounded"></div>
             <div className="h-10 w-40 bg-slate-200 rounded"></div>
             <div className="h-10 w-40 bg-slate-200 rounded"></div>
+            <div className="h-10 w-44 bg-slate-200 rounded"></div> {/* Added for new button */}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="h-32 bg-slate-200 rounded-lg"></div>
@@ -29,7 +31,7 @@ const FamilyRealmSkeleton = () => (
     </div>
 );
 
-export default function FamilyRealm({ family, onBack }) {
+export default function FamilyRealm({ family, onBack, onFamilyUpdate }) { // Added onFamilyUpdate to props
     const { token } = useContext(AppContext);
 
     // --- STATE FOR MODALS ---
@@ -39,6 +41,7 @@ export default function FamilyRealm({ family, onBack }) {
     const [isGoalsListModalOpen, setIsGoalsListModalOpen] = useState(false);
     const [isFamilyTransactionsModalOpen, setIsFamilyTransactionsModalOpen] = useState(false);
     const [isLoanListModalOpen, setIsLoanListModalOpen] = useState(false);
+    const [isMembersModalOpen, setIsMembersModalOpen] = useState(false); // State for the new modal
 
     // --- STATE FOR DASHBOARD DATA ---
     const [loading, setLoading] = useState(true);
@@ -52,7 +55,7 @@ export default function FamilyRealm({ family, onBack }) {
     const [reportError, setReportError] = useState(null);
     const [period, setPeriod] = useState('monthly');
 
-    const isInitialMount = useRef(true); // FIXED: Add ref to track initial mount
+    const isInitialMount = useRef(true);
 
 
     // --- DATA FETCHING (Summary Cards) ---
@@ -138,7 +141,6 @@ export default function FamilyRealm({ family, onBack }) {
         if (isInitialMount.current) {
             isInitialMount.current = false;
         } else {
-            // This code will only run on subsequent renders when dependencies change
             getFamilyReport();
         }
     }, [period, getFamilyReport]);
@@ -149,33 +151,35 @@ export default function FamilyRealm({ family, onBack }) {
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
         
-        // Re-fetch all summary data AND the report
         getFamilyBalance();
         getFamilyActiveGoalsCount();
         getFamilyActiveLoansCount();
         getFamilyReport();
     };
+
+    const handleMembersUpdate = (updatedFamily) => {
+        if (onFamilyUpdate) {
+            onFamilyUpdate(updatedFamily);
+        }
+    };
     
-    // Show skeleton for the entire page ONLY on the very first load
     if (loading) return <FamilyRealmSkeleton />;
 
     return (
         <>
             <div className="p-4 md:p-10">
-                {/* --- MODIFIED HEADER --- */}
                 <header className="dashboard-header mb-8">
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        {/* Left Side: Back Button & Title */}
                         <div className="flex items-center gap-4">
                             <button onClick={onBack} className="secondary-btn-sm">&larr; Back</button>
                             <h1 className="text-2xl font-bold text-slate-800">{family.first_name}: Family Realm</h1>
                         </div>
 
-                        {/* Right Side: Action Buttons */}
                         <div className="flex flex-wrap gap-4">
                             <button onClick={() => setIsTransactionModalOpen(true)} className="primary-btn">+ Add Family Transaction</button>
                             <button onClick={() => setIsGoalModalOpen(true)} className="secondary-btn">+ Add Family Goal</button>
                             <button onClick={() => setIsLoanModalOpen(true)} className="secondary-btn">+ Record a Loan</button>
+                            <button onClick={() => setIsMembersModalOpen(true)} className="secondary-btn">Manage Members</button> {/* New Button */}
                         </div>
                     </div>
                 </header>
@@ -229,6 +233,17 @@ export default function FamilyRealm({ family, onBack }) {
                 {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.first_name}`}><FamilyTransactionsWidget family={family} /></Modal>}
                 {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.first_name}`}><GoalListsWidget family={family} /></Modal>}
                 {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Lending Activity for ${family.first_name}`}><LoanTrackingWidget family={family} /></Modal>}
+                
+                {/* New Modal for Family Members */}
+                {isMembersModalOpen && (
+                    <Modal isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)} title={`Manage Members for ${family.first_name}`}>
+                        <FamilyMembersView
+                            family={family}
+                            onBack={() => setIsMembersModalOpen(false)}
+                            onFamilyUpdate={handleMembersUpdate}
+                        />
+                    </Modal>
+                )}
             </Suspense>
         </>
     );
