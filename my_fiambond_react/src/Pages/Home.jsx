@@ -1,5 +1,3 @@
-// src/pages/Home.jsx
-
 import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
@@ -13,11 +11,7 @@ const CreateTransactionWidget = lazy(() => import("../Components/CreateTransacti
 const FamilyManagementWidget = lazy(() => import("../Components/FamilyManagementWidget"));
 const CreateFamilyWidget = lazy(() => import("../Components/CreateFamilyWidget"));
 const FamilyRealm = lazy(() => import('../Components/FamilyRealm'));
-
-// --- NEWLY SEPARATED CHART COMPONENT ---
-// Ensure you have created this component file as described previously
 const PersonalReportChartWidget = lazy(() => import('../Components/PersonalReportChartWidget.jsx'));
-
 
 // --- SKELETON COMPONENT ---
 // This placeholder UI is shown during the initial full-page data load.
@@ -74,7 +68,7 @@ export default function Home() {
   const [reportError, setReportError] = useState(null);
   const [period, setPeriod] = useState('monthly');
 
-  // --- DATA FETCHING FUNCTIONS (Using token from context) ---
+  // --- DATA FETCHING FUNCTIONS ---
   const getSummaryData = useCallback(async () => {
     if (!token) return;
     try {
@@ -90,10 +84,10 @@ export default function Home() {
     }
   }, [token]);
   
-  const getActiveGoalsCount = useCallback(async () => {
+  const getActiveTotalGoalsCount = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/active-personal-count`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/active-total-count`, {
           headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -101,7 +95,7 @@ export default function Home() {
         setActiveGoalsCount(data.count || 0);
       }
     } catch (error) {
-        console.error("Error fetching active goals count:", error);
+        console.error("Error fetching total active goals count:", error);
     }
   }, [token]);
 
@@ -146,7 +140,7 @@ export default function Home() {
         setIsInitialLoading(true);
         await Promise.all([
           getSummaryData(),
-          getActiveGoalsCount(),
+          getActiveTotalGoalsCount(),
           getFamilyCount(),
           getReport()
         ]);
@@ -156,37 +150,36 @@ export default function Home() {
     } else {
       setIsInitialLoading(false);
     }
-  }, [token, getSummaryData, getActiveGoalsCount, getFamilyCount, getReport]);
+  }, [token, getSummaryData, getActiveTotalGoalsCount, getFamilyCount, getReport]);
 
   // --- EFFECT FOR PERIOD CHANGES ONLY ---
   useEffect(() => {
-    // Avoid re-fetching on the initial load, as the first useEffect already handles it
     if (!isInitialLoading && token) {
       getReport();
     }
   }, [period, isInitialLoading, token, getReport]);
 
-  // --- SUCCESS HANDLERS (for child components) ---
+  // --- SUCCESS HANDLERS ---
   const handleTransactionSuccess = useCallback(() => {
     setIsCreateTransactionModalOpen(false);
-    getSummaryData(); // Re-fetch balance
-    getReport();      // Re-fetch report
+    getSummaryData();
+    getReport();
   }, [getSummaryData, getReport]);
   
   const handleGoalSuccess = useCallback(() => {
     setIsCreateGoalModalOpen(false);
-    getActiveGoalsCount(); // Re-fetch goal count
-  }, [getActiveGoalsCount]);
+    getActiveTotalGoalsCount();
+  }, [getActiveTotalGoalsCount]);
 
   const handleFamilySuccess = useCallback(() => {
     setIsCreateFamilyModalOpen(false);
-    getFamilyCount(); // Re-fetch family count
+    getFamilyCount();
   }, [getFamilyCount]);
 
   // --- HANDLERS FOR FAMILY REALM NAVIGATION ---
   const handleEnterFamilyRealm = (family) => {
     setActiveFamilyRealm(family);
-    setIsFamilyModalOpen(false); // Close modal after selection
+    setIsFamilyModalOpen(false);
   };
   
   const handleExitFamilyRealm = () => {
@@ -207,12 +200,12 @@ export default function Home() {
 
       {/* --- MAIN VIEW LOGIC --- */}
       {activeFamilyRealm ? (
-        // RENDER THE FAMILY REALM VIEW IF A FAMILY IS SELECTED
+        // RENDER THE FAMILY REALM VIEW
         <Suspense fallback={<DashboardSkeleton />}>
             <FamilyRealm family={activeFamilyRealm} onBack={handleExitFamilyRealm} />
         </Suspense>
       ) : user ? (
-        // RENDER THE PERSONAL DASHBOARD IF LOGGED IN
+        // RENDER THE PERSONAL DASHBOARD
         isInitialLoading ? <DashboardSkeleton /> : (
           <div className="p-4 md:p-10">
             <header className="dashboard-header">
@@ -232,7 +225,7 @@ export default function Home() {
               </div>
               
               <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
-                <h4 className="font-bold text-gray-600">Active Personal Goals</h4>
+                <h4 className="font-bold text-gray-600">Your Active Goals</h4>
                 <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
                 <span className="text-link text-sm mt-2">View Goals &rarr;</span>
               </div>
@@ -244,7 +237,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* --- REFACTORED REPORT SECTION --- */}
             <div className="dashboard-section">
               <div className="w-full mx-auto flex justify-center gap-4 mb-6">
                 <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
