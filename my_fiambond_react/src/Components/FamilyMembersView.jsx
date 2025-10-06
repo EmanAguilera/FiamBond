@@ -1,13 +1,9 @@
-import { useState, useCallback, useContext, useEffect, memo } from 'react'; // Import memo
+import { useState, useCallback, useContext, useEffect, memo } from 'react';
 import { AppContext } from '../Context/AppContext';
 
 // --- SKELETON LOADER COMPONENT ---
-// This placeholder mimics the entire layout of the members view.
-// It provides immediate visual feedback while family details are being fetched.
 const FamilyMembersSkeleton = () => (
     <div className="animate-pulse space-y-8">
-        <div className="h-8 w-40 bg-slate-200 rounded-md"></div> {/* Back button */}
-
         {/* Skeleton for Add Member section */}
         <div>
             <div className="h-7 w-2/3 bg-slate-200 rounded mb-4"></div>
@@ -31,7 +27,7 @@ const FamilyMembersSkeleton = () => (
 );
 
 
-function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
+function FamilyMembersView({ family, onFamilyUpdate }) { // Removed onBack from props
     const { token } = useContext(AppContext);
     
     const [detailedFamily, setDetailedFamily] = useState(null);
@@ -44,7 +40,7 @@ function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
     const MAX_MEMBERS_PER_FAMILY = 10;
 
     const getFamilyDetails = useCallback(async () => {
-        setLoading(true); // Always set loading to true when starting fetch
+        setLoading(true);
         setError(null);
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}`, {
@@ -56,7 +52,7 @@ function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
         } catch (err) {
             setError(err.message);
         } finally {
-            setLoading(false); // Always set loading to false after fetch attempt
+            setLoading(false);
         }
     }, [token, family.id]);
 
@@ -83,10 +79,8 @@ function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
                 }
                 return;
             }
-            // Instead of refetching all details, optimistic update if possible or just get details
-            // For simplicity and correctness here, re-fetch details after successful add
-            getFamilyDetails(); // Refresh details to show new member
-            onFamilyUpdate(data); // Notify parent (FamilyManagementWidget)
+            getFamilyDetails(); 
+            onFamilyUpdate(data);
             setNewMemberEmail("");
             setFormMessage({ type: 'success', text: "Member added successfully!" });
         } catch (err) {
@@ -95,7 +89,6 @@ function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
         }
     }
     
-    // --- RENDER LOGIC ---
     if (loading) {
         return <FamilyMembersSkeleton />;
     }
@@ -108,7 +101,7 @@ function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
 
     return (
         <div className="space-y-8">
-            <button onClick={onBack} className="secondary-btn-sm">&larr; Back to Families List</button>
+            {/* The "Back to Families List" button has been removed from here */}
 
             {members.length < MAX_MEMBERS_PER_FAMILY ? (
                 <div>
@@ -145,5 +138,4 @@ function FamilyMembersView({ family, onBack, onFamilyUpdate }) {
     );
 };
 
-// Wrap the component in memo() for performance optimization.
 export default memo(FamilyMembersView);
