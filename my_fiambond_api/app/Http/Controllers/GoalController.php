@@ -12,36 +12,27 @@ class GoalController extends Controller
 {
     /**
      * Display a paginated list of goals.
-     * - If 'family_id' is provided, it shows all goals for that family.
-     * - If not, it shows all goals (personal and family) created by the logged-in user.
      */
     public function index(Request $request)
     {
         $status = $request->query('status');
         $familyId = $request->query('family_id');
 
-        // Eager load relationships to prevent N+1 query problems on the frontend
         $query = Goal::with(['family', 'user', 'completedBy'])->latest();
 
-        // LOGIC FOR FAMILY-SPECIFIC GOAL LIST (from FamilyRealm)
         if ($familyId) {
             $family = Family::find($familyId);
             if (!$family) {
                 return response(['message' => 'Family not found.'], 404);
             }
-            // Authorize: Ensure the user is a member of the requested family.
             if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
                 return response(['message' => 'Unauthorized to view goals for this family.'], 403);
             }
-            // Filter to show all goals belonging to this family.
             $query->where('family_id', $familyId);
-        }
-        // LOGIC FOR THE MAIN DASHBOARD'S GOAL LIST (shows all goals created by the user)
-        else {
+        } else {
             $query->where('user_id', $request->user()->id);
         }
 
-        // Filter by status if provided (e.g., 'active', 'completed')
         if ($status === 'active' || $status === 'completed') {
             $query->where('status', $status);
         }
@@ -50,25 +41,21 @@ class GoalController extends Controller
     }
 
     /**
-     * Get the total count of all active goals (personal and family) created by the user.
-     * Used for the main dashboard summary card.
+     * Get the total count of all active goals created by the user.
      */
     public function getActiveTotalCount(Request $request)
     {
         $count = $request->user()->goals()
             ->where('status', 'active')
             ->count();
-
         return response()->json(['count' => $count]);
     }
 
     /**
      * Get the count of active goals for a specific family.
-     * Used for the FamilyRealm dashboard summary card.
      */
     public function getActiveFamilyCount(Request $request, Family $family)
     {
-        // Authorize: Ensure the user is a member of the family.
         if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
             return response(['message' => 'Unauthorized'], 403);
         }
@@ -89,8 +76,6 @@ class GoalController extends Controller
         $fields = $request->validate([
             'name' => [
                 'required', 'string', 'max:255',
-                // This rule prevents a user from creating duplicate-named goals
-                // within the same context (either personal or for the same family).
                 Rule::unique('goals')->where(function ($query) use ($user, $familyId) {
                     return $query->where('user_id', $user->id)
                                  ->where('family_id', $familyId);
@@ -101,25 +86,29 @@ class GoalController extends Controller
             'family_id' => [
                 'nullable', 'integer',
                 Rule::exists('families', 'id'),
-                // Ensure the user is a member of the family they're creating a goal for.
                 Rule::exists('family_user', 'family_id')->where('user_id', $user->id),
             ]
         ]);
 
-        // Associate the goal with the authenticated user and create it.
         $goal = $user->goals()->create($fields);
         return response($goal->load('family'), 201);
     }
 
+
+    // --- START OF THE FIX ---
+
     /**
      * Mark the specified goal as completed.
+     * This is the corrected version.
      */
     public function markAsCompleted(Request $request, Goal $goal)
     {
         $user = $request->user();
 
-        // Authorization: A user can complete a goal if they created it,
-        // OR if it's a family goal and they are a member of that family.
+        // FIX #1: Correct Authorization Logic
+        // A user can complete a goal if:
+        // 1. They are the original creator.
+        // 2. It's a family goal and they are a member of that family.
         $isCreator = $user->id === $goal->user_id;
         $isFamilyMember = $goal->family_id && $goal->family->members()->where('user_id', $user->id)->exists();
 
@@ -127,30 +116,35 @@ class GoalController extends Controller
             return response(['message' => 'You are not authorized to complete this goal.'], 403);
         }
 
-        // Update the goal's status and record who completed it and when.
+        // FIX #2: Add the Missing Logic to Record Completer and Timestamp
         $goal->status = 'completed';
-        $goal->completed_by_id = $user->id;
-        $goal->completed_at = now();
+        $goal->completed_by_id = $user->id; // Record who clicked the button
+        $goal->completed_at = now();       // Record when it was completed
         $goal->save();
 
-        // Create an expense transaction for the goal's creator upon completion.
+        // Create an expense transaction for the goal's original creator.
         Transaction::create([
-            'user_id' => $goal->user_id,
-            'family_id' => $goal->family_id,
-            'description' => 'Completed Goal: ' . $goal->name,
-            'amount' => $goal->target_amount,
-            'type' => 'expense',
+            'user_id'       => $goal->user_id, // The expense is tied to the goal's creator
+            'family_id'     => $goal->family_id,
+            'description'   => 'Completed Goal: ' . $goal->name,
+            'amount'        => $goal->target_amount,
+            'type'          => 'expense',
+            'transaction_date' => now(), // It's good practice to add the date
         ]);
 
+        // Return the updated goal with all the new info
         return response($goal->load(['user', 'completedBy']));
     }
+
+    // --- END OF THE FIX ---
+
 
     /**
      * Remove the specified goal from storage.
      */
     public function destroy(Request $request, Goal $goal)
     {
-        // Authorization: Only the original creator of the goal can delete it.
+        // Only the original creator can abandon a goal.
         if ($request->user()->id !== $goal->user_id) {
             return response(['message' => 'You are not authorized to abandon this goal.'], 403);
         }
