@@ -20,29 +20,47 @@ class Goal extends Model
         'name',
         'target_amount',
         'consequence_note',
-        // --- START OF FIX ---
-        'family_id',      // Allows associating a goal with a family
-        'target_date',    // Allows saving the optional target date
-        'status',         // Allows updating the goal's status
-        // --- END OF FIX ---
+        'family_id',
+        'target_date',
+        'status',
+        // --- ADD THESE LINES ---
+        'completed_by_id', // Tracks who marked the goal as complete
+        'completed_at',    // Tracks when the goal was completed
+        // --- END OF ADDITION ---
     ];
 
     /**
-     * Get the user who owns the goal.
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'completed_at' => 'datetime', // Automatically converts this to a Carbon instance
+    ];
+
+    /**
+     * Get the user who created the goal.
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
-    // --- START OF NEW METHOD ---
     /**
      * Get the family that this goal belongs to (if any).
-     * This defines the relationship for family-specific goals.
      */
     public function family(): BelongsTo
     {
         return $this->belongsTo(Family::class);
+    }
+
+    // --- ADD THIS ENTIRE METHOD ---
+    /**
+     * Get the user who completed the goal.
+     */
+    public function completedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by_id');
     }
     // --- END OF NEW METHOD ---
 }
