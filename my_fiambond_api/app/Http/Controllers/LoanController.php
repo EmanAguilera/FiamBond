@@ -40,10 +40,12 @@ class LoanController extends Controller
             return response(['message' => 'You must be a member of this family to lend money.'], 403);
         }
 
+        // MODIFIED: Add 'deadline' to validation
         $fields = $request->validate([
             'debtor_id' => ['required', 'integer', Rule::exists('users', 'id'), Rule::notIn([$lender->id]), Rule::exists('family_user', 'user_id')->where('family_id', $family->id)],
             'amount' => 'required|numeric|min:0.01',
             'description' => 'required|string|max:255',
+            'deadline' => 'nullable|date|after_or_equal:today', // Deadline is optional and must be today or in the future
         ]);
 
         $debtor = User::find($fields['debtor_id']);
@@ -51,12 +53,14 @@ class LoanController extends Controller
         try {
             $loan = DB::transaction(function () use ($family, $lender, $debtor, $fields) {
                 // 1. Create the Loan record
+                // MODIFIED: Add 'deadline' to the created loan
                 $loan = Loan::create([
                     'family_id'   => $family->id,
                     'creditor_id' => $lender->id,
                     'debtor_id'   => $debtor->id,
                     'amount'      => $fields['amount'],
                     'description' => $fields['description'],
+                    'deadline'    => $fields['deadline'] ?? null, // Save the deadline if provided
                 ]);
 
                 // 2. Create the lender's expense transaction, linked to the loan
@@ -95,7 +99,6 @@ class LoanController extends Controller
     {
         $borrower = $request->user();
 
-        // Authorization: Only the original debtor can make a repayment.
         if ($borrower->id !== $loan->debtor_id) {
             return response(['message' => 'You are not authorized to repay this loan.'], 403);
         }
@@ -112,12 +115,9 @@ class LoanController extends Controller
         $lender = $loan->creditor;
 
         try {
-            // Use a DB transaction for atomicity.
             DB::transaction(function () use ($loan, $borrower, $lender, $fields) {
-                // 1. Update the loan's repaid amount
                 $loan->increment('repaid_amount', $fields['amount']);
 
-                // 2. Create the borrower's expense transaction for the repayment
                 $borrower->transactions()->create([
                     'description' => "Repayment to {$lender->full_name} for: " . $loan->description,
                     'amount'      => $fields['amount'],
@@ -126,7 +126,6 @@ class LoanController extends Controller
                     'loan_id'     => $loan->id,
                 ]);
 
-                // 3. Create the lender's income transaction for the repayment
                 $lender->transactions()->create([
                     'description' => "Repayment from {$borrower->full_name} for: " . $loan->description,
                     'amount'      => $fields['amount'],
@@ -145,12 +144,10 @@ class LoanController extends Controller
 
     public function getActiveLoanCount(Request $request, Family $family)
     {
-        // Authorization: Ensure the user is a member of the family.
         if (!$family->members()->where('user_id', $request->user()->id)->exists()) {
             return response(['message' => 'Unauthorized'], 403);
         }
 
-        // An active loan is one where the original amount is greater than the repaid amount.
         $count = Loan::where('family_id', $family->id)
             ->where('amount', '>', DB::raw('repaid_amount'))
             ->count();

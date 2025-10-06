@@ -1,21 +1,17 @@
 import { useContext, useState, useEffect, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
-// --- SKELETON LOADER COMPONENT ---
-// A refined skeleton loader that accurately mimics the new loan item layout.
 const LoanListSkeleton = () => (
     <div className="animate-pulse">
         <h3 className="font-bold text-lg text-gray-800 mb-2">Family Lending</h3>
         <div className="dashboard-card p-0">
             {[...Array(3)].map((_, i) => (
                 <div key={i} className="flex justify-between items-center p-4 border-b last:border-b-0 border-slate-100">
-                    {/* Left Side Skeleton */}
                     <div>
                         <div className="h-5 w-48 bg-slate-200 rounded"></div>
                         <div className="h-4 w-32 bg-slate-200 rounded mt-2"></div>
                         <div className="h-4 w-24 bg-slate-200 rounded mt-2"></div>
                     </div>
-                    {/* Right Side Skeleton */}
                     <div className="text-right">
                         <div className="h-6 w-28 bg-slate-200 rounded"></div>
                         <div className="h-4 w-20 bg-slate-200 rounded mt-1 ml-auto"></div>
@@ -26,8 +22,25 @@ const LoanListSkeleton = () => (
     </div>
 );
 
-// --- LOAN ITEM COMPONENT ---
-// Redesigned to match the transaction item's style.
+// --- DEADLINE NOTIFICATION HELPER ---
+const DeadlineNotification = ({ deadline, outstanding }) => {
+    if (!deadline || outstanding <= 0) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today's date
+    const deadlineDate = new Date(deadline);
+    const timeDiff = deadlineDate.getTime() - today.getTime();
+    const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+    if (dayDiff < 0) {
+        return <span className="text-xs font-semibold text-red-600">Overdue</span>;
+    }
+    if (dayDiff <= 7) {
+        return <span className="text-xs font-semibold text-yellow-600">Due Soon</span>;
+    }
+    return null;
+};
+
 const LoanItem = ({ loan }) => {
     const { user } = useContext(AppContext);
     const isBorrower = user.id === loan.debtor.id;
@@ -36,7 +49,6 @@ const LoanItem = ({ loan }) => {
     return (
         <div className="p-4 border-b last:border-b-0 border-gray-100">
             <div className="flex justify-between items-start">
-                {/* Left Side: Loan Details */}
                 <div className="min-w-0 pr-4">
                     <p className="font-semibold text-gray-800 break-words">{loan.description}</p>
                     <small className="text-xs text-gray-500">
@@ -45,9 +57,17 @@ const LoanItem = ({ loan }) => {
                      <p className="text-sm text-gray-600 mt-1">
                         Total Loan: <span className="font-mono">₱{parseFloat(loan.amount).toFixed(2)}</span>
                     </p>
+                    {/* Display Deadline Info */}
+                    {loan.deadline && (
+                        <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-gray-500">
+                                Due: {new Date(loan.deadline).toLocaleDateString()}
+                            </p>
+                           <DeadlineNotification deadline={loan.deadline} outstanding={outstanding} />
+                        </div>
+                    )}
                 </div>
 
-                {/* Right Side: Outstanding Amount */}
                 <div className="text-right flex-shrink-0">
                     <p className={`font-bold text-lg ${outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
                         <span className="font-mono">₱{outstanding.toFixed(2)}</span>
@@ -56,7 +76,6 @@ const LoanItem = ({ loan }) => {
                 </div>
             </div>
 
-            {/* Repayment Button (Conditional) */}
             {isBorrower && outstanding > 0 && (
                 <button
                     onClick={() => alert('Repayment functionality would go here.')}
@@ -69,7 +88,6 @@ const LoanItem = ({ loan }) => {
     );
 };
 
-// --- MAIN WIDGET COMPONENT ---
 export default function LoanTrackingWidget({ family }) {
     const { token } = useContext(AppContext);
     const [loans, setLoans] = useState([]);
@@ -99,7 +117,6 @@ export default function LoanTrackingWidget({ family }) {
         getLoans();
     }, [getLoans]);
 
-    // --- RENDER LOGIC ---
     if (loading) return <LoanListSkeleton />;
     if (error) return <p className="error text-center py-4">{error}</p>;
 
