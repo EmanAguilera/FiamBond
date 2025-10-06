@@ -4,6 +4,7 @@ import { AppContext } from "../Context/AppContext.jsx";
 export default function CreateFamilyGoalWidget({ family, onSuccess }) {
   const { token } = useContext(AppContext);
 
+  // MODIFIED: Added target_date to the initial state
   const [formData, setFormData] = useState({ name: "", target_amount: "", target_date: "" });
   const [formErrors, setFormErrors] = useState({});
   const [formError, setFormError] = useState(null);
@@ -13,7 +14,7 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }) {
     setFormErrors({});
     setFormError(null);
     
-    const bodyPayload = { ...formData, family_id: family.id }; // Automatically add family_id
+    const bodyPayload = { ...formData, family_id: family.id };
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals`, {
@@ -32,10 +33,7 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }) {
       if (onSuccess) onSuccess();
 
     } catch (err) {
-      // --- THIS IS THE FIX ---
-      // We now log the actual error to the console for debugging.
       console.error('Failed to create family goal:', err);
-      // --- END OF FIX ---
       setFormError("A network error occurred. Please try again.");
     }
   }
@@ -52,6 +50,7 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }) {
             <input type="number" placeholder="Target Amount" value={formData.target_amount} onChange={(e) => setFormData({ ...formData, target_amount: e.target.value })} className="w-full p-2 border rounded-md"/>
             {formErrors.target_amount && <p className="error">{formErrors.target_amount[0]}</p>}
           </div>
+          {/* MODIFIED: Added the date input field */}
           <div>
             <input type="date" value={formData.target_date} onChange={(e) => setFormData({ ...formData, target_date: e.target.value })} className="w-full p-2 border rounded-md text-gray-500"/>
             {formErrors.target_date && <p className="error">{formErrors.target_date[0]}</p>}

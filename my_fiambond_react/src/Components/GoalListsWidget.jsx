@@ -2,9 +2,6 @@ import { useContext, useEffect, useState, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
 // --- SKELETON LOADER COMPONENT ---
-// This component renders a placeholder UI that perfectly mimics the layout of the goal lists.
-// It is shown instantly while the real data is being fetched in the background,
-// preventing any "whitespace" or jarring content pop-in.
 const GoalListsSkeleton = () => (
     <div className="space-y-8 animate-pulse">
       {/* Skeleton for Active Goals */}
@@ -17,6 +14,7 @@ const GoalListsSkeleton = () => (
                 <div>
                   <div className="h-6 w-48 bg-slate-200 rounded"></div>
                   <div className="h-4 w-24 bg-slate-200 rounded mt-2"></div>
+                  <div className="h-3 w-40 bg-slate-200 rounded mt-2"></div> {/* For dates */}
                 </div>
                 <div className="h-7 w-28 bg-slate-200 rounded"></div>
               </div>
@@ -67,7 +65,6 @@ export default function GoalListsWidget({ family }) {
     if (!token) return;
     try {
       let url = `${import.meta.env.VITE_API_URL}/api/goals?status=active&page=${page}`;
-      // If a family object is passed as a prop, add it as a query parameter
       if (family) {
         url += `&family_id=${family.id}`;
       }
@@ -84,14 +81,13 @@ export default function GoalListsWidget({ family }) {
     } catch (err) {
       setListError(err.message);
     }
-  }, [token, family]); // Add `family` to the dependency array
+  }, [token, family]); 
   
   // Fetches a page of COMPLETED goals
   const getCompletedGoals = useCallback(async (page = 1) => {
     if (!token) return;
     try {
       let url = `${import.meta.env.VITE_API_URL}/api/goals?status=completed&page=${page}`;
-      // If a family object is passed as a prop, add it as a query parameter
       if (family) {
         url += `&family_id=${family.id}`;
       }
@@ -108,7 +104,7 @@ export default function GoalListsWidget({ family }) {
     } catch (err) {
       setListError(err.message);
     }
-  }, [token, family]); // Add `family` to the dependency array
+  }, [token, family]);
 
   // Initial data load for both lists
   useEffect(() => {
@@ -133,7 +129,6 @@ export default function GoalListsWidget({ family }) {
         throw new Error(errorData?.message || "Could not update the goal.");
       }
 
-      // Refresh both lists from the first page to reflect the change
       getActiveGoals(1);
       getCompletedGoals(1);
     } catch (err) {
@@ -158,14 +153,12 @@ export default function GoalListsWidget({ family }) {
         throw new Error(errorData?.message || "Could not delete the goal.");
       }
 
-      // Refresh the active goals from the current page to maintain user context
       getActiveGoals(activePagination?.current_page || 1);
     } catch (err) {
       setListError(err.message);
     }
   }
 
-  // --- RENDER LOGIC ---
   if (loading) return <GoalListsSkeleton />;
   if (listError) return <p className="error text-center py-10">{listError}</p>;
 
@@ -178,6 +171,10 @@ export default function GoalListsWidget({ family }) {
           <div className="space-y-3">
             {activeGoals.map((goal) => {
               const isOverdue = goal.target_date && new Date() > new Date(goal.target_date);
+              // MODIFIED: Format dates for display
+              const creationDate = new Date(goal.created_at).toLocaleDateString();
+              const deadlineDate = goal.target_date ? new Date(goal.target_date).toLocaleDateString() : null;
+
               return (
                 <div key={goal.id} className="p-4 bg-gray-50 border border-gray-200 rounded-md">
                   <div className="flex justify-between items-start gap-4">
@@ -188,6 +185,15 @@ export default function GoalListsWidget({ family }) {
                       ) : (
                         <p className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded-full inline-block mt-1">Personal Goal</p>
                       )}
+                      
+                      {/* MODIFIED: Added this block to display the dates */}
+                      <div className="text-xs text-gray-500 mt-2 space-y-1">
+                          <p>Created: <span className="font-medium">{creationDate}</span></p>
+                          {deadlineDate && (
+                            <p>Deadline: <span className="font-medium">{deadlineDate}</span></p>
+                          )}
+                      </div>
+
                     </div>
                     <p className="font-bold text-lg text-indigo-600 flex-shrink-0">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
@@ -212,7 +218,6 @@ export default function GoalListsWidget({ family }) {
           </div>
         ) : <p className="text-gray-600 italic">You have no active goals yet.</p>}
         
-        {/* Active Goals Pagination */}
         {activePagination && activePagination.last_page > 1 && (
             <div className="flex justify-between items-center mt-6">
                 <button onClick={() => getActiveGoals(activePagination.current_page - 1)} disabled={activePagination.current_page === 1} className="pagination-btn">&larr; Previous</button>
@@ -241,7 +246,6 @@ export default function GoalListsWidget({ family }) {
           </div>
         ) : <p className="text-gray-600 italic">You have not completed any goals yet.</p>}
         
-        {/* Completed Goals Pagination */}
         {completedPagination && completedPagination.last_page > 1 && (
              <div className="flex justify-between items-center mt-6">
                 <button onClick={() => getCompletedGoals(completedPagination.current_page - 1)} disabled={completedPagination.current_page === 1} className="pagination-btn">&larr; Previous</button>
