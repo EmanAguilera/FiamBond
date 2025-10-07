@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect, useCallback, ChangeEvent, FormEvent } from "react";
+import { useContext, useState, useEffect, useCallback, ChangeEvent, FormEvent, useRef } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
 // Define TypeScript interfaces for better type-checking
@@ -21,7 +21,7 @@ interface CreateTransactionWidgetProps {
   onSuccess?: () => void;
 }
 
-// A simplified and robust conflict modal
+// This is the conflict modal, it is fully included here.
 function CoinTossModal({ goal, onAbandon, onAcknowledge }: { goal: IGoal; onAbandon: () => void; onAcknowledge: () => void; }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -46,6 +46,9 @@ function CoinTossModal({ goal, onAbandon, onAcknowledge }: { goal: IGoal; onAban
 
 export default function CreateTransactionWidget({ onSuccess }: CreateTransactionWidgetProps) {
   const { token } = useContext(AppContext);
+  
+  // Create a ref to hold a reference to the form element
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [formData, setFormData] = useState<ITransactionForm>({ 
     description: "", 
@@ -115,7 +118,9 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
       
       setFormData({ description: "", amount: "", type: "expense" });
       setAttachment(null);
-      if (e) e.currentTarget.reset();
+      
+      // Use the ref to safely reset the form
+      formRef.current?.reset();
 
       if (onSuccess) {
         onSuccess();
@@ -162,7 +167,7 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
       )}
 
       <div className="w-full">
-        <form onSubmit={handleCreateTransaction} className="space-y-6">
+        <form ref={formRef} onSubmit={handleCreateTransaction} className="space-y-6">
           <div className="flex justify-center gap-8 text-gray-700">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="type" value="expense" checked={formData.type === "expense"} onChange={handleInputChange} className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"/>
