@@ -1,21 +1,36 @@
-import { useContext, useState } from "react";
+import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 
-export default function CreateFamilyWidget({ onSuccess }) {
-  const { token } = useContext(AppContext);
-  const [familyName, setFamilyName] = useState("");
-  const [errors, setErrors] = useState({});
-  const [generalError, setGeneralError] = useState(null);
+// Define TypeScript interfaces for props and API errors
+interface CreateFamilyWidgetProps {
+  onSuccess?: () => void;
+}
 
-  async function handleCreateFamily(e) {
+interface IApiError {
+  [key: string]: string[];
+}
+
+export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProps) {
+  const { token } = useContext(AppContext);
+  const [familyName, setFamilyName] = useState<string>("");
+  const [errors, setErrors] = useState<IApiError>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const handleCreateFamily = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrors({});
     setGeneralError(null);
+    setLoading(true);
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
         method: "post",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify({ first_name: familyName }),
       });
 
@@ -29,7 +44,6 @@ export default function CreateFamilyWidget({ onSuccess }) {
         return;
       }
 
-      // On success, reset the form and call the callback
       setFamilyName("");
       if (onSuccess) {
         onSuccess();
@@ -37,8 +51,10 @@ export default function CreateFamilyWidget({ onSuccess }) {
     } catch (error) {
       console.error('Failed to create family:', error);
       setGeneralError('A network error occurred. Please check your connection.');
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="w-full">
@@ -48,13 +64,16 @@ export default function CreateFamilyWidget({ onSuccess }) {
             type="text"
             placeholder="Family Name (e.g., Smith Household)"
             value={familyName}
-            onChange={(e) => setFamilyName(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setFamilyName(e.target.value)}
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            disabled={loading}
           />
           {errors.first_name && <p className="error">{errors.first_name[0]}</p>}
         </div>
         {generalError && <p className="error">{generalError}</p>}
-        <button type="submit" className="primary-btn w-full">Create Family</button>
+        <button type="submit" className="primary-btn w-full" disabled={loading}>
+          {loading ? 'Creating...' : 'Create Family'}
+        </button>
       </form>
     </div>
   );
