@@ -1,6 +1,6 @@
 # Fiambond: Tracking Family and Personal Finances.
 
-Fiambond is a full stack financial tracking application to help people and families to manage their income, spending and financial goals. Fiambond is an application built on an API that uses Laravel and a React frontend enabling you to experience a clear and transparent, **fully responsive, app interface, whether on a phone, tablet, or computer**, to keep track of your financial well-being.
+Fiambond is a full stack financial tracking application to help people and families to manage their income, spending and financial goals. Fiambond is an application built on an API that uses Laravel and a React frontend enabling you to experience a clear and transparent, **fully responsive, app interface, whether on a phone, tablet, or computer**, to keep track of your financial well-being. No more render
 
 ### Live Application Link
 
