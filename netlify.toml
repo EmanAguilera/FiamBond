@@ -7,7 +7,7 @@
   
   [build.environment]
     NODE_VERSION = "20"
-    VITE_API_URL = "https://fiambond-api.onrender.com"
+    VITE_API_URL = "fiambondapi-8l199j54.b4a.run"
 
 [[redirects]]
   from = "/*"
