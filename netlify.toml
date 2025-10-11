@@ -7,7 +7,7 @@
   
   [build.environment]
     NODE_VERSION = "20"
-    VITE_API_URL = "fiambondapi-0ayoqtqb.b4a.run"
+    VITE_API_URL = "fiambondapi-07kpwxjf.b4a.run"
 
 [[redirects]]
   from = "/*"
