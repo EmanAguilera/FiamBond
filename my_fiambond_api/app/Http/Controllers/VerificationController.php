@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User; // <-- Make sure User is imported
-use Illuminate\Http\Request; // <-- We will use the generic Request
+use Illuminate\Http\Request; // <-- We will use the generic Requests
 use Illuminate\Http\RedirectResponse;
 
 class VerificationController extends Controller
