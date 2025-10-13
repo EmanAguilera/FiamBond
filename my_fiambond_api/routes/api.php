@@ -22,7 +22,7 @@ Route::post('/verify-2fa', [AuthController::class, 'verifyTwoFactor']);
 // The route the user is redirected to from the verification email.
 // The 'signed' middleware protects the URL from being tampered with.
 Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])
-    ->middleware(['auth:sanctum', 'signed'])
+    ->middleware(['signed']) 
     ->name('verification.verify');
 
 // The route for a user to request a new verification email.
@@ -34,7 +34,7 @@ Route::post('/email/resend', [VerificationController::class, 'resend'])
 
 
 // --- Routes that require user authentication ---
-Route::group(['middleware' => ['auth:sanctum']], function () {
+Route::group(['middleware' => ['auth:sanctum', 'verified']], function () {
     Route::get('/user', function (Request $request) {
         // --- MODIFIED: Ensure only verified users can access their data ---
         if (!$request->user()->hasVerifiedEmail()) {
