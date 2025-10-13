@@ -25,7 +25,7 @@ class VerificationController extends Controller
         // --- IMPORTANT ---
         // Redirect the user to a frontend page that shows a "Verification Successful" message.
         // You can add query parameters if your frontend needs them.
-        return redirect(env('FRONTEND_URL', 'http://localhost:3000') . '/login?verified=true');
+        return redirect(env('FRONTEND_URL', 'http://localhost:3000') . '/login?verified=1');
     }
 
     /**
