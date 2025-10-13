@@ -5,19 +5,19 @@ namespace App\Http\Controllers;
 // Import necessary classes
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
-use App\Mail\TwoFactorCodeMail; // The mailable for sending the OTP
-use Carbon\Carbon; // Used for setting the OTP expiry time
+use App\Mail\TwoFactorCodeMail;
+use Carbon\Carbon;
+// --- ADDED: Import the Registered event ---
+use Illuminate\Auth\Events\Registered;
 
 class AuthController extends Controller
 {
     /**
      * Handle a registration request.
-     * Creates a new user and returns a success message.
      */
     public function register(Request $request)
     {
@@ -30,26 +30,27 @@ class AuthController extends Controller
         ]);
 
         // Create the new user in the database
-        User::create([
+        $user = User::create([
             'first_name' => $fields['first_name'],
             'last_name' => $fields['last_name'],
             'email' => $fields['email'],
             'password' => Hash::make($fields['password']),
         ]);
 
-        // --- CHANGE START ---
-        // OLD: The controller created a token and returned it, logging the user in.
-        // NEW: Return a success message instead, prompting the user to proceed to login.
+        // --- CHANGED ---
+        // Fire the Registered event. Laravel's event listener will automatically
+        // send the verification email because your User model implements MustVerifyEmail.
+        event(new Registered($user));
+        // --- END OF CHANGE ---
 
+        // Return a response prompting the user to check their email
         return response([
-            'message' => 'Registration successful. Please log in.'
-        ], 201); // 201 Created status
-        // --- CHANGE END ---
+            'message' => 'Registration successful. Please check your email for a verification link.'
+        ], 201);
     }
 
     /**
      * Handle the first step of a login request.
-     * Verifies credentials, generates a 2FA code, and sends it via email.
      */
     public function login(Request $request)
     {
@@ -64,27 +65,30 @@ class AuthController extends Controller
 
         // Check if a user was found and if the provided password is correct
         if (!$user || !Hash::check($fields['password'], $user->password)) {
-            // If not, throw a validation exception with an error message
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials do not match our records.'],
             ]);
         }
 
-        // Generate a random 6-digit One-Time Password (OTP)
-        $otp = random_int(100000, 999999);
+        // --- ADDED: Check if the user's email is verified ---
+        if (!$user->hasVerifiedEmail()) {
+            return response([
+                'message' => 'Your email address is not verified. Please check your inbox.'
+            ], 403); // 403 Forbidden status is appropriate here
+        }
+        // --- END OF ADDED CHECK ---
 
-        // Store the OTP and set an expiry time (e.g., 10 minutes from now)
+        // Generate and send the 2FA code (this part remains the same)
+        $otp = random_int(100000, 999999);
         $user->otp_code = $otp;
         $user->otp_expires_at = Carbon::now()->addMinutes(10);
         $user->save();
 
-        // Send the OTP to the user's email address
         Mail::to($user->email)->send(new TwoFactorCodeMail((string)$otp));
 
-        // Return a response indicating that 2FA is required
         return response([
             'message' => 'A 2FA code has been sent to your email.',
-            'user_id' => $user->id // Send user_id for the frontend to use in the next step
+            'user_id' => $user->id
         ]);
     }
 
@@ -99,26 +103,26 @@ class AuthController extends Controller
             'otp_code' => 'required|string',
         ]);
 
-        // Find the user
         $user = User::find($fields['user_id']);
 
-        // Check if the submitted code is incorrect or if the code has expired
-        if ($user->otp_code !== $fields['otp_code'] || Carbon::now()->gt($user->otp_expires_at)) {
-            // If the code is invalid, return an error response
-            return response([
-                'message' => 'The provided code is invalid or has expired.'
-            ], 422); // 422 Unprocessable Entity status
+        // This check implicitly relies on the login step having already found the user
+        if (!$user) {
+             return response(['message' => 'User not found.'], 404);
         }
 
-        // The code is valid, so clear the OTP fields in the database
-        $user->otp_code = null;
-        $user->otp_expires_at = null;
-        $user->save();
+        if ($user->otp_code !== $fields['otp_code'] || Carbon::now()->gt($user->otp_expires_at)) {
+            return response(['message' => 'The provided code is invalid or has expired.'], 422);
+        }
 
-        // Create the final authentication token
+        // Clear the OTP fields
+        $user->forceFill([
+            'otp_code' => null,
+            'otp_expires_at' => null,
+        ])->save();
+
+        // Create the authentication token
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        // Return the authenticated user data and the token
         return response([
             'user' => $user,
             'token' => $token
@@ -127,14 +131,11 @@ class AuthController extends Controller
 
     /**
      * Handle a logout request.
-     * Deletes the user's current access token.
      */
     public function logout(Request $request)
     {
-        // Revoke the token that was used to authenticate the current request
         $request->user()->currentAccessToken()->delete();
 
-        // Return a success message
         return response([
             'message' => 'You have been successfully logged out.'
         ]);
