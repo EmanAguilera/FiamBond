@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+// --- CHANGE: Import the MustVerifyEmail contract ---
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -10,7 +12,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+// --- CHANGE: Implement the MustVerifyEmail contract in the class definition ---
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -84,8 +87,6 @@ class User extends Authenticatable
     {
         return $this->hasMany(Family::class, 'owner_id');
     }
-
- 
 
     /**
      * The transactions created by the user.
