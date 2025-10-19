@@ -6,6 +6,8 @@ import Register from "./Pages/Auth/Register";
 import Settings from "./Pages/Settings.jsx"; // Import the new Settings component
 import PrivateRoutes from "./Utils/PrivateRoutes.jsx"; // Import a guard for authenticated routes
 
+import FirebaseTutorialPage from "./Pages/FirebaseTutorialPage.jsx";
+
 export default function App() {
   return (
     <Routes>
@@ -14,6 +16,8 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+
+        <Route path="/tutorial" element={<FirebaseTutorialPage />} />
         {/* Protected Routes */}
           <Route element={<PrivateRoutes />}>
           <Route path="/settings" element={<Settings />} /> {/* Add the new settings route here */}
