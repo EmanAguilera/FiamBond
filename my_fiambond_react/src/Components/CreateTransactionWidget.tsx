@@ -1,19 +1,19 @@
-import { useContext, useState, useEffect, useCallback, ChangeEvent, FormEvent, useRef } from "react";
-import { AppContext } from "../Context/AppContext.jsx";
+// Components/CreateTransactionWidget.tsx
 
-// Define TypeScript interfaces for better type-checking
+import { useContext, useState, ChangeEvent, FormEvent, useRef } from "react";
+import { AppContext } from "../Context/AppContext.jsx";
+import { db } from "../config/firebase-config"; // No storage import needed
+import { collection, addDoc, doc, deleteDoc, serverTimestamp } from "firebase/firestore";
+
+// --- TypeScript Interfaces ---
 interface ITransactionForm {
   description: string;
   amount: string;
   type: "expense" | "income";
 }
 
-interface IApiError {
-  [key: string]: string[];
-}
-
 interface IGoal {
-  id: number;
+  id: string; // Firestore IDs are strings
   name: string;
 }
 
@@ -21,7 +21,7 @@ interface CreateTransactionWidgetProps {
   onSuccess?: () => void;
 }
 
-// This is the conflict modal, it is fully included here.
+// --- CoinTossModal Component (Remains unchanged) ---
 function CoinTossModal({ goal, onAbandon, onAcknowledge }: { goal: IGoal; onAbandon: () => void; onAcknowledge: () => void; }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -44,93 +44,61 @@ function CoinTossModal({ goal, onAbandon, onAcknowledge }: { goal: IGoal; onAban
   );
 }
 
+
 export default function CreateTransactionWidget({ onSuccess }: CreateTransactionWidgetProps) {
-  const { token } = useContext(AppContext);
-  
-  // Create a ref to hold a reference to the form element
+  const { user } = useContext(AppContext);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [formData, setFormData] = useState<ITransactionForm>({ 
-    description: "", 
-    amount: "", 
-    type: "expense" 
-  });
-  
-  const [attachment, setAttachment] = useState<File | null>(null);
-  const [errors, setErrors] = useState<IApiError>({});
+  const [formData, setFormData] = useState<ITransactionForm>({ description: "", amount: "", type: "expense" });
+  // The 'attachment' state is no longer needed
   const [formError, setFormError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<IGoal | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value as any }));
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setAttachment(e.target.files[0]);
-    } else {
-      setAttachment(null);
-    }
-  };
+  // The 'handleFileChange' function is no longer needed
 
-  const handleCreateTransaction = async (e?: FormEvent<HTMLFormElement>, force = false) => {
+  const handleCreateTransaction = async (e?: FormEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
-    setErrors({});
+    if (!user) {
+        setFormError("You must be logged in.");
+        return;
+    }
+
     setFormError(null);
     setLoading(true);
 
-    const payload = new FormData();
-    payload.append('description', formData.description);
-    payload.append('amount', formData.amount);
-    payload.append('type', formData.type);
-    
-    if (force) {
-      payload.append('force_creation', 'true');
-    }
-    if (attachment) {
-      payload.append('attachment', attachment);
-    }
-
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
-        method: "post",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        body: payload,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 409) {
-          setConflict(data.goal);
-        } else if (res.status === 422) {
-          setErrors(data.errors);
-        } else {
-          setFormError(data.message || "An unexpected error occurred.");
-        }
-        return;
-      }
+      // The file upload step is completely removed.
       
+      // Prepare the data and save it to Firestore.
+      const transactionData = {
+        user_id: user.uid,
+        family_id: null,
+        description: formData.description,
+        amount: Number(formData.amount),
+        type: formData.type,
+        attachment_url: null, // Always null as we are ignoring storage
+        created_at: serverTimestamp(),
+      };
+
+      await addDoc(collection(db, "transactions"), transactionData);
+      
+      // Reset the form and call the success handler
       setFormData({ description: "", amount: "", type: "expense" });
-      setAttachment(null);
-      
-      // Use the ref to safely reset the form
       formRef.current?.reset();
-
-      if (onSuccess) {
-        onSuccess();
-      }
+      if (onSuccess) onSuccess();
 
     } catch (err) {
       console.error('Failed to create transaction:', err);
       setFormError('A network error occurred. Please check your connection.');
     } finally {
       setLoading(false);
+      setConflict(null);
     }
   };
 
@@ -138,22 +106,17 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
     if (!conflict) return;
     setLoading(true);
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/goals/${conflict.id}`, {
-        method: 'delete',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      await handleCreateTransaction(undefined, true); 
+      await deleteDoc(doc(db, "goals", conflict.id));
+      await handleCreateTransaction();
     } catch (err) {
       console.error(err);
       setFormError("Could not abandon the goal. Please try again.");
-    } finally {
-        setConflict(null);
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   const handleAcknowledge = () => {
-    handleCreateTransaction(undefined, true);
+    handleCreateTransaction();
   };
 
   return (
@@ -186,8 +149,8 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
               value={formData.description}
               onChange={handleInputChange}
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required
             />
-            {errors.description && <p className="error">{errors.description[0]}</p>}
           </div>
           <div>
             <input
@@ -198,25 +161,11 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
               value={formData.amount}
               onChange={handleInputChange}
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required
             />
-            {errors.amount && <p className="error">{errors.amount[0]}</p>}
           </div>
 
-          <div>
-            <label htmlFor="attachment" className="block text-sm font-medium text-gray-700 mb-1">Attach Receipt (Optional)</label>
-            <input
-              id="attachment"
-              type="file"
-              onChange={handleFileChange}
-              className="w-full text-sm text-slate-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-full file:border-0
-                file:text-sm file:font-semibold
-                file:bg-indigo-50 file:text-indigo-700
-                hover:file:bg-indigo-100"
-            />
-            {errors.attachment && <p className="error">{errors.attachment[0]}</p>}
-          </div>
+          {/* The entire file input section has been removed */}
 
           {formError && <p className="error">{formError}</p>}
           <button type="submit" className="primary-btn w-full" disabled={loading}>

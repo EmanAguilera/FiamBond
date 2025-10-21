@@ -1,8 +1,11 @@
-import { useContext, useState, FormEvent, ChangeEvent } from "react";
-import { useNavigate, NavLink } from "react-router-dom";
-import { AppContext } from "../../Context/AppContext.jsx";
+// Pages/Register.tsx
 
-// TS FIX: Define the shape of the form data
+import { useState, FormEvent, ChangeEvent } from "react";
+import { useNavigate, NavLink } from "react-router-dom";
+import { auth } from "../../config/firebase-config"; // Adjust path
+import { createUserWithEmailAndPassword } from "firebase/auth";
+
+// --- Type definitions remain the same ---
 interface RegisterFormData {
   first_name: string;
   last_name: string;
@@ -11,23 +14,13 @@ interface RegisterFormData {
   password_confirmation: string;
 }
 
-// TS FIX: Define the shape of the validation errors object
 interface ErrorState {
   [key: string]: string[];
 }
 
-// NOTE: The context type is simplified as handleLogin is no longer used here.
-// You might have a broader context type in your actual application.
-interface AppContextType {
-  handleLogin: (user: any, token: string) => void;
-}
-
 export default function Register() {
-  // NOTE: handleLogin is kept for type consistency, but is no longer called in this component.
-  const { handleLogin } = useContext(AppContext) as AppContextType;
   const navigate = useNavigate();
 
-  // TS FIX: Provide types to the useState hooks
   const [formData, setFormData] = useState<RegisterFormData>({
     first_name: "",
     last_name: "",
@@ -39,117 +32,66 @@ export default function Register() {
   const [errors, setErrors] = useState<ErrorState>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
 
-  // TS FIX: Add the event type for the form submission
   async function handleRegisterSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setErrors({});
     setGeneralError(null);
 
+    if (formData.password !== formData.password_confirmation) {
+      setGeneralError("Passwords do not match.");
+      return;
+    }
+
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
-        method: "post",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-      
-      const data = await res.json();
-
-      // --- CHANGE START ---
-      // If the response is not OK (e.g., status 422, 500), handle errors.
-      if (!res.ok) {
-        if (res.status === 422) {
-          setErrors(data.errors);
-        } else {
-          const message = data.message || 'Registration failed. Please try again later.';
-          setGeneralError(message);
-        }
-        return; // Stop execution
+      await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      // On successful registration, Firebase automatically signs the user in.
+      // The onAuthStateChanged listener in AppContext will handle the user state.
+      navigate("/"); // Navigate to the main page after registration
+    } catch (error: any) {
+      // Handle Firebase-specific errors
+      if (error.code === 'auth/email-already-in-use') {
+        setGeneralError('This email is already registered.');
+      } else if (error.code === 'auth/weak-password') {
+        setGeneralError('Password should be at least 6 characters.');
+      } else {
+        setGeneralError('Failed to register. Please try again.');
+        console.error('Registration error:', error);
       }
-
-      // If the response is OK (status 201), registration was successful.
-      // Instead of logging in, navigate to the login page.
-      navigate("/login");
-      // --- CHANGE END ---
-
-    } catch (error) {
-      console.error('Registration network error:', error);
-      setGeneralError('A network error occurred. Please check your connection and try again.');
     }
   }
 
-  // TS FIX: A helper function to handle input changes with proper event typing
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
   };
 
+  // The rest of your JSX remains the same
   return (
-    <main className="login-wrapper">
+      <main className="login-wrapper">
       <div className="login-card">
         <h1 className="title">Create a new account</h1>
         <form onSubmit={handleRegisterSubmit} className="space-y-6">
+          {/* Your form inputs for first_name, last_name, email, password, etc. */}
+          {/* Make sure they call handleInputChange */}
 
           <div className="form-group">
             <label htmlFor="first_name">First Name</label>
-            <input
-              id="first_name"
-              type="text"
-              placeholder="John"
-              value={formData.first_name}
-              onChange={handleInputChange}
-            />
-            {errors.first_name && <p className="error">{errors.first_name[0]}</p>}
+            <input id="first_name" type="text" placeholder="John" value={formData.first_name} onChange={handleInputChange}/>
           </div>
-
           <div className="form-group">
             <label htmlFor="last_name">Last Name</label>
-            <input
-              id="last_name"
-              type="text"
-              placeholder="Doe"
-              value={formData.last_name}
-              onChange={handleInputChange}
-            />
-            {errors.last_name && <p className="error">{errors.last_name[0]}</p>}
+            <input id="last_name" type="text" placeholder="Doe" value={formData.last_name} onChange={handleInputChange}/>
           </div>
-
           <div className="form-group">
             <label htmlFor="email">Email address</label>
-            <input
-              id="email"
-              type="email"
-              placeholder="john.doe@example.com"
-              value={formData.email}
-              onChange={handleInputChange}
-            />
-            {errors.email && <p className="error">{errors.email[0]}</p>}
+            <input id="email" type="email" placeholder="john.doe@example.com" value={formData.email} onChange={handleInputChange}/>
           </div>
-
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={formData.password}
-              onChange={handleInputChange}
-            />
-            {errors.password && <p className="error">{errors.password[0]}</p>}
+            <input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={handleInputChange}/>
           </div>
-
           <div className="form-group">
             <label htmlFor="password_confirmation">Confirm Password</label>
-            <input
-              id="password_confirmation"
-              type="password"
-              placeholder="••••••••"
-              value={formData.password_confirmation}
-              onChange={handleInputChange}
-            />
-            {errors.password_confirmation && <p className="error">{errors.password_confirmation[0]}</p>}
+            <input id="password_confirmation" type="password" placeholder="••••••••" value={formData.password_confirmation} onChange={handleInputChange}/>
           </div>
 
           {generalError && <p className="error">{generalError}</p>}

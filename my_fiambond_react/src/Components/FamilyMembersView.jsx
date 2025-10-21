@@ -1,7 +1,21 @@
-import { useState, useCallback, useContext, useEffect, memo } from 'react';
-import { AppContext } from '../Context/AppContext';
+// Components/FamilyMembersView.jsx
 
-// --- SKELETON LOADER COMPONENT ---
+import { useState, useCallback, useEffect, memo } from 'react'; // useContext is no longer needed
+// AppContext import is no longer needed
+import { db } from '../config/firebase-config';
+import { 
+    doc, 
+    getDoc, 
+    collection, 
+    query, 
+    where, 
+    getDocs, 
+    updateDoc, 
+    arrayUnion, 
+    documentId 
+} from 'firebase/firestore';
+
+// --- FULL SKELETON LOADER COMPONENT ---
 const FamilyMembersSkeleton = () => (
     <div className="animate-pulse space-y-8">
         {/* Skeleton for Add Member section */}
@@ -27,15 +41,15 @@ const FamilyMembersSkeleton = () => (
 );
 
 
-function FamilyMembersView({ family, onFamilyUpdate }) { // Removed onBack from props
-    const { token } = useContext(AppContext);
+function FamilyMembersView({ family, onFamilyUpdate }) {
+    // THE FIX IS HERE: The entire useContext line has been removed as it's not used.
     
-    const [detailedFamily, setDetailedFamily] = useState(null);
+    const [members, setMembers] = useState([]);
+    const [familyDetails, setFamilyDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const [newMemberEmail, setNewMemberEmail] = useState("");
-    const [formErrors, setFormErrors] = useState({});
     const [formMessage, setFormMessage] = useState({ type: '', text: '' });
     const MAX_MEMBERS_PER_FAMILY = 10;
 
@@ -43,18 +57,34 @@ function FamilyMembersView({ family, onFamilyUpdate }) { // Removed onBack from 
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (!res.ok) throw new Error("Could not load family details.");
-            const data = await res.json();
-            setDetailedFamily(data);
+            const familyDocRef = doc(db, "families", family.id);
+            const familyDocSnap = await getDoc(familyDocRef);
+            if (!familyDocSnap.exists()) throw new Error("Could not load family details.");
+            
+            const familyData = familyDocSnap.data();
+            setFamilyDetails({ id: familyDocSnap.id, ...familyData });
+            
+            const memberIds = familyData.member_ids || [];
+            if (memberIds.length === 0) {
+                setMembers([]);
+                setLoading(false);
+                return;
+            }
+
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where(documentId(), "in", memberIds));
+            const usersSnapshot = await getDocs(q);
+            const fetchedMembers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            setMembers(fetchedMembers);
+
         } catch (err) {
+            console.error("Error fetching family details: ", err);
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    }, [token, family.id]);
+    }, [family.id]);
 
     useEffect(() => {
         getFamilyDetails();
@@ -63,29 +93,45 @@ function FamilyMembersView({ family, onFamilyUpdate }) { // Removed onBack from 
     async function handleAddMember(e) {
         e.preventDefault();
         setFormMessage({ type: '', text: '' });
-        setFormErrors({});
+
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/members`, {
-                method: "post",
-                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
-                body: JSON.stringify({ email: newMemberEmail }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                if (res.status === 422) {
-                    setFormErrors(data.errors);
-                } else {
-                    setFormMessage({ type: 'error', text: data.message || "Failed to add member." });
-                }
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where("email", "==", newMemberEmail));
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                setFormMessage({ type: 'error', text: "No user found with that email address." });
                 return;
             }
-            getFamilyDetails(); 
-            onFamilyUpdate(data);
+
+            const newMemberDoc = querySnapshot.docs[0];
+            const newMemberId = newMemberDoc.id;
+
+            if (familyDetails.member_ids.includes(newMemberId)) {
+                setFormMessage({ type: 'error', text: "This user is already a member of the family." });
+                return;
+            }
+
+            const familyDocRef = doc(db, "families", family.id);
+            await updateDoc(familyDocRef, {
+                member_ids: arrayUnion(newMemberId)
+            });
+            
             setNewMemberEmail("");
             setFormMessage({ type: 'success', text: "Member added successfully!" });
+            getFamilyDetails(); 
+            
+            if (onFamilyUpdate) {
+                onFamilyUpdate({ ...familyDetails, member_ids: [...familyDetails.member_ids, newMemberId] });
+            }
+
         } catch (err) {
             console.error("Failed to add member:", err);
-            setFormMessage({ type: 'error', text: 'A network error occurred.' });
+            if (err.code === 'failed-precondition') {
+                 setFormMessage({ type: 'error', text: "Query requires an index on 'email' in the 'users' collection." });
+            } else {
+                setFormMessage({ type: 'error', text: 'A network error occurred.' });
+            }
         }
     }
     
@@ -97,20 +143,15 @@ function FamilyMembersView({ family, onFamilyUpdate }) { // Removed onBack from 
         return <p className="error text-center py-4">{error}</p>;
     }
 
-    const members = detailedFamily?.members || [];
-
     return (
         <div className="space-y-8">
-            {/* The "Back to Families List" button has been removed from here */}
-
             {members.length < MAX_MEMBERS_PER_FAMILY ? (
                 <div>
                     <h2 className="font-bold text-xl mb-4 text-gray-800 break-words">
-                        Add Member to "{detailedFamily.first_name}"
+                        Add Member to "{familyDetails.family_name}"
                     </h2>
                     <form onSubmit={handleAddMember} className="space-y-4">
-                        <input type="email" placeholder="New Member's Email" value={newMemberEmail} onChange={(e) => setNewMemberEmail(e.target.value)} className="w-full p-2 border rounded-md" />
-                        {formErrors.email && <p className="error">{formErrors.email[0]}</p>}
+                        <input type="email" placeholder="New Member's Email" value={newMemberEmail} onChange={(e) => setNewMemberEmail(e.target.value)} className="w-full p-2 border rounded-md" required />
                         {formMessage.text && <p className={`mt-2 text-sm ${formMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{formMessage.text}</p>}
                         <button type="submit" className="primary-btn">Add Member</button>
                     </form>

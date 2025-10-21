@@ -1,48 +1,46 @@
+// Components/CreateFamilyWidget.tsx
+
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
+import { db } from "../config/firebase-config"; // Adjust path if necessary
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-// Define TypeScript interfaces for props and API errors
+// FIX #1: Define an interface for the component's props
 interface CreateFamilyWidgetProps {
-  onSuccess?: () => void;
-}
-
-interface IApiError {
-  [key: string]: string[];
+  onSuccess?: () => void; // 'onSuccess' is an optional function that returns nothing
 }
 
 export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProps) {
-  const { token } = useContext(AppContext);
+  const { user } = useContext(AppContext);
   const [familyName, setFamilyName] = useState<string>("");
-  const [errors, setErrors] = useState<IApiError>({});
+  
+  // FIX #3: Specify that the state can be a string OR null
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
+  // FIX #2: Add the correct event type for a form submission
   const handleCreateFamily = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrors({});
+    
+    if (!user) {
+      // This is now valid because generalError can be a string
+      setGeneralError("You must be logged in to perform this action.");
+      return;
+    }
+
     setGeneralError(null);
     setLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families`, {
-        method: "post",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ first_name: familyName }),
-      });
+      const familyData = {
+        family_name: familyName,
+        owner_id: user.uid,
+        member_ids: [user.uid],
+        created_at: serverTimestamp(),
+      };
 
-      if (!res.ok) {
-        const data = await res.json();
-        if (res.status === 422) {
-          setErrors(data.errors);
-        } else {
-          setGeneralError(data.message || "Failed to create the family.");
-        }
-        return;
-      }
+      const familiesCollectionRef = collection(db, "families");
+      await addDoc(familiesCollectionRef, familyData);
 
       setFamilyName("");
       if (onSuccess) {
@@ -50,10 +48,16 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
       }
     } catch (error) {
       console.error('Failed to create family:', error);
+      // This is also now valid
       setGeneralError('A network error occurred. Please check your connection.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Add the correct event type for an input change
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setFamilyName(e.target.value);
   };
 
   return (
@@ -64,11 +68,11 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
             type="text"
             placeholder="Family Name (e.g., Smith Household)"
             value={familyName}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setFamilyName(e.target.value)}
+            onChange={handleInputChange} // Use the new typed handler
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             disabled={loading}
+            required
           />
-          {errors.first_name && <p className="error">{errors.first_name[0]}</p>}
         </div>
         {generalError && <p className="error">{generalError}</p>}
         <button type="submit" className="primary-btn w-full" disabled={loading}>
