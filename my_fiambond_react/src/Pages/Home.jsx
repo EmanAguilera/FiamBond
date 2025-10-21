@@ -1,8 +1,10 @@
 import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
+import { db } from "../config/firebase-config"; // Ensure this path is correct
+import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy } from "firebase/firestore";
 
-// --- WIDGET IMPORTS (Code Splitting with React.lazy) ---
+// --- WIDGET IMPORTS ---
 const Modal = lazy(() => import("../Components/Modal"));
 const GoalListsWidget = lazy(() => import("../Components/GoalListsWidget"));
 const CreateGoalWidget = lazy(() => import("../Components/CreateGoalWidget"));
@@ -14,7 +16,6 @@ const FamilyRealm = lazy(() => import('../Components/FamilyRealm'));
 const PersonalReportChartWidget = lazy(() => import('../Components/PersonalReportChartWidget.jsx'));
 
 // --- SKELETON COMPONENT ---
-// This placeholder UI is shown during the initial full-page data load.
 const DashboardSkeleton = () => (
   <div className="p-4 md:p-10 animate-pulse">
     <header className="dashboard-header mb-8">
@@ -42,9 +43,38 @@ const DashboardSkeleton = () => (
   </div>
 );
 
+// --- Helper function to format transaction data for charts ---
+const formatDataForChart = (transactions) => {
+    if (!transactions || transactions.length === 0) {
+        return { labels: [], datasets: [] };
+    }
+    const data = {};
+    transactions.forEach(tx => {
+        if (tx.created_at && typeof tx.created_at.toDate === 'function') {
+            const date = tx.created_at.toDate().toLocaleDateString();
+            if (!data[date]) {
+                data[date] = { income: 0, expense: 0 };
+            }
+            if (tx.type === 'income') {
+                data[date].income += tx.amount;
+            } else {
+                data[date].expense += tx.amount;
+            }
+        }
+    });
+    const labels = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
+    return {
+        labels,
+        datasets: [
+            { label: 'Inflow (₱)', data: labels.map(label => data[label].income), backgroundColor: 'rgba(75, 192, 192, 0.5)' },
+            { label: 'Outflow (₱)', data: labels.map(label => data[label].expense), backgroundColor: 'rgba(255, 99, 132, 0.5)' }
+        ]
+    };
+};
+
 
 export default function Home() {
-  const { user, token } = useContext(AppContext);
+  const { user } = useContext(AppContext);
 
   // --- STATE FOR MODAL VISIBILITY ---
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
@@ -70,60 +100,81 @@ export default function Home() {
 
   // --- DATA FETCHING FUNCTIONS ---
   const getSummaryData = useCallback(async () => {
-    if (!token) return;
+    if (!user) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/balance`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const q = query(collection(db, "transactions"), where("user_id", "==", user.uid), where("family_id", "==", null));
+      const querySnapshot = await getDocs(q);
+      let balance = 0;
+      querySnapshot.forEach((doc) => {
+        const transaction = doc.data();
+        if (transaction.type === 'income') balance += transaction.amount;
+        else balance -= transaction.amount;
       });
-      if (!res.ok) throw new Error("Could not load summary data.");
-      const data = await res.json();
-      setSummaryData({ netPosition: data.balance });
+      setSummaryData({ netPosition: balance });
     } catch (err) {
       console.error("Failed to fetch summary data:", err);
-      setSummaryError("Network error. Please check your connection.");
+      setSummaryError("Could not load summary data.");
     }
-  }, [token]);
+  }, [user]);
   
   const getActiveTotalGoalsCount = useCallback(async () => {
-    if (!token) return;
+    if (!user) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals/active-total-count`, {
-          headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setActiveGoalsCount(data.count || 0);
-      }
+      const q = query(collection(db, "goals"), where("user_id", "==", user.uid), where("family_id", "==", null), where("status", "==", "active"));
+      const snapshot = await getCountFromServer(q);
+      setActiveGoalsCount(snapshot.data().count);
     } catch (error) {
-        console.error("Error fetching total active goals count:", error);
+        console.error("Error fetching active goals count:", error);
     }
-  }, [token]);
+  }, [user]);
 
   const getFamilyCount = useCallback(async () => {
-    if (!token) return;
+    if (!user) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/summaries?page=1`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setFamilyCount(data.total || 0);
-      }
+      const q = query(collection(db, "families"), where("member_ids", "array-contains", user.uid));
+      const snapshot = await getCountFromServer(q);
+      setFamilyCount(snapshot.data().count);
     } catch (error) { 
       console.error("Error fetching family count:", error); 
     }
-  }, [token]);
+  }, [user]);
 
   const getReport = useCallback(async () => {
-    if (!token) return;
+    if (!user) return;
     setReportLoading(true);
     setReportError(null);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reports?period=${period}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Could not process the financial report.");
-      setReport(await res.json());
+        const now = new Date();
+        let startDate;
+        if (period === 'weekly') startDate = new Date(now.setDate(now.getDate() - 7));
+        else if (period === 'yearly') startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+        else startDate = new Date(now.setMonth(now.getMonth() - 1));
+
+        const q = query(
+            collection(db, "transactions"),
+            where("user_id", "==", user.uid),
+            where("family_id", "==", null),
+            where("created_at", ">=", Timestamp.fromDate(startDate)),
+            orderBy("created_at", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        const transactions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+
+        let totalInflow = 0;
+        let totalOutflow = 0;
+        transactions.forEach(tx => {
+            if (tx.type === 'income') totalInflow += tx.amount;
+            else totalOutflow += tx.amount;
+        });
+
+        setReport({
+            chartData: formatDataForChart(transactions),
+            totalInflow,
+            totalOutflow,
+            netPosition: totalInflow - totalOutflow,
+            reportTitle: `Report from ${startDate.toLocaleDateString()}`,
+            transactionCount: transactions.length
+        });
     } catch (err) {
       console.error("Failed to fetch report:", err);
       setReportError("Network error. Please try again.");
@@ -131,11 +182,11 @@ export default function Home() {
     } finally {
       setReportLoading(false);
     }
-  }, [token, period]);
+  }, [user, period]);
 
   // --- EFFECT FOR INITIAL DATA FETCHING ---
   useEffect(() => {
-    if (token) {
+    if (user) {
       const fetchInitialData = async () => {
         setIsInitialLoading(true);
         await Promise.all([
@@ -150,14 +201,14 @@ export default function Home() {
     } else {
       setIsInitialLoading(false);
     }
-  }, [token, getSummaryData, getActiveTotalGoalsCount, getFamilyCount, getReport]);
+  }, [user, getSummaryData, getActiveTotalGoalsCount, getFamilyCount, getReport]);
 
   // --- EFFECT FOR PERIOD CHANGES ONLY ---
   useEffect(() => {
-    if (!isInitialLoading && token) {
+    if (!isInitialLoading && user) {
       getReport();
     }
-  }, [period, isInitialLoading, token, getReport]);
+  }, [period, isInitialLoading, user, getReport]);
 
   // --- SUCCESS HANDLERS ---
   const handleTransactionSuccess = useCallback(() => {
@@ -188,7 +239,6 @@ export default function Home() {
 
   return (
     <>
-      {/* --- MODALS (Lazy Loaded) --- */}
       <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
         {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><PersonalTransactionsWidget /></Modal>}
         {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
@@ -198,14 +248,11 @@ export default function Home() {
         {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
       </Suspense>
 
-      {/* --- MAIN VIEW LOGIC --- */}
       {activeFamilyRealm ? (
-        // RENDER THE FAMILY REALM VIEW
         <Suspense fallback={<DashboardSkeleton />}>
             <FamilyRealm family={activeFamilyRealm} onBack={handleExitFamilyRealm} />
         </Suspense>
       ) : user ? (
-        // RENDER THE PERSONAL DASHBOARD
         isInitialLoading ? <DashboardSkeleton /> : (
           <div className="p-4 md:p-10">
             <header className="dashboard-header">
@@ -259,7 +306,6 @@ export default function Home() {
           </div>
         )
       ) : (
-        // RENDER THE HERO SECTION IF NOT LOGGED IN
         <div className="hero-section">
           <div className="hero-content">
             <div className="hero-text">

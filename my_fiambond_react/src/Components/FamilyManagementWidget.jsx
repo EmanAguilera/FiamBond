@@ -1,19 +1,20 @@
+// Components/FamilyManagementWidget.jsx
+
 import { useState, useCallback, useContext, useEffect } from 'react';
-import { AppContext } from '../Context/AppContext';
+import { AppContext } from '../Context/AppContext.jsx';
+import { db } from '../config/firebase-config'; // Adjust path
+import { collection, query, where, getDocs, orderBy, documentId } from 'firebase/firestore';
 import FamilyListItem from './FamilyListItems.jsx';
 
-// --- SKELETON LOADER COMPONENT ---
-// Updated to reflect the new button layout.
+// --- FULL SKELETON LOADER COMPONENT ---
 const FamilyListSkeleton = () => (
     <div className="animate-pulse">
         <h2 className="h-7 w-1/3 bg-slate-200 rounded mb-4"></h2>
         <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
                 <div key={i} className="p-4 bg-slate-100 border border-slate-200 rounded-md">
-                    {/* Skeleton for FamilyListItem content */}
                     <div className="h-5 w-1/2 bg-slate-200 rounded"></div>
                     <div className="h-4 w-1/4 bg-slate-200 rounded mt-2"></div>
-                    {/* Skeleton for the new action button */}
                     <div className="mt-3 border-t border-slate-200 pt-3">
                         <div className="h-8 w-40 bg-slate-200 rounded"></div>
                     </div>
@@ -23,14 +24,10 @@ const FamilyListSkeleton = () => (
     </div>
 );
 
-// --- MAIN WIDGET ---
-// The component now accepts `onEnterRealm` to handle navigation.
 export default function FamilyManagementWidget({ onEnterRealm }) {
-    const { token } = useContext(AppContext);
+    const { user } = useContext(AppContext);
     
-    // Internal view state is no longer needed, as this component only shows the list.
     const [families, setFamilies] = useState([]);
-    const [pagination, setPagination] = useState(null);
     const [listError, setListError] = useState(null);
     const [loadingList, setLoadingList] = useState(true);
 
@@ -38,56 +35,75 @@ export default function FamilyManagementWidget({ onEnterRealm }) {
         setFamilies(currentFamilies => currentFamilies.map(f => (f.id === updatedFamily.id ? updatedFamily : f)));
     }, []);
 
-    const getFamilies = useCallback(async (page = 1) => {
+    const getFamilies = useCallback(async () => {
+        if (!user) return;
         setLoadingList(true);
         setListError(null);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families?page=${page}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error("Could not load your families.");
-            
-            const data = await res.json();
-            setFamilies(data.data);
-            const { data: _, ...paginationData } = data;
-            setPagination(paginationData);
+            // Step 1: Query the 'families' collection to find all families the user is a member of.
+            const familiesRef = collection(db, "families");
+            const q = query(
+                familiesRef,
+                where("member_ids", "array-contains", user.uid),
+                orderBy("created_at", "desc")
+            );
 
-            // Data Enrichment to fetch full owner details if not present in the list summary.
-            const familiesToEnrich = data.data.filter(f => !f.owner);
-            if (familiesToEnrich.length > 0) {
-                Promise.all(familiesToEnrich.map(family =>
-                    fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}`, { headers: { Authorization: `Bearer ${token}` } })
-                        .then(res => res.ok ? res.json() : null)
-                        .then(detailedFamily => {
-                            if (detailedFamily) {
-                                handleFamilyUpdated(detailedFamily);
-                            }
-                        })
-                        .catch(err => console.error(`Failed to enrich family ${family.id}:`, err))
-                ));
+            const querySnapshot = await getDocs(q);
+            const fetchedFamilies = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            if (fetchedFamilies.length === 0) {
+                setFamilies([]);
+                return;
             }
 
+            // Step 2: Enrich the data with the owner's full name.
+            // Get a unique list of all owner IDs from the fetched families.
+            const ownerIds = [...new Set(fetchedFamilies.map(f => f.owner_id))];
+
+            // Query the 'users' collection to get the profiles for these owners.
+            const usersRef = collection(db, "users");
+            const ownersQuery = query(usersRef, where(documentId(), "in", ownerIds));
+            const ownersSnapshot = await getDocs(ownersQuery);
+
+            // Create a simple map for easy lookup: { 'owner_uid': { full_name: 'John Doe' }, ... }
+            const ownersMap = {};
+            ownersSnapshot.forEach(doc => {
+                ownersMap[doc.id] = doc.data();
+            });
+
+            // Step 3: Merge the owner's data into each family object.
+            const enrichedFamilies = fetchedFamilies.map(family => ({
+                ...family,
+                owner: ownersMap[family.owner_id] || { full_name: 'Unknown Owner' }
+            }));
+
+            setFamilies(enrichedFamilies);
+
         } catch (error) {
-            setListError(error.message);
+            console.error("Failed to fetch families:", error);
+            if (error.code === 'failed-precondition') {
+                setListError("Query requires an index. Please create a composite index in Firestore for the 'families' collection.");
+            } else {
+                setListError("Could not load your families.");
+            }
         } finally {
             setLoadingList(false);
         }
-    }, [token, handleFamilyUpdated]);
+    }, [user]);
 
     useEffect(() => { 
         getFamilies(); 
     }, [getFamilies]);
 
-    // This function is called after a family is deleted from FamilyListItem.
+    // This function is called from FamilyListItem after a family is deleted.
+    // The simplest way to update the list is to just re-fetch it.
     function handleFamilyDeleted() {
-        const currentPage = pagination?.current_page || 1;
-        // If the last item on a page is deleted, fetch the previous page.
-        const pageToFetch = (families.length === 1 && currentPage > 1) ? currentPage - 1 : currentPage;
-        getFamilies(pageToFetch);
+        getFamilies();
     }
     
-    // --- RENDER LOGIC ---
-
     if (loadingList) {
         return <FamilyListSkeleton />;
     }
@@ -108,7 +124,6 @@ export default function FamilyManagementWidget({ onEnterRealm }) {
                                 onFamilyUpdated={handleFamilyUpdated}
                                 onFamilyDeleted={handleFamilyDeleted}
                             />
-                            {/* The action button now calls `onEnterRealm` passed via props */}
                             <div className="flex flex-wrap gap-2 mt-3 border-t border-gray-200 pt-3">
                                 <button onClick={() => onEnterRealm(family)} className="primary-btn-sm">
                                     Enter Family Realm
@@ -116,13 +131,7 @@ export default function FamilyManagementWidget({ onEnterRealm }) {
                             </div>
                         </div>
                     ))}
-                    {pagination && pagination.last_page > 1 && (
-                        <div className="flex justify-between items-center mt-6">
-                            <button onClick={() => getFamilies(pagination.current_page - 1)} disabled={pagination.current_page === 1} className="pagination-btn">&larr; Previous</button>
-                            <span className="pagination-text">Page {pagination.current_page} of {pagination.last_page}</span>
-                            <button onClick={() => getFamilies(pagination.current_page + 1)} disabled={pagination.current_page === pagination.last_page} className="pagination-btn">Next &rarr;</button>
-                        </div>
-                    )}
+                    {/* Pagination is removed in favor of a fetch-all approach, suitable for a smaller number of families per user. */}
                 </div>
             ) : (
                 <p className="text-gray-600 italic text-center py-4">You are not a member of any families yet.</p>

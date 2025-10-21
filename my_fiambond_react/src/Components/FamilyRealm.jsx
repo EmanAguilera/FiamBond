@@ -1,5 +1,7 @@
 import { useState, lazy, Suspense, useContext, useCallback, useEffect, useRef } from 'react';
 import { AppContext } from '../Context/AppContext.jsx';
+import { db } from '../config/firebase-config.js'; // Adjust path
+import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy } from 'firebase/firestore';
 
 // --- LAZY LOADED COMPONENTS ---
 const Modal = lazy(() => import('./Modal.jsx'));
@@ -10,9 +12,9 @@ const CreateLoanWidget = lazy(() => import('./CreateLoanWidget.jsx'));
 const CreateFamilyTransactionWidget = lazy(() => import('./CreateFamilyTransactionWidget.jsx'));
 const CreateFamilyGoalWidget = lazy(() => import('./CreateFamilyGoalWidget.jsx'));
 const FamilyTransactionsWidget = lazy(() => import('./FamilyTransactionsWidget.jsx'));
-const FamilyMembersView = lazy(() => import('./FamilyMembersView.jsx')); // Import FamilyMembersView
+const FamilyMembersView = lazy(() => import('./FamilyMembersView.jsx'));
 
-// --- SKELETON LOADER FOR THE DASHBOARD ---
+// --- FULL SKELETON LOADER COMPONENT ---
 const FamilyRealmSkeleton = () => (
     <div className="p-4 md:p-10 animate-pulse">
         <div className="h-8 w-60 bg-slate-200 rounded-md mb-6"></div>
@@ -20,7 +22,7 @@ const FamilyRealmSkeleton = () => (
             <div className="h-10 w-48 bg-slate-200 rounded"></div>
             <div className="h-10 w-40 bg-slate-200 rounded"></div>
             <div className="h-10 w-40 bg-slate-200 rounded"></div>
-            <div className="h-10 w-44 bg-slate-200 rounded"></div> {/* Added for new button */}
+            <div className="h-10 w-44 bg-slate-200 rounded"></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="h-32 bg-slate-200 rounded-lg"></div>
@@ -31,8 +33,51 @@ const FamilyRealmSkeleton = () => (
     </div>
 );
 
-export default function FamilyRealm({ family, onBack, onFamilyUpdate }) { // Added onFamilyUpdate to props
-    const { token } = useContext(AppContext);
+// --- Helper function from FamilyLedgerView to format chart data ---
+const formatDataForChart = (transactions) => {
+    if (!transactions || transactions.length === 0) {
+        return { labels: [], datasets: [] };
+    }
+
+    const data = {}; // e.g., { '10/21/2025': { income: 100, expense: 50 } }
+
+    transactions.forEach(tx => {
+        // Ensure created_at is a valid object with a toDate method
+        if (tx.created_at && typeof tx.created_at.toDate === 'function') {
+            const date = tx.created_at.toDate().toLocaleDateString();
+            if (!data[date]) {
+                data[date] = { income: 0, expense: 0 };
+            }
+            if (tx.type === 'income') {
+                data[date].income += tx.amount;
+            } else {
+                data[date].expense += tx.amount;
+            }
+        }
+    });
+
+    const labels = Object.keys(data).sort((a,b) => new Date(a) - new Date(b));
+    
+    return {
+        labels,
+        datasets: [
+            {
+                label: 'Inflow (₱)',
+                data: labels.map(label => data[label].income),
+                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+            },
+            {
+                label: 'Outflow (₱)',
+                data: labels.map(label => data[label].expense),
+                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+            },
+        ],
+    };
+};
+
+
+export default function FamilyRealm({ family, onBack, onFamilyUpdate }) {
+    const { user } = useContext(AppContext);
 
     // --- STATE FOR MODALS ---
     const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
@@ -41,100 +86,112 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate }) { // Add
     const [isGoalsListModalOpen, setIsGoalsListModalOpen] = useState(false);
     const [isFamilyTransactionsModalOpen, setIsFamilyTransactionsModalOpen] = useState(false);
     const [isLoanListModalOpen, setIsLoanListModalOpen] = useState(false);
-    const [isMembersModalOpen, setIsMembersModalOpen] = useState(false); // State for the new modal
+    const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
 
     // --- STATE FOR DASHBOARD DATA ---
     const [loading, setLoading] = useState(true);
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
     const [activeLoansCount, setActiveLoansCount] = useState(0);
-
-    // --- STATE LIFTED UP FROM CHART WIDGET ---
     const [report, setReport] = useState(null);
     const [reportLoading, setReportLoading] = useState(true);
     const [reportError, setReportError] = useState(null);
     const [period, setPeriod] = useState('monthly');
-
     const isInitialMount = useRef(true);
-
 
     // --- DATA FETCHING (Summary Cards) ---
     const getFamilyBalance = useCallback(async () => {
-        if (!token || !family) return;
+        if (!user || !family) return;
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/balance`, {
-                headers: { Authorization: `Bearer ${token}` },
-                cache: 'no-store'
+            const q = query(collection(db, "transactions"), where("family_id", "==", family.id));
+            const querySnapshot = await getDocs(q);
+            let netPosition = 0;
+            querySnapshot.forEach(doc => {
+                const tx = doc.data();
+                if (tx.type === 'income') netPosition += tx.amount;
+                else netPosition -= tx.amount;
             });
-            if (res.ok) setSummaryData(await res.json());
+            setSummaryData({ netPosition });
         } catch (error) { console.error("Failed to fetch family balance", error); }
-    }, [token, family]);
+    }, [user, family]);
 
     const getFamilyActiveGoalsCount = useCallback(async () => {
-        if (!token || !family) return;
+        if (!user || !family) return;
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/active-goals-count`, {
-                headers: { Authorization: `Bearer ${token}` },
-                cache: 'no-store'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setActiveGoalsCount(data.count || 0);
-            }
+            const q = query(collection(db, "goals"), where("family_id", "==", family.id), where("status", "==", "active"));
+            const snapshot = await getCountFromServer(q);
+            setActiveGoalsCount(snapshot.data().count);
         } catch (error) { console.error("Failed to fetch family goal count", error); }
-    }, [token, family]);
+    }, [user, family]);
 
     const getFamilyActiveLoansCount = useCallback(async () => {
-        if (!token || !family) return;
+        if (!user || !family) return;
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/active-loans-count`, {
-                headers: { Authorization: `Bearer ${token}` },
-                cache: 'no-store'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setActiveLoansCount(data.count || 0);
-            }
+            const q = query(collection(db, "loans"), where("family_id", "==", family.id), where("status", "==", "outstanding"));
+            const snapshot = await getCountFromServer(q);
+            setActiveLoansCount(snapshot.data().count);
         } catch (error) { console.error("Failed to fetch family loan count", error); }
-    }, [token, family]);
+    }, [user, family]);
 
-    // --- DATA FETCHING LIFTED UP FROM CHART WIDGET ---
+    // --- DATA FETCHING (Report Chart) ---
     const getFamilyReport = useCallback(async () => {
-        if (!token || !family) return;
+        if (!user || !family) return;
         setReportLoading(true);
         setReportError(null);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/report?period=${period}`, {
-                headers: { Authorization: `Bearer ${token}` },
-                cache: 'no-store'
+            const now = new Date();
+            let startDate;
+            if (period === 'weekly') startDate = new Date(now.setDate(now.getDate() - 7));
+            else if (period === 'yearly') startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+            else startDate = new Date(now.setMonth(now.getMonth() - 1));
+
+            const q = query(
+                collection(db, "transactions"),
+                where("family_id", "==", family.id),
+                where("created_at", ">=", Timestamp.fromDate(startDate)),
+                orderBy("created_at", "desc")
+            );
+            const querySnapshot = await getDocs(q);
+            const transactions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+
+            let totalInflow = 0;
+            let totalOutflow = 0;
+            transactions.forEach(tx => {
+                if (tx.type === 'income') totalInflow += tx.amount;
+                else totalOutflow += tx.amount;
             });
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => null);
-                throw new Error(errorData?.message || "Could not process the report request.");
-            }
-            setReport(await res.json());
+            
+            setReport({
+                chartData: formatDataForChart(transactions),
+                totalInflow,
+                totalOutflow,
+                netPosition: totalInflow - totalOutflow,
+                reportTitle: `Report from ${startDate.toLocaleDateString()}`,
+                transactionCount: transactions.length
+            });
         } catch (err) {
             console.error('Failed to fetch family report:', err);
             setReportError(err.message);
         } finally {
             setReportLoading(false);
         }
-    }, [token, family, period]);
+    }, [user, family, period]);
 
     // --- INITIAL DATA LOAD ---
+    const fetchDashboardData = useCallback(async () => {
+        setLoading(true);
+        await Promise.all([
+            getFamilyBalance(),
+            getFamilyActiveGoalsCount(),
+            getFamilyActiveLoansCount(),
+            getFamilyReport()
+        ]);
+        setLoading(false);
+    }, [getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport]);
+    
     useEffect(() => {
-        const fetchDashboardData = async () => {
-            setLoading(true);
-            await Promise.all([
-                getFamilyBalance(),
-                getFamilyActiveGoalsCount(),
-                getFamilyActiveLoansCount(),
-                getFamilyReport()
-            ]);
-            setLoading(false);
-        };
         fetchDashboardData();
-    }, [family.id, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport]);
+    }, [fetchDashboardData]);
 
     // --- EFFECT FOR PERIOD CHANGES ONLY ---
     useEffect(() => {
@@ -150,11 +207,7 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate }) { // Add
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
-        
-        getFamilyBalance();
-        getFamilyActiveGoalsCount();
-        getFamilyActiveLoansCount();
-        getFamilyReport();
+        fetchDashboardData();
     };
 
     const handleMembersUpdate = (updatedFamily) => {
@@ -172,14 +225,13 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate }) { // Add
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <button onClick={onBack} className="secondary-btn-sm">&larr; Back</button>
-                            <h1 className="text-2xl font-bold text-slate-800">{family.first_name}: Family Realm</h1>
+                            <h1 className="text-2xl font-bold text-slate-800">{family.family_name}: Family Realm</h1>
                         </div>
-
                         <div className="flex flex-wrap gap-4">
                             <button onClick={() => setIsTransactionModalOpen(true)} className="primary-btn">+ Add Family Transaction</button>
                             <button onClick={() => setIsGoalModalOpen(true)} className="secondary-btn">+ Add Family Goal</button>
                             <button onClick={() => setIsLoanModalOpen(true)} className="secondary-btn">+ Record a Loan</button>
-                            <button onClick={() => setIsMembersModalOpen(true)} className="secondary-btn">Manage Members</button> {/* New Button */}
+                            <button onClick={() => setIsMembersModalOpen(true)} className="secondary-btn">Manage Members</button>
                         </div>
                     </div>
                 </header>
@@ -225,21 +277,18 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate }) { // Add
                 </div>
             </div>
 
-            {/* --- MODALS --- */}
             <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
-                {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Add Transaction for ${family.first_name}`}><CreateFamilyTransactionWidget family={family} onSuccess={handleSuccess} /></Modal>}
-                {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Add Goal for ${family.first_name}`}><CreateFamilyGoalWidget family={family} onSuccess={handleSuccess} /></Modal>}
+                {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Add Transaction for ${family.family_name}`}><CreateFamilyTransactionWidget family={family} onSuccess={handleSuccess} /></Modal>}
+                {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Add Goal for ${family.family_name}`}><CreateFamilyGoalWidget family={family} onSuccess={handleSuccess} /></Modal>}
                 {isLoanModalOpen && <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Lend Money to a Family Member"><CreateLoanWidget family={family} onSuccess={handleSuccess} /></Modal>}
-                {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.first_name}`}><FamilyTransactionsWidget family={family} /></Modal>}
-                {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.first_name}`}><GoalListsWidget family={family} /></Modal>}
-                {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Lending Activity for ${family.first_name}`}><LoanTrackingWidget family={family} /></Modal>}
+                {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.family_name}`}><FamilyTransactionsWidget family={family} /></Modal>}
+                {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.family_name}`}><GoalListsWidget family={family} /></Modal>}
+                {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Lending Activity for ${family.family_name}`}><LoanTrackingWidget family={family} /></Modal>}
                 
-                {/* New Modal for Family Members */}
                 {isMembersModalOpen && (
-                    <Modal isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)} title={`Manage Members for ${family.first_name}`}>
+                    <Modal isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)} title={`Manage Members for ${family.family_name}`}>
                         <FamilyMembersView
                             family={family}
-                            onBack={() => setIsMembersModalOpen(false)}
                             onFamilyUpdate={handleMembersUpdate}
                         />
                     </Modal>

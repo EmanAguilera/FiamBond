@@ -7,6 +7,16 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 // Register the necessary chart components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+/**
+ * A memoized presentational component that displays a personal financial report.
+ * It is completely decoupled from the data source (Firebase/API) and relies
+ * on its parent component to provide a processed 'report' object as a prop.
+ *
+ * NO CHANGES ARE NEEDED FOR THE FIREBASE REFACTOR.
+ *
+ * @param {object} props - The component props.
+ * @param {object} props.report - The processed financial report data to display.
+ */
 function PersonalReportChartWidget({ report }) {
     
     const chartOptions = {
@@ -19,13 +29,12 @@ function PersonalReportChartWidget({ report }) {
     };
 
     return (
-        // --- THIS IS THE FIX ---
-        // Changed "content-card" to "dashboard-card" to match the family chart's style.
         <div className="dashboard-card font-mono text-slate-800">
             {report ? (
                 <>
                     <div className="mb-8 relative" style={{ height: '350px' }}>
-                        {report.chartData?.datasets?.length > 0 ? (
+                        {/* It checks for the chartData provided in the report prop */}
+                        {report.chartData?.datasets?.length > 0 && report.chartData?.labels?.length > 0 ? (
                             <Bar options={chartOptions} data={report.chartData} />
                         ) : (
                             <div className="flex items-center justify-center h-full">
@@ -33,13 +42,21 @@ function PersonalReportChartWidget({ report }) {
                             </div>
                         )}
                     </div>
+                    {/* It displays all summary fields from the report prop */}
                     <div className="space-y-3 text-sm">
                         <p><span className="font-bold">Summary for:</span> {report.reportTitle}</p>
                         <hr className="border-dashed" />
-                        <p><span className="font-bold">Total Inflow:</span> +₱{parseFloat(report.totalInflow).toFixed(2)}</p>
-                        <p><span className="font-bold">Total Outflow:</span> -₱{parseFloat(report.totalOutflow).toFixed(2)}</p>
-                        <p className={`font-bold ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                            Net Position: ₱{parseFloat(report.netPosition).toFixed(2)}
+                        <p className="flex justify-between">
+                            <span>Total Inflow:</span> 
+                            <span className="text-green-600 font-semibold">+₱{parseFloat(report.totalInflow).toFixed(2)}</span>
+                        </p>
+                        <p className="flex justify-between">
+                            <span>Total Outflow:</span> 
+                            <span className="text-red-500 font-semibold">-₱{parseFloat(report.totalOutflow).toFixed(2)}</span>
+                        </p>
+                        <p className={`flex justify-between font-bold text-base ${report.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            <span>Net Position:</span> 
+                            <span>₱{parseFloat(report.netPosition).toFixed(2)}</span>
                         </p>
                         <hr className="border-dashed" />
                         <p className="font-bold">Analysis:</p>

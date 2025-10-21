@@ -1,10 +1,19 @@
+// src/Components/PersonalTransactionsWidget.jsx
+
 import { useContext, useEffect, useState, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
+import { db } from '../config/firebase-config'; // Adjust path
+import { 
+    collection, 
+    query, 
+    where, 
+    orderBy, 
+    limit, 
+    startAfter, 
+    getDocs 
+} from 'firebase/firestore';
 
-// --- SKELETON LOADER COMPONENT ---
-// This component renders a placeholder UI that mimics the transaction list's layout.
-// It is shown instantly while the real data is being fetched, providing a smooth
-// loading experience instead of a blank space or simple text.
+// --- FULL SKELETON LOADER COMPONENT ---
 const TransactionListSkeleton = () => (
   <div className="animate-pulse">
     <div className="dashboard-card p-0">
@@ -18,66 +27,91 @@ const TransactionListSkeleton = () => (
         </div>
       ))}
     </div>
-    <div className="flex justify-between items-center mt-6">
-        <div className="h-8 w-24 bg-slate-200 rounded"></div>
-        <div className="h-4 w-28 bg-slate-200 rounded"></div>
-        <div className="h-8 w-24 bg-slate-200 rounded"></div>
+    <div className="flex justify-center items-center mt-6">
+        <div className="h-9 w-28 bg-slate-200 rounded"></div>
     </div>
   </div>
 );
 
+const TRANSACTIONS_PER_PAGE = 10;
 
 export default function PersonalTransactionsWidget() {
-  const { token } = useContext(AppContext);
+  const { user } = useContext(AppContext);
   const [transactions, setTransactions] = useState([]);
-  const [pagination, setPagination] = useState(null);
+  const [lastVisible, setLastVisible] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const getTransactions = useCallback(async (page = 1) => {
-    if (!token) {
-        setLoading(false);
-        return;
-    }
-    // Set loading to true only for the initial fetch, not for pagination clicks
-    if (page === 1) {
-        setLoading(true);
-    }
+  const getTransactions = useCallback(async (isInitialLoad = false) => {
+    if (!user) {
+      setLoading(false);
+      return;
+    };
+    setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions?page=${page}&per_page=10`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        throw new Error("Could not load transactions.");
+      let transactionsQuery = query(
+        collection(db, "transactions"),
+        where("user_id", "==", user.uid),
+        where("family_id", "==", null),
+        orderBy("created_at", "desc"),
+        limit(TRANSACTIONS_PER_PAGE)
+      );
+
+      if (!isInitialLoad && lastVisible) {
+        transactionsQuery = query(transactionsQuery, startAfter(lastVisible));
       }
-      const data = await res.json();
-      setTransactions(Array.isArray(data.data) ? data.data : []);
-      const { data: _, ...paginationData } = data;
-      setPagination(paginationData);
+
+      const documentSnapshots = await getDocs(transactionsQuery);
+      const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
+      setLastVisible(newLastVisible);
+      
+      if (documentSnapshots.docs.length < TRANSACTIONS_PER_PAGE) {
+        setHasMore(false);
+      }
+
+      const fetchedTransactions = documentSnapshots.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      
+      if (isInitialLoad) {
+        setTransactions(fetchedTransactions);
+      } else {
+        setTransactions(prev => [...prev, ...fetchedTransactions]);
+      }
+
     } catch (err) {
-      setError(err.message);
+      console.error("Failed to fetch personal transactions:", err);
+      if (err.code === 'failed-precondition') {
+        setError("Query requires an index. Please create the required composite index in Firestore.");
+      } else {
+        setError("Could not load transactions.");
+      }
     } finally {
       setLoading(false);
     }
-  }, [token]);
+    // THE FIX IS HERE (Part 1): Add dependencies to useCallback
+  }, [user, lastVisible]);
 
+  // Effect for the initial data load
   useEffect(() => {
-    // We only need to call getTransactions here for the initial load.
-    // Subsequent calls will be handled by the pagination buttons.
-    getTransactions(1);
-  }, [getTransactions]);
+    if(user) {
+        getTransactions(true);
+    }
+    // THE FIX IS HERE (Part 2): Add getTransactions to the dependency array
+  }, [user, getTransactions]);
 
+  const handleLoadMore = () => {
+    getTransactions(false);
+  };
   
-  // --- RENDER LOGIC ---
-
-  // While fetching the initial data, show the detailed skeleton loader.
-  if (loading) {
+  if (loading && transactions.length === 0) {
     return <TransactionListSkeleton />;
   }
   
-  // If an error occurs, show the error message.
   if (error) {
     return <p className="error text-center py-4">{error}</p>;
   }
@@ -91,7 +125,7 @@ export default function PersonalTransactionsWidget() {
               <div className="min-w-0 pr-4">
                 <p className="transaction-description break-words">{transaction.description}</p>
                 <small className="transaction-date">
-                  {new Date(transaction.created_at).toLocaleDateString()}
+                  {transaction.created_at.toDate().toLocaleDateString()}
                 </small>
               </div>
               <p className={`transaction-amount flex-shrink-0 ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>
@@ -106,16 +140,10 @@ export default function PersonalTransactionsWidget() {
         )}
       </div>
       
-      {pagination && pagination.last_page > 1 && (
-        <div className="flex justify-between items-center mt-6">
-          <button onClick={() => getTransactions(pagination.current_page - 1)} disabled={pagination.current_page === 1} className="pagination-btn">
-            &larr; Previous
-          </button>
-          <span className="pagination-text">
-            Page {pagination.current_page} of {pagination.last_page}
-          </span>
-          <button onClick={() => getTransactions(pagination.current_page + 1)} disabled={pagination.current_page === pagination.last_page} className="pagination-btn">
-            Next &rarr;
+      {hasMore && (
+        <div className="flex justify-center mt-6">
+          <button onClick={handleLoadMore} disabled={loading} className="pagination-btn">
+            {loading ? 'Loading...' : 'Load More'}
           </button>
         </div>
       )}

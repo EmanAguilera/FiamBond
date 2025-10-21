@@ -1,9 +1,13 @@
+// Components/CreateFamilyTransactionWidget.tsx
+
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
+import { db } from "../config/firebase-config"; // Adjust path if necessary
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 // Define TypeScript interfaces for better type-checking
 interface Family {
-  id: number;
+  id: string; // Firestore document IDs are strings
   // Include other properties of the family object if available
 }
 
@@ -18,12 +22,9 @@ interface ITransactionForm {
   type: "expense" | "income";
 }
 
-interface IApiError {
-  [key: string]: string[];
-}
-
 export default function CreateFamilyTransactionWidget({ family, onSuccess }: CreateFamilyTransactionWidgetProps) {
-  const { token } = useContext(AppContext) as { token: string };
+  // Get the full user object to access user.uid
+  const { user } = useContext(AppContext);
 
   const [formData, setFormData] = useState<ITransactionForm>({
     description: "",
@@ -31,48 +32,46 @@ export default function CreateFamilyTransactionWidget({ family, onSuccess }: Cre
     type: "expense",
   });
   
-  const [errors, setErrors] = useState<IApiError>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
+  // This function can handle changes for both radio buttons and text inputs
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value as any })); // Use 'as any' for the radio button type
   };
 
   const handleCreateTransaction = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrors({});
+
+    // Guard clause: Ensure a user is logged in.
+    if (!user) {
+        setFormError("You must be logged in to add a transaction.");
+        return;
+    }
+
     setFormError(null);
     setLoading(true);
 
-    const payload = new FormData();
-    payload.append('description', formData.description);
-    payload.append('amount', formData.amount);
-    payload.append('type', formData.type);
-    payload.append('family_id', String(family.id)); // Ensure family_id is a string for FormData
-
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
-        method: "post",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        body: payload,
-      });
+      // Prepare the data object to be saved in Firestore.
+      // The structure must match your 'transactions' collection.
+      const transactionData = {
+        user_id: user.uid,
+        family_id: family.id,
+        description: formData.description,
+        amount: Number(formData.amount), // Convert the amount string to a number
+        type: formData.type,
+        created_at: serverTimestamp(),
+        attachment_url: null, // For now, we are not handling file uploads
+      };
 
-      const data = await res.json();
+      // Get a reference to the 'transactions' collection and add the new document.
+      const transactionsCollectionRef = collection(db, "transactions");
+      await addDoc(transactionsCollectionRef, transactionData);
 
-      if (!res.ok) {
-        if (res.status === 422) {
-          setErrors(data.errors);
-        } else {
-          setFormError(data.message || "An unexpected error occurred.");
-        }
-        return;
-      }
-      
+      // If successful, reset the form and call the onSuccess callback.
+      setFormData({ description: "", amount: "", type: "expense" });
       if (onSuccess) {
         onSuccess();
       }
@@ -90,21 +89,54 @@ export default function CreateFamilyTransactionWidget({ family, onSuccess }: Cre
       <form onSubmit={handleCreateTransaction} className="space-y-6">
         <div className="flex justify-center gap-8 text-gray-700">
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="type" value="expense" checked={formData.type === "expense"} onChange={handleInputChange} className="h-4 w-4 text-indigo-600" disabled={loading} />
+            <input 
+              type="radio" 
+              name="type" 
+              value="expense" 
+              checked={formData.type === "expense"} 
+              onChange={handleInputChange} 
+              className="h-4 w-4 text-indigo-600" 
+              disabled={loading} 
+            />
             Expense
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="type" value="income" checked={formData.type === "income"} onChange={handleInputChange} className="h-4 w-4 text-indigo-600" disabled={loading} />
+            <input 
+              type="radio" 
+              name="type" 
+              value="income" 
+              checked={formData.type === "income"} 
+              onChange={handleInputChange} 
+              className="h-4 w-4 text-indigo-600" 
+              disabled={loading} 
+            />
             Income
           </label>
         </div>
         <div>
-          <input type="text" name="description" placeholder="Description" value={formData.description} onChange={handleInputChange} className="w-full p-2 border rounded-md" disabled={loading} />
-          {errors.description && <p className="error">{errors.description[0]}</p>}
+          <input 
+            type="text" 
+            name="description" 
+            placeholder="Description" 
+            value={formData.description} 
+            onChange={handleInputChange} 
+            className="w-full p-2 border rounded-md" 
+            disabled={loading} 
+            required 
+          />
         </div>
         <div>
-          <input type="number" name="amount" placeholder="Amount" step="0.01" value={formData.amount} onChange={handleInputChange} className="w-full p-2 border rounded-md" disabled={loading} />
-          {errors.amount && <p className="error">{errors.amount[0]}</p>}
+          <input 
+            type="number" 
+            name="amount" 
+            placeholder="Amount" 
+            step="0.01" 
+            value={formData.amount} 
+            onChange={handleInputChange} 
+            className="w-full p-2 border rounded-md" 
+            disabled={loading} 
+            required 
+          />
         </div>
         {formError && <p className="error">{formError}</p>}
         <button type="submit" className="primary-btn w-full" disabled={loading}>

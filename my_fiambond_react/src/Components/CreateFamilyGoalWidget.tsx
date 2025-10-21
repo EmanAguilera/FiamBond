@@ -1,10 +1,15 @@
+// Components/CreateFamilyGoalWidget.tsx
+
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
+import { db } from "../config/firebase-config"; // Adjust path if necessary
+import { collection, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 
 // Define TypeScript interfaces for better type-checking
 interface Family {
-  id: number;
+  id: string; // Firestore document IDs are strings
   // Add any other properties of the family object if available
+  family_name?: string;
 }
 
 interface CreateFamilyGoalWidgetProps {
@@ -18,12 +23,11 @@ interface IGoalForm {
   target_date: string;
 }
 
-interface IApiError {
-  [key: string]: string[];
-}
+// NOTE: The IApiError interface is no longer needed as Firebase client-side errors are simpler.
 
 export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFamilyGoalWidgetProps) {
-  const { token } = useContext(AppContext) as { token: string };
+  // Get the user object from context to access the user's UID
+  const { user } = useContext(AppContext);
 
   const [formData, setFormData] = useState<IGoalForm>({
     name: "",
@@ -31,7 +35,6 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
     target_date: "",
   });
 
-  const [formErrors, setFormErrors] = useState<IApiError>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -42,33 +45,36 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
 
   const handleCreateGoal = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setFormErrors({});
+    
+    // Guard clause: Ensure a user is logged in before proceeding.
+    if (!user) {
+      setFormError("You must be logged in to create a goal.");
+      return;
+    }
+    
     setFormError(null);
     setLoading(true);
     
-    const bodyPayload = { ...formData, family_id: family.id };
-
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals`, {
-        method: "post",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(bodyPayload),
-      });
+      // Prepare the data object to be saved in Firestore.
+      // It must match the structure of your 'goals' collection.
+      const goalData = {
+        user_id: user.uid,
+        family_id: family.id, // Link to the family using its document ID
+        name: formData.name,
+        target_amount: Number(formData.target_amount), // Convert amount to a number
+        target_date: Timestamp.fromDate(new Date(formData.target_date)), // Convert date string to Firestore Timestamp
+        status: "active",
+        created_at: serverTimestamp(),
+        completed_at: null,
+        completed_by_user_id: null,
+      };
 
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 422) {
-          setFormErrors(data.errors);
-        } else {
-          setFormError(data.message || "An unexpected error occurred.");
-        }
-        return;
-      }
+      // Get a reference to the 'goals' collection and add the new document.
+      const goalsCollectionRef = collection(db, "goals");
+      await addDoc(goalsCollectionRef, goalData);
       
+      // If the operation is successful, call the onSuccess callback if it exists.
       if (onSuccess) {
         onSuccess();
       }
@@ -93,8 +99,8 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
             onChange={handleInputChange}
             className="w-full p-2 border rounded-md"
             disabled={loading}
+            required
           />
-          {formErrors.name && <p className="error">{formErrors.name[0]}</p>}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -106,8 +112,9 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
               onChange={handleInputChange}
               className="w-full p-2 border rounded-md"
               disabled={loading}
+              required
+              step="0.01" // Allow decimal values for money
             />
-            {formErrors.target_amount && <p className="error">{formErrors.target_amount[0]}</p>}
           </div>
           <div>
             <input
@@ -117,8 +124,8 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
               onChange={handleInputChange}
               className="w-full p-2 border rounded-md text-gray-500"
               disabled={loading}
+              required
             />
-            {formErrors.target_date && <p className="error">{formErrors.target_date[0]}</p>}
           </div>
         </div>
         {formError && <p className="error">{formError}</p>}

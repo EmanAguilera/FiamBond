@@ -1,19 +1,32 @@
+// Components/CreateLoanWidget.tsx
+
 import { useContext, useState, useEffect, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
+import { db } from "../config/firebase-config"; // Adjust path
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+  Timestamp,
+  documentId,
+} from "firebase/firestore";
 
-// Define TypeScript interfaces for better type-checking
+// --- TypeScript Interfaces ---
 interface Family {
-  id: number;
-  // Add other family properties if available
+  id: string; // Firestore document ID
 }
 
 interface User {
-  id: number;
-  // Add other user properties if available
+  uid: string; // Firebase Auth UID
 }
 
 interface Member {
-  id: number;
+  id: string; // The user's UID
   full_name: string;
 }
 
@@ -23,7 +36,8 @@ interface CreateLoanWidgetProps {
 }
 
 export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidgetProps) {
-  const { token, user } = useContext(AppContext) as { token: string; user: User };
+  // Use the user object from context. Note: your context might provide 'user.id', ensure it maps to 'user.uid'
+  const { user } = useContext(AppContext);
 
   const [formData, setFormData] = useState({
     amount: "",
@@ -36,22 +50,43 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
+  // Effect to fetch family members to populate the dropdown
   useEffect(() => {
     const fetchMembers = async () => {
-      if (!family.id || !token) return;
+      if (!family.id || !user?.uid) return;
 
       setLoading(true);
+      setError(null);
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          // Ensure user is not in the list of potential debtors
-          setMembers(data.members.filter((member: Member) => member.id !== user.id));
-        } else {
-          throw new Error("Failed to fetch family members.");
+        // 1. Get the family document to find member IDs
+        const familyDocRef = doc(db, "families", family.id);
+        const familyDocSnap = await getDoc(familyDocRef);
+
+        if (!familyDocSnap.exists()) {
+          throw new Error("Family not found.");
         }
+
+        const memberIds = familyDocSnap.data().member_ids || [];
+        // Filter out the current user so they can't lend to themselves
+        const otherMemberIds = memberIds.filter((id: string) => id !== user.uid);
+
+        if (otherMemberIds.length === 0) {
+          setMembers([]); // No other members to lend to
+          return;
+        }
+
+        // 2. Get the user documents for the other members
+        const usersCollectionRef = collection(db, "users");
+        const q = query(usersCollectionRef, where(documentId(), "in", otherMemberIds));
+        
+        const querySnapshot = await getDocs(q);
+        const fetchedMembers = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          full_name: doc.data().full_name
+        } as Member));
+
+        setMembers(fetchedMembers);
+
       } catch (err) {
         console.error("Failed to fetch family members:", err);
         setError("Could not load family members. Please try again.");
@@ -61,7 +96,7 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
     };
 
     fetchMembers();
-  }, [family.id, token, user.id]);
+  }, [family.id, user?.uid]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -70,37 +105,38 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
 
   const handleLendMoney = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if(!user) {
+        setError("You must be logged in.");
+        return;
+    }
     setError(null);
     setLoading(true);
 
-    const loanDetails = {
-      creditor_id: user.id,
-      debtor_id: parseInt(formData.debtorId, 10),
-      amount: parseFloat(formData.amount),
-      description: formData.description,
-      deadline: formData.deadline || null,
-    };
-
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/loans`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(loanDetails),
-      });
+        const loanData = {
+            family_id: family.id,
+            creditor_id: user.uid,
+            debtor_id: formData.debtorId,
+            amount: Number(formData.amount),
+            repaid_amount: 0, // Loans start with 0 repaid
+            description: formData.description,
+            deadline: formData.deadline ? Timestamp.fromDate(new Date(formData.deadline)) : null,
+            status: "outstanding", // New loans are always 'outstanding'
+            created_at: serverTimestamp(),
+        };
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to record the loan.");
-      }
+        const loansCollectionRef = collection(db, "loans");
+        await addDoc(loansCollectionRef, loanData);
 
-      if (onSuccess) {
-        onSuccess();
-      }
+        if (onSuccess) {
+            onSuccess();
+        }
 
     } catch (err: any) {
-      setError(err.message);
+        console.error("Failed to record loan:", err);
+        setError("Failed to record the loan. Please try again.");
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
@@ -108,8 +144,10 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
     <form onSubmit={handleLendMoney} className="space-y-4">
       <div>
         <label htmlFor="debtorId" className="block text-sm font-medium text-gray-700">Lending To:</label>
-        <select id="debtorId" value={formData.debtorId} onChange={handleInputChange} required disabled={loading} className="w-full p-2 border border-gray-300 rounded-md">
-          <option value="">Select a family member</option>
+        <select id="debtorId" value={formData.debtorId} onChange={handleInputChange} required disabled={loading || members.length === 0} className="w-full p-2 border border-gray-300 rounded-md">
+          <option value="">
+            {members.length > 0 ? "Select a family member" : "No other members in this family"}
+          </option>
           {members.map(member => (
             <option key={member.id} value={member.id}>{member.full_name}</option>
           ))}
@@ -128,7 +166,7 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
         <input id="deadline" type="date" value={formData.deadline} onChange={handleInputChange} disabled={loading} className="w-full p-2 border border-gray-300 rounded-md" />
       </div>
       {error && <p className="error">{error}</p>}
-      <button type="submit" className="primary-btn w-full" disabled={loading}>
+      <button type="submit" className="primary-btn w-full" disabled={loading || members.length === 0}>
         {loading ? 'Processing...' : 'Confirm & Lend Money'}
       </button>
     </form>

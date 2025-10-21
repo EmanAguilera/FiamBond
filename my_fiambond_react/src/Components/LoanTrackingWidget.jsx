@@ -1,7 +1,18 @@
+// Components/LoanTrackingWidget.jsx
+
 import { useContext, useState, useEffect, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
+import { db } from '../config/firebase-config'; // Adjust path
+import { 
+    collection, 
+    query, 
+    where, 
+    orderBy, 
+    getDocs, 
+    documentId 
+} from 'firebase/firestore';
 
-// --- SKELETON LOADER COMPONENT ---
+// --- FULL SKELETON LOADER COMPONENT ---
 const LoanListSkeleton = () => (
     <div className="animate-pulse">
         <h3 className="font-bold text-lg text-gray-800 mb-2">Family Lending</h3>
@@ -27,11 +38,12 @@ const LoanListSkeleton = () => (
 
 // --- DEADLINE NOTIFICATION HELPER ---
 const DeadlineNotification = ({ deadline, outstanding }) => {
+    // This function expects a JavaScript Date object, not a Firestore Timestamp
     if (!deadline || outstanding <= 0) return null;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalize today's date
-    const deadlineDate = new Date(deadline);
+    const deadlineDate = deadline; // Already a Date object
     const timeDiff = deadlineDate.getTime() - today.getTime();
     const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
@@ -45,18 +57,18 @@ const DeadlineNotification = ({ deadline, outstanding }) => {
 };
 
 
-// --- LOAN ITEM COMPONENT ---
+// --- LOAN ITEM SUB-COMPONENT ---
 const LoanItem = ({ loan }) => {
     const { user } = useContext(AppContext);
-    const isBorrower = user.id === loan.debtor.id;
+    // Use user.uid for comparison
+    const isBorrower = user.uid === loan.debtor.id;
     const outstanding = parseFloat(loan.amount) - parseFloat(loan.repaid_amount);
     
-    // MODIFIED: Format the creation date from the backend's `created_at` field.
-    const creationDate = new Date(loan.created_at).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
+    // Handle Firestore Timestamps by converting them to JS Dates
+    const creationDate = loan.created_at?.toDate().toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric'
     });
+    const deadlineDate = loan.deadline?.toDate();
 
     return (
         <div className="p-4 border-b last:border-b-0 border-gray-100">
@@ -64,24 +76,20 @@ const LoanItem = ({ loan }) => {
                 {/* Left Side: Loan Details */}
                 <div className="min-w-0 pr-4">
                     <p className="font-semibold text-gray-800 break-words">{loan.description}</p>
-                    
-                    {/* MODIFIED: Grouped small details and added Creation Date display */}
                     <div className="mt-1 text-xs text-gray-500 space-y-1">
                         <p>Date Created: {creationDate}</p>
+                        {/* Access enriched data */}
                         <p>From: {loan.creditor.full_name} To: {loan.debtor.full_name}</p>
                     </div>
-
-                     <p className="text-sm text-gray-600 mt-2">
+                    <p className="text-sm text-gray-600 mt-2">
                         Total Loan: <span className="font-mono">₱{parseFloat(loan.amount).toFixed(2)}</span>
                     </p>
-                    
-                    {/* Deadline Info (if it exists) */}
-                    {loan.deadline && (
+                    {deadlineDate && (
                         <div className="flex items-center gap-2 mt-1">
                             <p className="text-xs text-gray-500">
-                                Due: {new Date(loan.deadline).toLocaleDateString()}
+                                Due: {deadlineDate.toLocaleDateString()}
                             </p>
-                           <DeadlineNotification deadline={loan.deadline} outstanding={outstanding} />
+                           <DeadlineNotification deadline={deadlineDate} outstanding={outstanding} />
                         </div>
                     )}
                 </div>
@@ -110,35 +118,65 @@ const LoanItem = ({ loan }) => {
 
 // --- MAIN WIDGET COMPONENT ---
 export default function LoanTrackingWidget({ family }) {
-    const { token } = useContext(AppContext);
+    const { user } = useContext(AppContext);
     const [loans, setLoans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const getLoans = useCallback(async () => {
+        if (!user) return;
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/families/${family.id}/loans`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error("Could not fetch loan activity.");
+            // Step 1: Fetch all loans for the given family
+            const loansQuery = query(
+                collection(db, "loans"),
+                where("family_id", "==", family.id),
+                orderBy("created_at", "desc")
+            );
+            const loansSnapshot = await getDocs(loansQuery);
+            const fetchedLoans = loansSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            const data = await res.json();
-            setLoans(data.data || []);
+            if (fetchedLoans.length === 0) {
+                setLoans([]);
+                return;
+            }
+
+            // Step 2: Enrich the data with user names
+            const userIds = new Set();
+            fetchedLoans.forEach(loan => {
+                userIds.add(loan.creditor_id);
+                userIds.add(loan.debtor_id);
+            });
+
+            const usersQuery = query(collection(db, "users"), where(documentId(), "in", [...userIds]));
+            const usersSnapshot = await getDocs(usersQuery);
+            const usersMap = {};
+            usersSnapshot.forEach(doc => {
+                usersMap[doc.id] = { id: doc.id, ...doc.data() };
+            });
+
+            // Step 3: Merge user data into each loan object
+            const enrichedLoans = fetchedLoans.map(loan => ({
+                ...loan,
+                creditor: usersMap[loan.creditor_id] || { full_name: "Unknown User" },
+                debtor: usersMap[loan.debtor_id] || { full_name: "Unknown User" }
+            }));
+
+            setLoans(enrichedLoans);
+
         } catch (err) {
             console.error("Failed to fetch loans:", err);
-            setError(err.message);
+            setError("Could not fetch loan activity.");
         } finally {
             setLoading(false);
         }
-    }, [token, family.id]);
+    }, [user, family.id]);
 
     useEffect(() => {
         getLoans();
     }, [getLoans]);
 
-    // --- RENDER LOGIC ---
     if (loading) return <LoanListSkeleton />;
     if (error) return <p className="error text-center py-4">{error}</p>;
 

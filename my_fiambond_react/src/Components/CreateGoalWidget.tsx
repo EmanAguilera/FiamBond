@@ -1,15 +1,15 @@
+// Components/CreateGoalWidget.tsx
+
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
+import { db } from "../config/firebase-config"; // Adjust path if necessary
+import { collection, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 
-// Define TypeScript interfaces for better type-checking
+// --- TypeScript interfaces ---
 interface IGoalForm {
   name: string;
   target_amount: string;
   target_date: string;
-}
-
-interface IApiError {
-  [key: string]: string[];
 }
 
 interface CreateGoalWidgetProps {
@@ -17,7 +17,7 @@ interface CreateGoalWidgetProps {
 }
 
 export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
-  const { token } = useContext(AppContext);
+  const { user } = useContext(AppContext);
 
   const [formData, setFormData] = useState<IGoalForm>({
     name: "",
@@ -25,7 +25,6 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
     target_date: "",
   });
 
-  const [formErrors, setFormErrors] = useState<IApiError>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -36,37 +35,35 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
 
   const handleCreateGoal = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setFormErrors({});
+    
+    if (!user) {
+      setFormError("You must be logged in to create a goal.");
+      return;
+    }
+
     setFormError(null);
     setLoading(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/goals`, {
-        method: "post",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
+      const goalData = {
+        user_id: user.uid,
+        family_id: null,
+        name: formData.name,
+        target_amount: Number(formData.target_amount),
+        target_date: Timestamp.fromDate(new Date(formData.target_date)),
+        status: "active",
+        created_at: serverTimestamp(),
+        completed_at: null,
+        completed_by_user_id: null,
+      };
 
-      const data = await res.json();
+      const goalsCollectionRef = collection(db, "goals");
+      await addDoc(goalsCollectionRef, goalData);
 
-      if (!res.ok) {
-        if (res.status === 422) {
-          setFormErrors(data.errors);
-        } else {
-          setFormError(data.message || "An unexpected error occurred.");
-        }
-        return;
-      }
-
+      setFormData({ name: "", target_amount: "", target_date: "" });
       if (onSuccess) {
         onSuccess();
       }
-      
-      setFormData({ name: "", target_amount: "", target_date: "" });
 
     } catch (err) {
       console.error('Failed to create goal:', err);
@@ -87,8 +84,8 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
             value={formData.name}
             onChange={handleInputChange}
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            required
           />
-          {formErrors.name && <p className="error">{formErrors.name[0]}</p>}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -99,8 +96,9 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
               value={formData.target_amount}
               onChange={handleInputChange}
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required
+              step="0.01"
             />
-            {formErrors.target_amount && <p className="error">{formErrors.target_amount[0]}</p>}
           </div>
           <div>
             <input
@@ -109,14 +107,17 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
               value={formData.target_date}
               onChange={handleInputChange}
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-500"
+              required
             />
-            {formErrors.target_date && <p className="error">{formErrors.target_date[0]}</p>}
           </div>
         </div>
         {formError && <p className="error">{formError}</p>}
+        
+        {/* THE FIX IS HERE: Ensured the button has a proper closing tag */}
         <button type="submit" className="primary-btn w-full" disabled={loading}>
           {loading ? 'Setting Goal...' : 'Set Goal'}
         </button>
+
       </form>
     </div>
   );
