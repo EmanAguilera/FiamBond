@@ -1,5 +1,3 @@
-// Components/GoalListsWidget.jsx
-
 import { useContext, useEffect, useState, useCallback } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 import { db } from '../config/firebase-config'; // Adjust path
@@ -77,21 +75,34 @@ export default function GoalListsWidget({ family }) {
     setLoading(true);
     setListError(null);
     try {
-        let goalsQuery = query(
-            collection(db, "goals"),
-            where("status", "in", ["active", "completed"]),
-            orderBy("created_at", "desc")
-        );
+        let goalsQuery;
 
+        // Conditionally build the query for either family or personal goals
         if (family) {
-            goalsQuery = query(goalsQuery, where("family_id", "==", family.id));
+            // Query for FAMILY goals
+            goalsQuery = query(
+                collection(db, "goals"),
+                where("family_id", "==", family.id),
+                where("status", "in", ["active", "completed"]),
+                orderBy("created_at", "desc")
+            );
         } else {
-            goalsQuery = query(goalsQuery, where("family_id", "==", null));
+            // Query for PERSONAL goals
+            goalsQuery = query(
+                collection(db, "goals"),
+                where("family_id", "==", null),
+                // THIS IS THE CRITICAL FIX: The query must prove it's only asking for the current user's goals
+                // to satisfy the security rules.
+                where("user_id", "==", user.uid),
+                where("status", "in", ["active", "completed"]),
+                orderBy("created_at", "desc")
+            );
         }
 
         const goalsSnapshot = await getDocs(goalsQuery);
         const allGoals = goalsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+        // --- Data Enrichment ---
         const userIds = new Set();
         const familyIds = new Set();
         allGoals.forEach(goal => {
@@ -126,7 +137,7 @@ export default function GoalListsWidget({ family }) {
 
     } catch (err) {
       console.error("Failed to get goals:", err);
-      setListError("Could not load your goals.");
+      setListError("Could not load your goals. Check permissions and indexes.");
     } finally {
       setLoading(false);
     }
@@ -147,7 +158,7 @@ export default function GoalListsWidget({ family }) {
             completed_by_user_id: user.uid
         });
         getGoals();
-    } catch { // THE FIX IS HERE: 'err' parameter is removed
+    } catch {
         setListError("Could not update the goal.");
     }
   }
@@ -158,7 +169,7 @@ export default function GoalListsWidget({ family }) {
     try {
         await deleteDoc(doc(db, "goals", goalId));
         getGoals();
-    } catch { // THE FIX IS HERE: 'err' parameter is removed
+    } catch {
         setListError("Could not delete the goal.");
     }
   }
@@ -168,7 +179,6 @@ export default function GoalListsWidget({ family }) {
 
   return (
     <div className="space-y-8">
-      {/* --- ACTIVE GOALS LIST --- */}
       <div>
         <h2 className="font-bold text-xl mb-4 text-gray-800">Active Goals</h2>
         {activeGoals.length > 0 ? (
@@ -214,8 +224,6 @@ export default function GoalListsWidget({ family }) {
           </div>
         ) : <p className="text-gray-600 italic">You have no active goals yet.</p>}
       </div>
-
-      {/* --- COMPLETED GOALS LIST --- */}
       <div>
         <h2 className="font-bold text-xl mb-4 text-gray-800">Completed Goals</h2>
         {completedGoals.length > 0 ? (
