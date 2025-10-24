@@ -1,8 +1,11 @@
 import { useContext, useState, useEffect } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
+import { auth, db } from "../config/firebase-config"; // Import services
+import { updateEmail, updatePassword } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
 
 export default function Settings() {
-  const { user, token, setUser } = useContext(AppContext);
+  const { user, setUser } = useContext(AppContext);
 
   const [formData, setFormData] = useState({
     first_name: '', last_name: '', email: '',
@@ -34,37 +37,39 @@ export default function Settings() {
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
+    if (!user) return;
     setProfileMessage({ type: '', text: '' });
-    setProfileErrors({});
+    setProfileErrors({}); // Clear old errors
     setIsSubmitting(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          first_name: formData.first_name, last_name: formData.last_name, email: formData.email,
-        }),
+      const currentUser = auth.currentUser;
+      const userDocRef = doc(db, "users", user.uid);
+
+      // 1. Update Email in Firebase Authentication (if changed)
+      if (formData.email !== user.email) {
+        await updateEmail(currentUser, formData.email);
+      }
+      
+      // 2. Update Profile in Firestore
+      await updateDoc(userDocRef, {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        full_name: `${formData.first_name} ${formData.last_name}`,
+        email: formData.email, // Keep email in sync
       });
 
-      const data = await res.json();
+      // 3. Update local context for immediate feedback
+      const updatedUser = { ...user, ...{first_name: formData.first_name, last_name: formData.last_name, email: formData.email} };
+      setUser(updatedUser);
 
-      if (!res.ok) {
-        if (res.status === 422) {
-          setProfileErrors(data.errors);
-        } else {
-          setProfileMessage({ type: 'error', text: data.message || 'Failed to update profile.' });
-        }
-        return;
-      }
-
-      setUser(data.user);
-      setProfileMessage({ type: 'success', text: data.message });
+      setProfileMessage({ type: 'success', text: "Profile updated successfully!" });
       setTimeout(() => setProfileMessage({ type: '', text: '' }), 5000);
 
     } catch (err) {
       console.error('Profile update error:', err);
-      setProfileMessage({ type: 'error', text: 'A network error occurred. Please try again.' });
+      // Provide a more specific error message if possible
+      setProfileMessage({ type: 'error', text: err.message || 'Failed to update profile. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -72,8 +77,9 @@ export default function Settings() {
 
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
+    if (!user) return;
     setPasswordMessage({ type: '', text: '' });
-    setPasswordErrors({});
+    setPasswordErrors({}); // Clear old errors
 
     if (formData.new_password !== formData.new_password_confirmation) {
       setPasswordMessage({ type: 'error', text: "The new passwords do not match." });
@@ -83,32 +89,17 @@ export default function Settings() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          new_password: formData.new_password, new_password_confirmation: formData.new_password_confirmation,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 422) {
-            setPasswordErrors(data.errors);
-        } else {
-            setPasswordMessage({ type: 'error', text: data.message || 'Failed to update password.' });
-        }
-        return;
-      }
+      const currentUser = auth.currentUser;
+      await updatePassword(currentUser, formData.new_password);
       
-      setPasswordMessage({ type: 'success', text: data.message });
+      setPasswordMessage({ type: 'success', text: "Password updated successfully!" });
       setFormData(prev => ({ ...prev, new_password: '', new_password_confirmation: '' }));
       setTimeout(() => setPasswordMessage({ type: '', text: '' }), 5000);
 
     } catch (err) {
       console.error('Password update error:', err);
-      setPasswordMessage({ type: 'error', text: 'A network error occurred. Please try again.' });
+      // This error often means the user needs to re-authenticate for security reasons.
+      setPasswordMessage({ type: 'error', text: 'Failed to update password. You may need to log out and log back in.' });
     } finally {
       setIsSubmitting(false);
     }
