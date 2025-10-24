@@ -1,19 +1,20 @@
+// src/main.tsx
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App'; // .js extension is not needed
-import AppProvider from './Context/AppContext'; // .jsx extension is not needed
+import { BrowserRouter } from 'react-router-dom';
+import AppProvider from './Context/AppContext';
+import App from './App';
 import './App.css'; 
 
-import { BrowserRouter } from 'react-router-dom';
-
-// 1. Get the root element from the DOM
 const rootElement = document.getElementById('root');
 
-// 2. Check if the element was actually found before rendering
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
+      {/* THIS is the one and only BrowserRouter for your entire application */}
       <BrowserRouter>
+        {/* The context provider wraps the App so all components can access the user state */}
         <AppProvider>
           <App />
         </AppProvider>
@@ -21,6 +22,5 @@ if (rootElement) {
     </React.StrictMode>
   );
 } else {
-  // Optional: Log an error to the console if the root element is missing
   console.error("Failed to find the root element. Check your index.html file.");
 }
