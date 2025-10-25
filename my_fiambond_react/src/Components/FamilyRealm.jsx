@@ -1,6 +1,6 @@
 import { useState, lazy, Suspense, useContext, useCallback, useEffect, useRef } from 'react';
 import { AppContext } from '../Context/AppContext.jsx';
-import { db } from '../config/firebase-config.js'; // Adjust path
+import { db } from '../config/firebase-config.js';
 import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy } from 'firebase/firestore';
 
 // --- LAZY LOADED COMPONENTS ---
@@ -39,10 +39,9 @@ const formatDataForChart = (transactions) => {
         return { labels: [], datasets: [] };
     }
 
-    const data = {}; // e.g., { '10/21/2025': { income: 100, expense: 50 } }
+    const data = {};
 
     transactions.forEach(tx => {
-        // Ensure created_at is a valid object with a toDate method
         if (tx.created_at && typeof tx.created_at.toDate === 'function') {
             const date = tx.created_at.toDate().toLocaleDateString();
             if (!data[date]) {
@@ -75,8 +74,8 @@ const formatDataForChart = (transactions) => {
     };
 };
 
-
-export default function FamilyRealm({ family, onBack, onFamilyUpdate }) {
+// --- THE FIX IS HERE (Part 1): Accept the new 'onDataChange' prop ---
+export default function FamilyRealm({ family, onBack, onFamilyUpdate, onDataChange }) {
     const { user } = useContext(AppContext);
 
     // --- STATE FOR MODALS ---
@@ -203,11 +202,20 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate }) {
     }, [period, getFamilyReport]);
 
     // --- SUCCESS HANDLERS ---
+    // --- THE FIX IS HERE (Part 2): Update the success handler ---
     const handleSuccess = () => {
+        // First, close all relevant modals
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
+        
+        // Then, refresh the data for this component (FamilyRealm)
         fetchDashboardData();
+        
+        // Finally, call the onDataChange prop to signal the Home component to refresh its data.
+        if (onDataChange) {
+            onDataChange();
+        }
     };
 
     const handleMembersUpdate = (updatedFamily) => {

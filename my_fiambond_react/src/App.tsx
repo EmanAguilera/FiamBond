@@ -1,5 +1,3 @@
-// src/App.tsx
-
 import { Routes, Route } from "react-router-dom";
 
 // Import Layouts and Pages
@@ -13,34 +11,32 @@ import VerifyEmail from './Pages/Auth/VerifyEmail.jsx';
 // Import Route Protectors
 import PrivateRoutes from "./Utils/PrivateRoutes.jsx";
 import PublicRoute from "./Utils/PublicRoutes.jsx";
+// THE FIX IS HERE: Import your new VerificationRoute protector
+import VerificationRoute from "./Utils/VerificationRoute.jsx";
 
 export default function App() {
   return (
-    // The BrowserRouter and AppProvider are correctly in main.tsx.
     <Routes>
-      {/* THE FIX IS HERE: The main Layout wraps EVERYTHING. */}
-      <Route path="/" element={<Layout />}>
+      <Route element={<Layout />}>
 
-        {/* --- Section 1: Public-Facing Routes --- */}
-        {/* The Home page is now the main index route, accessible to everyone. */}
-        {/* The Home component itself will decide to show the Hero or the Dashboard. */}
-        <Route index element={<Home />} />
+        <Route path="/welcome" element={<Home />} />
 
-        {/* --- Section 2: Authentication Routes (for logged-out users) --- */}
-        {/* These use PublicRoute to redirect logged-in users away. */}
+        {/* --- Public-Facing Routes --- */}
         <Route element={<PublicRoute />}>
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
         </Route>
         
-        {/* --- Section 3: Verification Route (Special Case) --- */}
-        <Route path="verify-email" element={<VerifyEmail />} />
+        {/* --- Verification Route --- */}
+        {/* THE FIX IS HERE: Wrap the verify-email route in its new, dedicated protector. */}
+        <Route element={<VerificationRoute />}>
+          <Route path="verify-email" element={<VerifyEmail />} />
+        </Route>
 
-        {/* --- Section 4: Protected Routes (for logged-in & verified users) --- */}
-        {/* This group contains ONLY the pages that MUST be protected. */}
+        {/* --- Protected Routes --- */}
         <Route element={<PrivateRoutes />}>
+          <Route path="/" element={<Home />} />
           <Route path="settings" element={<Settings />} />
-          {/* Add any other strictly private routes here, like /profile, etc. */}
         </Route>
         
       </Route>
