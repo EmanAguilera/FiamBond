@@ -1,8 +1,6 @@
-// Components/CreateLoanWidget.tsx
-
 import { useContext, useState, useEffect, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
-import { db } from "../config/firebase-config"; // Adjust path
+import { db } from "../config/firebase-config";
 import {
   doc,
   getDoc,
@@ -10,10 +8,10 @@ import {
   query,
   where,
   getDocs,
-  addDoc,
   serverTimestamp,
   Timestamp,
   documentId,
+  writeBatch, // THE FIX IS HERE: Import writeBatch for atomic operations
 } from "firebase/firestore";
 
 // --- TypeScript Interfaces ---
@@ -36,7 +34,6 @@ interface CreateLoanWidgetProps {
 }
 
 export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidgetProps) {
-  // Use the user object from context. Note: your context might provide 'user.id', ensure it maps to 'user.uid'
   const { user } = useContext(AppContext);
 
   const [formData, setFormData] = useState({
@@ -48,17 +45,19 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
 
   const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true); // Start as true for initial fetch
 
   // Effect to fetch family members to populate the dropdown
   useEffect(() => {
     const fetchMembers = async () => {
-      if (!family.id || !user?.uid) return;
+      if (!family.id || !user?.uid) {
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
       setError(null);
       try {
-        // 1. Get the family document to find member IDs
         const familyDocRef = doc(db, "families", family.id);
         const familyDocSnap = await getDoc(familyDocRef);
 
@@ -67,15 +66,14 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
         }
 
         const memberIds = familyDocSnap.data().member_ids || [];
-        // Filter out the current user so they can't lend to themselves
         const otherMemberIds = memberIds.filter((id: string) => id !== user.uid);
 
         if (otherMemberIds.length === 0) {
-          setMembers([]); // No other members to lend to
+          setMembers([]);
+          setLoading(false);
           return;
         }
 
-        // 2. Get the user documents for the other members
         const usersCollectionRef = collection(db, "users");
         const q = query(usersCollectionRef, where(documentId(), "in", otherMemberIds));
         
@@ -103,9 +101,10 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
     setFormData(prev => ({ ...prev, [id]: value }));
   };
 
+  // --- THE FIX IS HERE: This entire function is updated to be atomic ---
   const handleLendMoney = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if(!user) {
+    if (!user) {
         setError("You must be logged in.");
         return;
     }
@@ -113,28 +112,51 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
     setLoading(true);
 
     try {
+        // Find the debtor's name for a more descriptive transaction
+        const debtorName = members.find(m => m.id === formData.debtorId)?.full_name || 'Family Member';
+
+        // 1. Create a new write batch to perform multiple operations atomically
+        const batch = writeBatch(db);
+
+        // 2. Define the new loan document in the 'loans' collection
+        const newLoanRef = doc(collection(db, "loans"));
         const loanData = {
             family_id: family.id,
             creditor_id: user.uid,
             debtor_id: formData.debtorId,
             amount: Number(formData.amount),
-            repaid_amount: 0, // Loans start with 0 repaid
+            repaid_amount: 0,
             description: formData.description,
             deadline: formData.deadline ? Timestamp.fromDate(new Date(formData.deadline)) : null,
-            status: "outstanding", // New loans are always 'outstanding'
+            status: "outstanding",
             created_at: serverTimestamp(),
         };
+        // Stage the loan creation in the batch
+        batch.set(newLoanRef, loanData);
 
-        const loansCollectionRef = collection(db, "loans");
-        await addDoc(loansCollectionRef, loanData);
+        // 3. Define the corresponding personal expense in the 'transactions' collection
+        const newTransactionRef = doc(collection(db, "transactions"));
+        const transactionData = {
+            user_id: user.uid, // This expense belongs to the lender (current user)
+            family_id: null,   // This is a personal transaction record
+            type: "expense",
+            amount: Number(formData.amount),
+            description: `Loan to ${debtorName}: ${formData.description}`,
+            created_at: serverTimestamp(),
+        };
+        // Stage the personal transaction creation in the batch
+        batch.set(newTransactionRef, transactionData);
+
+        // 4. Commit the batch. Both documents are created, or neither is.
+        await batch.commit();
 
         if (onSuccess) {
             onSuccess();
         }
 
     } catch (err: any) {
-        console.error("Failed to record loan:", err);
-        setError("Failed to record the loan. Please try again.");
+        console.error("Failed to record loan and transaction:", err);
+        setError("Failed to process the loan. Please try again.");
     } finally {
         setLoading(false);
     }
@@ -146,7 +168,7 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
         <label htmlFor="debtorId" className="block text-sm font-medium text-gray-700">Lending To:</label>
         <select id="debtorId" value={formData.debtorId} onChange={handleInputChange} required disabled={loading || members.length === 0} className="w-full p-2 border border-gray-300 rounded-md">
           <option value="">
-            {members.length > 0 ? "Select a family member" : "No other members in this family"}
+            {loading ? "Loading members..." : members.length > 0 ? "Select a family member" : "No other members in this family"}
           </option>
           {members.map(member => (
             <option key={member.id} value={member.id}>{member.full_name}</option>

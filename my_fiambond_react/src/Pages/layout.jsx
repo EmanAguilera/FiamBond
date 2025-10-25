@@ -1,7 +1,5 @@
-// src/Pages/layout.jsx
-
 import { useContext, useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
 import {
     HomeIcon,
@@ -14,19 +12,50 @@ import {
 export default function Layout() {
     const { user, handleLogout } = useContext(AppContext);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const location = useLocation();
+
+    const authLayoutPaths = ['/login', '/register', '/verify-email'];
+    // THE FIX IS HERE: We also want the simple layout for our new public landing page.
+    const isAuthPage = authLayoutPaths.includes(location.pathname) || location.pathname === '/welcome';
 
     const navItems = user ? [
         { name: "Dashboard", href: "/", icon: HomeIcon },
         { name: "Settings", href: "/settings", icon: Cog6ToothIcon },
     ] : [];
 
+    // If the current page is an authentication or landing page, render the simple layout.
+    if (isAuthPage) {
+        return (
+            <div className="min-h-screen bg-slate-50">
+                <header className="app-header">
+                    <nav className="top-nav">
+                        {/* CHANGE #1: Point the logo to /welcome */}
+                        <Link to="/welcome" className="logo">Fiambond</Link>
+                        
+                        {location.pathname !== '/verify-email' && !user && (
+                            <div className="flex items-center space-x-2">
+                                <NavLink to="/register" className="nav-link"> Register </NavLink>
+                                <NavLink to="/login" className="nav-link"> Login </NavLink>
+                            </div>
+                        )}
+                    </nav>
+                </header>
+                <main>
+                    <Outlet />
+                </main>
+            </div>
+        );
+    }
+
+    // Otherwise, render the full Dashboard layout.
     return (
         <>
             <header className="app-header">
                 <nav className="top-nav">
-                    <Link to="/" className="logo">Fiambond</Link>
+                    {/* CHANGE #2: Point the logo to /welcome here as well */}
+                    <Link to="/welcome" className="logo">Fiambond</Link>
                     
-                    {user ? (
+                    {user && (
                         <div className="flex items-center space-x-4">
                             <div className="hidden md:flex items-center space-x-4">
                                 <p className="text-slate-500 text-sm whitespace-nowrap">
@@ -44,11 +73,6 @@ export default function Layout() {
                                 {isMobileMenuOpen ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
                             </button>
                         </div>
-                    ) : (
-                        <div className="flex items-center space-x-2">
-                            <NavLink to="/register" className="nav-link"> Register </NavLink>
-                            <NavLink to="/login" className="nav-link"> Login </NavLink>
-                        </div>
                     )}
                 </nav>
 
@@ -59,7 +83,6 @@ export default function Layout() {
                                 <li key={item.name}>
                                     <NavLink
                                         to={item.href}
-                                        // THE FIX IS HERE: Corrected the function name
                                         onClick={() => setIsMobileMenuOpen(false)}
                                         className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}
                                     >
@@ -87,27 +110,25 @@ export default function Layout() {
             </header>
 
             <div className="flex">
-                {user && (
-                    <aside className="sidebar">
-                        <nav className="sidebar-nav">
-                            <ul>
-                                {navItems.map((item) => (
-                                    <li key={item.name}>
-                                        <NavLink
-                                            to={item.href}
-                                            className={({ isActive }) => `sidebar-nav-link group ${isActive ? 'active' : ''}`}
-                                        >
-                                            {item.icon && <item.icon className="h-5 w-5 text-gray-400 group-hover:text-indigo-600" />}
-                                            <span className="ml-3">{item.name}</span>
-                                        </NavLink>
-                                    </li>
-                                ))}
-                            </ul>
-                        </nav>
-                    </aside>
-                )}
+                <aside className="sidebar">
+                    <nav className="sidebar-nav">
+                        <ul>
+                            {navItems.map((item) => (
+                                <li key={item.name}>
+                                    <NavLink
+                                        to={item.href}
+                                        className={({ isActive }) => `sidebar-nav-link group ${isActive ? 'active' : ''}`}
+                                    >
+                                        {item.icon && <item.icon className="h-5 w-5 text-gray-400 group-hover:text-indigo-600" />}
+                                        <span className="ml-3">{item.name}</span>
+                                    </NavLink>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+                </aside>
 
-                <main className={`w-full ${user ? 'main-content-with-sidebar' : 'p-4 md:p-10'}`}>
+                <main className="w-full main-content-with-sidebar">
                     <Outlet />
                 </main>
             </div>

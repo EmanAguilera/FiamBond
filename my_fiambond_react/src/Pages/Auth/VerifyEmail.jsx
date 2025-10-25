@@ -1,5 +1,3 @@
-// src/Pages/Auth/VerifyEmail.jsx
-
 import { useContext, useState, useEffect } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
 import { sendEmailVerification } from 'firebase/auth';
@@ -14,6 +12,7 @@ export default function VerifyEmail() {
     const [isResending, setIsResending] = useState(false);
     const [cooldown, setCooldown] = useState(0);
 
+    // All of your existing logic for this component remains the same.
     useEffect(() => {
         const interval = setInterval(async () => {
             if (auth.currentUser) {
@@ -45,10 +44,7 @@ export default function VerifyEmail() {
             setMessage('A new verification email has been sent.');
             setCooldown(60);
         } catch (err) {
-            // THE FIX IS HERE: We now log the error to the console,
-            // which means the 'err' variable is officially "used".
             console.error("Resend Verification Error:", err);
-            
             if (err.code === 'auth/too-many-requests') {
                 setError('You have requested this too many times. Please wait a moment before trying again.');
             } else {
@@ -61,8 +57,9 @@ export default function VerifyEmail() {
 
     const isButtonDisabled = isResending || cooldown > 0;
 
+    // This is the layout wrapper that makes the page look like your Login/Register pages.
     return (
-        <div className="flex justify-center items-center h-full">
+        <main className="login-wrapper">
             <div className="login-card text-center" style={{ maxWidth: '450px' }}>
                 <h1 className="title">Verify Your Email Address</h1>
                 <p className="text-gray-600 mb-6">
@@ -93,6 +90,6 @@ export default function VerifyEmail() {
                     </button>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }
