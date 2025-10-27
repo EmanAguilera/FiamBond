@@ -6,10 +6,13 @@ import {
     query, 
     where, 
     getDocs, 
-    documentId 
+    documentId,
+    runTransaction,
+    doc,
+    serverTimestamp
 } from 'firebase/firestore';
 
-// --- LAZY LOADED COMPONENTS FOR REPAYMENT ---
+// --- LAZY LOADED COMPONENTS ---
 const Modal = lazy(() => import('./Modal.jsx'));
 const MakeRepaymentWidget = lazy(() => import('./MakeRepaymentWidget.tsx'));
 const RecordPersonalRepaymentWidget = lazy(() => import('./RecordPersonalRepaymentWidget.tsx'));
@@ -17,7 +20,7 @@ const RecordPersonalRepaymentWidget = lazy(() => import('./RecordPersonalRepayme
 // --- FULL SKELETON LOADER COMPONENT ---
 const LoanListSkeleton = () => (
     <div className="animate-pulse">
-        <h3 className="font-bold text-lg text-gray-800 mb-2"></h3>
+        <h3 className="font-bold text-lg text-gray-800 mb-2 h-7 w-1/3 bg-slate-200 rounded"></h3>
         <div className="dashboard-card p-0">
             {[...Array(3)].map((_, i) => (
                 <div key={i} className="flex justify-between items-center p-4 border-b last:border-b-0 border-slate-100">
@@ -55,10 +58,13 @@ const LoanItem = ({ loan, onRepaymentSuccess }) => {
     const { user } = useContext(AppContext);
     const [isRepaymentModalOpen, setIsRepaymentModalOpen] = useState(false);
     const [isRecordRepaymentModalOpen, setIsRecordRepaymentModalOpen] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
+    const [confirmError, setConfirmError] = useState(null);
     
     const isCreditor = user.uid === loan.creditor_id;
     const isBorrower = user.uid === loan.debtor_id;
     const isPersonalLoan = loan.family_id === null;
+    const hasPendingPayment = loan.pending_repayment != null;
     const outstanding = parseFloat(loan.amount) - parseFloat(loan.repaid_amount);
     
     const creationDate = loan.created_at?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -73,6 +79,55 @@ const LoanItem = ({ loan, onRepaymentSuccess }) => {
     };
 
     const debtorDisplayName = loan.debtor ? loan.debtor.full_name : loan.debtor_name;
+
+    const handleConfirmRepayment = async () => {
+        if (!isCreditor || !hasPendingPayment) return;
+
+        setIsConfirming(true);
+        setConfirmError(null);
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const loanRef = doc(db, "loans", loan.id);
+                const loanDoc = await transaction.get(loanRef);
+
+                if (!loanDoc.exists() || !loanDoc.data().pending_repayment) {
+                    throw new Error("This payment is no longer pending or the loan does not exist.");
+                }
+
+                const currentData = loanDoc.data();
+                const repaymentAmount = currentData.pending_repayment.amount;
+
+                const newRepaidAmount = currentData.repaid_amount + repaymentAmount;
+                const newStatus = newRepaidAmount >= currentData.amount ? "repaid" : "outstanding";
+
+                transaction.update(loanRef, {
+                    repaid_amount: newRepaidAmount,
+                    status: newStatus,
+                    pending_repayment: null
+                });
+
+                const newTransactionRef = doc(collection(db, "transactions"));
+                const transactionData = {
+                    user_id: user.uid,
+                    family_id: null,
+                    type: "income",
+                    amount: repaymentAmount,
+                    description: `Loan repayment from ${debtorDisplayName}: ${loan.description}`,
+                    created_at: serverTimestamp(),
+                };
+                transaction.set(newTransactionRef, transactionData);
+            });
+            
+            handleSuccess();
+
+        } catch (error) {
+            console.error("Failed to confirm repayment:", error);
+            setConfirmError("Failed to confirm. Please try again.");
+        } finally {
+            setIsConfirming(false);
+        }
+    };
 
     return (
         <>
@@ -90,6 +145,21 @@ const LoanItem = ({ loan, onRepaymentSuccess }) => {
             </Suspense>
 
             <div className="p-4 border-b last:border-b-0 border-gray-100">
+                {isCreditor && hasPendingPayment && (
+                    <div className="mb-3 p-3 bg-blue-50 border-l-4 border-blue-400 rounded-r-md">
+                        <p className="text-sm font-semibold text-blue-800">Awaiting Confirmation</p>
+                        <p className="text-xs text-blue-700 mt-1">
+                            {debtorDisplayName} has submitted a payment of ₱{loan.pending_repayment.amount.toFixed(2)}.
+                        </p>
+                        <div className="flex gap-2 mt-2">
+                            <button onClick={handleConfirmRepayment} disabled={isConfirming} className="primary-btn-sm">
+                                {isConfirming ? 'Confirming...' : 'Confirm'}
+                            </button>
+                        </div>
+                        {confirmError && <p className="error text-xs mt-1">{confirmError}</p>}
+                    </div>
+                )}
+
                 <div className="flex justify-between items-start">
                     <div className="min-w-0 pr-4">
                         <p className="font-semibold text-gray-800 break-words">{loan.description}</p>
@@ -115,13 +185,13 @@ const LoanItem = ({ loan, onRepaymentSuccess }) => {
                     </div>
                 </div>
                 
-                {isBorrower && outstanding > 0 && (
+                {isBorrower && outstanding > 0 && !hasPendingPayment && (
                     <button onClick={() => setIsRepaymentModalOpen(true)} className="secondary-btn-sm w-full mt-3">
                         Make Repayment
                     </button>
                 )}
                 
-                {isCreditor && isPersonalLoan && outstanding > 0 && (
+                {isCreditor && isPersonalLoan && outstanding > 0 && !hasPendingPayment && (
                      <button onClick={() => setIsRecordRepaymentModalOpen(true)} className="primary-btn-sm w-full mt-3">
                         Record Repayment Received
                     </button>
