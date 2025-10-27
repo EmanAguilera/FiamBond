@@ -12,7 +12,7 @@ import {
 // --- LAZY LOADED COMPONENTS FOR REPAYMENT ---
 const Modal = lazy(() => import('./Modal.jsx'));
 const MakeRepaymentWidget = lazy(() => import('./MakeRepaymentWidget.tsx'));
-
+const RecordPersonalRepaymentWidget = lazy(() => import('./RecordPersonalRepaymentWidget.tsx'));
 
 // --- FULL SKELETON LOADER COMPONENT ---
 const LoanListSkeleton = () => (
@@ -54,8 +54,11 @@ const DeadlineNotification = ({ deadline, outstanding }) => {
 const LoanItem = ({ loan, onRepaymentSuccess }) => {
     const { user } = useContext(AppContext);
     const [isRepaymentModalOpen, setIsRepaymentModalOpen] = useState(false);
+    const [isRecordRepaymentModalOpen, setIsRecordRepaymentModalOpen] = useState(false);
     
-    const isBorrower = user.uid === loan.debtor.id;
+    const isCreditor = user.uid === loan.creditor_id;
+    const isBorrower = user.uid === loan.debtor_id;
+    const isPersonalLoan = loan.family_id === null;
     const outstanding = parseFloat(loan.amount) - parseFloat(loan.repaid_amount);
     
     const creationDate = loan.created_at?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -63,10 +66,13 @@ const LoanItem = ({ loan, onRepaymentSuccess }) => {
 
     const handleSuccess = () => {
         setIsRepaymentModalOpen(false);
+        setIsRecordRepaymentModalOpen(false);
         if (onRepaymentSuccess) {
             onRepaymentSuccess();
         }
     };
+
+    const debtorDisplayName = loan.debtor ? loan.debtor.full_name : loan.debtor_name;
 
     return (
         <>
@@ -74,6 +80,11 @@ const LoanItem = ({ loan, onRepaymentSuccess }) => {
                 {isRepaymentModalOpen && (
                     <Modal isOpen={isRepaymentModalOpen} onClose={() => setIsRepaymentModalOpen(false)} title="Make a Repayment">
                         <MakeRepaymentWidget loan={loan} onSuccess={handleSuccess} />
+                    </Modal>
+                )}
+                {isRecordRepaymentModalOpen && (
+                    <Modal isOpen={isRecordRepaymentModalOpen} onClose={() => setIsRecordRepaymentModalOpen(false)} title="Record Repayment Received">
+                        <RecordPersonalRepaymentWidget loan={loan} onSuccess={handleSuccess} />
                     </Modal>
                 )}
             </Suspense>
@@ -84,7 +95,7 @@ const LoanItem = ({ loan, onRepaymentSuccess }) => {
                         <p className="font-semibold text-gray-800 break-words">{loan.description}</p>
                         <div className="mt-1 text-xs text-gray-500 space-y-1">
                             <p>Date Created: {creationDate}</p>
-                            <p>From: {loan.creditor.full_name} To: {loan.debtor.full_name}</p>
+                            <p>From: {loan.creditor.full_name} To: {debtorDisplayName}</p>
                         </div>
                         <p className="text-sm text-gray-600 mt-2">
                             Total Loan: <span className="font-mono">₱{parseFloat(loan.amount).toFixed(2)}</span>
@@ -103,9 +114,16 @@ const LoanItem = ({ loan, onRepaymentSuccess }) => {
                         <small className="text-xs text-gray-500">Outstanding</small>
                     </div>
                 </div>
+                
                 {isBorrower && outstanding > 0 && (
                     <button onClick={() => setIsRepaymentModalOpen(true)} className="secondary-btn-sm w-full mt-3">
                         Make Repayment
+                    </button>
+                )}
+                
+                {isCreditor && isPersonalLoan && outstanding > 0 && (
+                     <button onClick={() => setIsRecordRepaymentModalOpen(true)} className="primary-btn-sm w-full mt-3">
+                        Record Repayment Received
                     </button>
                 )}
             </div>
@@ -153,22 +171,24 @@ export default function LoanTrackingWidget({ family, onDataChange }) {
 
             const userIds = new Set();
             fetchedLoans.forEach(loan => {
-                userIds.add(loan.creditor_id);
-                userIds.add(loan.debtor_id);
+                if (loan.creditor_id) userIds.add(loan.creditor_id);
+                if (loan.debtor_id) userIds.add(loan.debtor_id);
             });
 
-            const usersQuery = query(collection(db, "users"), where(documentId(), "in", [...userIds]));
-            const usersSnapshot = await getDocs(usersQuery);
             const usersMap = {};
-            usersSnapshot.forEach(doc => {
-                usersMap[doc.id] = { id: doc.id, ...doc.data() };
-            });
-
+            if (userIds.size > 0) {
+                const usersQuery = query(collection(db, "users"), where(documentId(), "in", [...userIds]));
+                const usersSnapshot = await getDocs(usersQuery);
+                usersSnapshot.forEach(doc => {
+                    usersMap[doc.id] = { id: doc.id, ...doc.data() };
+                });
+            }
+            
             const enrichedLoans = fetchedLoans
                 .map(loan => ({
                     ...loan,
-                    creditor: usersMap[loan.creditor_id] || { full_name: "Unknown User" },
-                    debtor: usersMap[loan.debtor_id] || { full_name: "Unknown User" }
+                    creditor: usersMap[loan.creditor_id] || { full_name: "Unknown" },
+                    debtor: loan.debtor_id ? usersMap[loan.debtor_id] : null
                 }))
                 .sort((a, b) => b.created_at.toMillis() - a.created_at.toMillis());
 
@@ -180,7 +200,6 @@ export default function LoanTrackingWidget({ family, onDataChange }) {
         } finally {
             setLoading(false);
         }
-    // THE FIX IS HERE: Add the full 'family' object to the dependency array.
     }, [user, family]);
 
     useEffect(() => {
@@ -207,7 +226,7 @@ export default function LoanTrackingWidget({ family, onDataChange }) {
                     loans.map(loan => <LoanItem key={loan.id} loan={loan} onRepaymentSuccess={handleRepaymentSuccess} />)
                 ) : (
                     <p className="text-center italic text-gray-500 py-4 px-3">
-                        {family ? "No lending activity in this family yet." : "You have no personal lending activity yet."}
+                        {family ? "No lending activity in this family yet." : "You have no personal or family lending activity yet."}
                     </p>
                 )}
             </div>

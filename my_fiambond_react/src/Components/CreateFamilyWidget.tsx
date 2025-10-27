@@ -1,29 +1,30 @@
-// Components/CreateFamilyWidget.tsx
-
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
-import { db } from "../config/firebase-config"; // Adjust path if necessary
+import { db } from "../config/firebase-config";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-// FIX #1: Define an interface for the component's props
+// --- TypeScript Interfaces ---
+interface NewFamily {
+  id: string;
+  family_name: string;
+  owner_id: string;
+}
+
 interface CreateFamilyWidgetProps {
-  onSuccess?: () => void; // 'onSuccess' is an optional function that returns nothing
+  // THE FIX IS HERE (Part 1): The onSuccess prop is updated to pass the new family object.
+  onSuccess?: (newFamily: NewFamily) => void;
 }
 
 export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProps) {
   const { user } = useContext(AppContext);
   const [familyName, setFamilyName] = useState<string>("");
-  
-  // FIX #3: Specify that the state can be a string OR null
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // FIX #2: Add the correct event type for a form submission
   const handleCreateFamily = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!user) {
-      // This is now valid because generalError can be a string
       setGeneralError("You must be logged in to perform this action.");
       return;
     }
@@ -40,22 +41,27 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
       };
 
       const familiesCollectionRef = collection(db, "families");
-      await addDoc(familiesCollectionRef, familyData);
+      // THE FIX IS HERE (Part 2): Get the reference to the newly created document.
+      const newDocRef = await addDoc(familiesCollectionRef, familyData);
 
       setFamilyName("");
+      
+      // THE FIX IS HERE (Part 3): Call the onSuccess callback with the new family's data.
       if (onSuccess) {
-        onSuccess();
+        onSuccess({
+          id: newDocRef.id,
+          family_name: familyName,
+          owner_id: user.uid,
+        });
       }
     } catch (error) {
       console.error('Failed to create family:', error);
-      // This is also now valid
       setGeneralError('A network error occurred. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Add the correct event type for an input change
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFamilyName(e.target.value);
   };
@@ -68,7 +74,7 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
             type="text"
             placeholder="Family Name (e.g., Smith Household)"
             value={familyName}
-            onChange={handleInputChange} // Use the new typed handler
+            onChange={handleInputChange}
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             disabled={loading}
             required
