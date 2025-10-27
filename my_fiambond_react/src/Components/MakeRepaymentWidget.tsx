@@ -1,8 +1,7 @@
 import { useState, useContext, FormEvent } from 'react';
 import { AppContext } from '../Context/AppContext.jsx';
 import { db } from '../config/firebase-config';
-// THE FIX IS HERE (Part 1): We only need updateDoc and serverTimestamp now
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
 
 // --- TypeScript Interfaces ---
 interface Loan {
@@ -26,7 +25,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // THE FIX IS HERE (Part 2): This entire function is replaced with the new "Submit for Confirmation" logic.
+    // THE FIX IS HERE: This entire function is replaced with the new atomic logic.
     const handleSubmitForConfirmation = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const repaymentAmount = parseFloat(amount);
@@ -48,17 +47,33 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
         setError(null);
 
         try {
-            const loanRef = doc(db, "loans", loan.id);
+            // 1. Create a new write batch for atomic operations
+            const batch = writeBatch(db);
 
-            // Update the loan document with a pending payment object.
-            // This is the "signal" to the creditor.
-            await updateDoc(loanRef, {
+            // 2. Operation 1: Update the loan document with a pending payment object.
+            const loanRef = doc(db, "loans", loan.id);
+            batch.update(loanRef, {
                 pending_repayment: {
                     amount: repaymentAmount,
                     submitted_by: user.uid,
                     submitted_at: serverTimestamp()
                 }
             });
+
+            // 3. Operation 2: Create a personal 'expense' transaction FOR THE DEBTOR (the current user).
+            const transactionRef = doc(collection(db, "transactions"));
+            const transactionData = {
+                user_id: user.uid, // The expense belongs to the person paying.
+                family_id: null,
+                type: 'expense',
+                amount: repaymentAmount,
+                description: `Loan repayment for: ${loan.description}`,
+                created_at: serverTimestamp()
+            };
+            batch.set(transactionRef, transactionData);
+
+            // 4. Commit both writes. They either both succeed or both fail.
+            await batch.commit();
 
             onSuccess();
 
@@ -97,7 +112,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
             <button type="submit" className="primary-btn w-full" disabled={loading}>
                 {loading ? 'Submitting...' : 'Submit for Confirmation'}
             </button>
-            <p className="text-xs text-center text-gray-500">The lender will need to confirm this payment to update the balance.</p>
+            <p className="text-xs text-center text-gray-500">This will be deducted from your personal balance. The lender must confirm this payment.</p>
         </form>
     );
 }
