@@ -1,7 +1,8 @@
 import { useState, useContext, FormEvent } from 'react';
 import { AppContext } from '../Context/AppContext.jsx';
 import { db } from '../config/firebase-config';
-import { doc, runTransaction, serverTimestamp, collection, Timestamp } from 'firebase/firestore';
+// THE FIX IS HERE (Part 1): We only need updateDoc and serverTimestamp now
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 // --- TypeScript Interfaces ---
 interface Loan {
@@ -25,7 +26,8 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleRepayment = async (e: FormEvent<HTMLFormElement>) => {
+    // THE FIX IS HERE (Part 2): This entire function is replaced with the new "Submit for Confirmation" logic.
+    const handleSubmitForConfirmation = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const repaymentAmount = parseFloat(amount);
 
@@ -46,53 +48,30 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
         setError(null);
 
         try {
-            // Use a Firestore Transaction to ensure the loan update and the lender's
-            // income transaction are created together (atomically).
-            await runTransaction(db, async (transaction) => {
-                const loanRef = doc(db, "loans", loan.id);
-                const loanDoc = await transaction.get(loanRef);
+            const loanRef = doc(db, "loans", loan.id);
 
-                if (!loanDoc.exists()) {
-                    throw new Error("This loan no longer exists.");
-                }
-
-                const currentData = loanDoc.data();
-                const newRepaidAmount = currentData.repaid_amount + repaymentAmount;
-                const newStatus = newRepaidAmount >= currentData.amount ? "repaid" : "outstanding";
-
-                // Operation 1: Update the loan document with the new repaid amount and status.
-                transaction.update(loanRef, {
-                    repaid_amount: newRepaidAmount,
-                    status: newStatus
-                });
-
-                // Operation 2: Create a corresponding 'income' transaction for the CREDITOR (the lender).
-                // This is the key to automatically updating their personal balance.
-                const newTransactionRef = doc(collection(db, "transactions"));
-                const transactionData = {
-                    user_id: loan.creditor_id, // The payment is INCOME for the lender.
-                    family_id: null,
-                    type: "income",
+            // Update the loan document with a pending payment object.
+            // This is the "signal" to the creditor.
+            await updateDoc(loanRef, {
+                pending_repayment: {
                     amount: repaymentAmount,
-                    description: `Loan repayment from ${user.full_name || 'a family member'}: ${loan.description}`,
-                    created_at: serverTimestamp(),
-                };
-                transaction.set(newTransactionRef, transactionData);
+                    submitted_by: user.uid,
+                    submitted_at: serverTimestamp()
+                }
             });
 
-            // If the entire transaction succeeds, call the onSuccess callback.
             onSuccess();
 
         } catch (err: any) {
-            console.error("Repayment transaction failed:", err);
-            setError("The repayment could not be processed. Please try again.");
+            console.error("Failed to submit repayment for confirmation:", err);
+            setError("Could not submit payment. Please check your connection and try again.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <form onSubmit={handleRepayment} className="space-y-4">
+        <form onSubmit={handleSubmitForConfirmation} className="space-y-4">
             <div>
                 <p className="text-sm text-gray-600">You are making a repayment for:</p>
                 <p className="font-semibold text-gray-800">{loan.description}</p>
@@ -116,8 +95,9 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
             </div>
             {error && <p className="error">{error}</p>}
             <button type="submit" className="primary-btn w-full" disabled={loading}>
-                {loading ? 'Processing Payment...' : 'Confirm Repayment'}
+                {loading ? 'Submitting...' : 'Submit for Confirmation'}
             </button>
+            <p className="text-xs text-center text-gray-500">The lender will need to confirm this payment to update the balance.</p>
         </form>
     );
 }
