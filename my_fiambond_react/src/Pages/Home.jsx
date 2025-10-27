@@ -11,11 +11,12 @@ const CreateGoalWidget = lazy(() => import("../Components/CreateGoalWidget"));
 const PersonalTransactionsWidget = lazy(() => import("../Components/PersonalTransactionsWidget.jsx"));
 const CreateTransactionWidget = lazy(() => import("../Components/CreateTransactionWidget"));
 const FamilyManagementWidget = lazy(() => import("../Components/FamilyManagementWidget"));
-const CreateFamilyWidget = lazy(() => import("../Components/CreateFamilyWidget"));
 const FamilyRealm = lazy(() => import('../Components/FamilyRealm'));
 const PersonalReportChartWidget = lazy(() => import('../Components/PersonalReportChartWidget.jsx'));
 const LoanTrackingWidget = lazy(() => import('../Components/LoanTrackingWidget.jsx'));
-
+const RecordLoanFlowWidget = lazy(() => import('../Components/RecordLoanFlowWidget.tsx'));
+const RecordLoanChoiceWidget = lazy(() => import('../Components/RecordLoanChoiceWidget.tsx'));
+const CreatePersonalLoanWidget = lazy(() => import('../Components/CreatePersonalLoanWidget.tsx'));
 
 // --- SKELETON COMPONENT ---
 const DashboardSkeleton = () => (
@@ -23,7 +24,7 @@ const DashboardSkeleton = () => (
         <header className="dashboard-header mb-8">
             <div className="flex flex-wrap gap-4">
                 <div className="h-10 w-40 bg-slate-200 rounded"></div>
-                <div className="h-10 w-32 bg-slate-200 rounded"></div>
+                <div className="h-10 w-40 bg-slate-200 rounded"></div>
                 <div className="h-10 w-32 bg-slate-200 rounded"></div>
                 <div className="h-10 w-40 bg-slate-200 rounded"></div>
             </div>
@@ -92,7 +93,8 @@ export default function Home() {
     const [isLendingModalOpen, setIsLendingModalOpen] = useState(false);
     const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false);
     const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false);
-    const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
+    const [isRecordLoanModalOpen, setIsRecordLoanModalOpen] = useState(false);
+    const [loanFlowStep, setLoanFlowStep] = useState('choice');
     
     // --- STATE FOR VIEW MANAGEMENT ---
     const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
@@ -228,16 +230,40 @@ export default function Home() {
         setIsCreateGoalModalOpen(false);
         getActiveTotalGoalsCount();
     }, [getActiveTotalGoalsCount]);
-
-    const handleFamilySuccess = useCallback(() => {
-        setIsCreateFamilyModalOpen(false);
-    }, []);
     
     const handleFamilyDataChange = useCallback(() => {
         getSummaryData();
         getReport();
         getLendingSummary();
     }, [getSummaryData, getReport, getLendingSummary]);
+
+    const handleRecordLoanSuccess = () => {
+        setIsRecordLoanModalOpen(false);
+        handleFamilyDataChange();
+    };
+    
+    const openCreateFamilyFromLoanFlow = () => {
+        setIsRecordLoanModalOpen(false);
+    };
+
+    // --- MODAL CONTENT RENDERER ---
+    const renderLoanModalContent = () => {
+        switch (loanFlowStep) {
+            case 'family':
+                return <RecordLoanFlowWidget 
+                            onSuccess={handleRecordLoanSuccess} 
+                            onRequestCreateFamily={openCreateFamilyFromLoanFlow} 
+                        />;
+            case 'personal':
+                return <CreatePersonalLoanWidget onSuccess={handleRecordLoanSuccess} />;
+            case 'choice':
+            default:
+                return <RecordLoanChoiceWidget 
+                            onSelectFamilyLoan={() => setLoanFlowStep('family')}
+                            onSelectPersonalLoan={() => setLoanFlowStep('personal')}
+                        />;
+        }
+    };
 
     // --- NAVIGATION HANDLERS ---
     const handleEnterFamilyRealm = (family) => {
@@ -258,16 +284,25 @@ export default function Home() {
                 {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><PersonalTransactionsWidget /></Modal>}
                 {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
                 {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget onEnterRealm={handleEnterFamilyRealm} /></Modal>}
-                
                 {isLendingModalOpen && (
                     <Modal isOpen={isLendingModalOpen} onClose={() => setIsLendingModalOpen(false)} title="Your Lending Activity">
                         <LoanTrackingWidget onDataChange={handleFamilyDataChange} />
                     </Modal>
                 )}
-
                 {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
                 {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
-                {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
+                {isRecordLoanModalOpen && (
+                    <Modal 
+                        isOpen={isRecordLoanModalOpen} 
+                        onClose={() => {
+                            setIsRecordLoanModalOpen(false);
+                            setLoanFlowStep('choice');
+                        }} 
+                        title="Record a New Loan"
+                    >
+                        {renderLoanModalContent()}
+                    </Modal>
+                )}
             </Suspense>
 
             {activeFamilyRealm ? (
@@ -280,8 +315,11 @@ export default function Home() {
                         <header className="dashboard-header">
                             <div className="flex flex-wrap gap-4">
                                 <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
+                                <button onClick={() => {
+                                    setLoanFlowStep('choice');
+                                    setIsRecordLoanModalOpen(true);
+                                }} className="primary-btn">+ Record a Loan</button>
                                 <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
-                                <button onClick={() => setIsCreateFamilyModalOpen(true)} className="secondary-btn">+ Add Family</button>
                                 <button onClick={() => setIsFamilyModalOpen(true)} className="secondary-btn">Manage Families</button>
                             </div>
                         </header>
@@ -308,7 +346,7 @@ export default function Home() {
                         </div>
 
                         <div className="dashboard-section">
-                             <div className="w-full mx-auto flex justify-center gap-4 mb-6">
+                            <div className="w-full mx-auto flex justify-center gap-4 mb-6">
                                 <button onClick={() => setPeriod('weekly')} className={period === 'weekly' ? 'active-period-btn' : 'period-btn'}>Weekly</button>
                                 <button onClick={() => setPeriod('monthly')} className={period === 'monthly' ? 'active-period-btn' : 'period-btn'}>Monthly</button>
                                 <button onClick={() => setPeriod('yearly')} className={period === 'yearly' ? 'active-period-btn' : 'period-btn'}>Yearly</button>
