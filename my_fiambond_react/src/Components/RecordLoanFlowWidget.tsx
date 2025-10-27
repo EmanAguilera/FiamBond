@@ -1,33 +1,41 @@
 import { useState, useEffect, useContext } from 'react';
 import { AppContext } from '../Context/AppContext.jsx';
 import { db } from '../config/firebase-config';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import CreateLoanWidget from './CreateLoanWidget'; // Import the existing widget
+import { collection, query, where, getDocs, doc, getDoc, documentId } from 'firebase/firestore';
+import CreateLoanWidget from './CreateLoanWidget'; // Ensure path is correct
 
 // --- TypeScript Interfaces ---
 interface Family {
     id: string;
     family_name: string;
+    member_ids: string[]; // We need member_ids to fetch the members
+}
+
+interface Member {
+    id: string;
+    full_name: string;
 }
 
 interface RecordLoanFlowWidgetProps {
     onSuccess: () => void;
-    // Optional: Add a prop to trigger opening the "Create Family" modal
     onRequestCreateFamily: () => void;
 }
 
 export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily }: RecordLoanFlowWidgetProps) {
     const { user } = useContext(AppContext);
     
-    // State to manage the view: 'loading', 'selecting', or 'lending'
-    const [flowState, setFlowState] = useState<'loading' | 'selecting' | 'lending'>('loading');
+    // State to manage the view: 'loadingFamilies', 'selecting', 'loadingMembers', or 'lending'
+    const [flowState, setFlowState] = useState<'loadingFamilies' | 'selecting' | 'loadingMembers' | 'lending'>('loadingFamilies');
     const [families, setFamilies] = useState<Family[]>([]);
     const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
+    const [familyMembers, setFamilyMembers] = useState<Member[]>([]); // State to hold the fetched members
     const [error, setError] = useState<string | null>(null);
 
+    // Effect 1: Fetch the user's families
     useEffect(() => {
         const fetchFamilies = async () => {
             if (!user?.uid) return;
+            setFlowState('loadingFamilies');
             setError(null);
             try {
                 const q = query(collection(db, "families"), where("member_ids", "array-contains", user.uid));
@@ -39,44 +47,86 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
                 
                 setFamilies(fetchedFamilies);
 
-                // Smart Logic: Decide what to show next
                 if (fetchedFamilies.length === 0) {
-                    // No families, stay in 'selecting' state to show a message
                     setFlowState('selecting');
                 } else if (fetchedFamilies.length === 1) {
-                    // Only one family, auto-select it and proceed to lending form
+                    // Auto-select the only family and trigger member fetching
                     setSelectedFamily(fetchedFamilies[0]);
-                    setFlowState('lending');
                 } else {
-                    // Multiple families, user must select one
                     setFlowState('selecting');
                 }
             } catch (err) {
                 console.error("Failed to fetch families for loan flow:", err);
                 setError("Could not load your families. Please try again.");
-                setFlowState('selecting'); // Show error in the selection screen
+                setFlowState('selecting');
             }
         };
 
         fetchFamilies();
     }, [user]);
 
+    // THE FIX IS HERE: Effect 2: Fetch members *after* a family has been selected
+    useEffect(() => {
+        const fetchMembers = async () => {
+            if (!selectedFamily || !selectedFamily.member_ids) return;
+
+            setFlowState('loadingMembers'); // Show a loading state for members
+            setError(null);
+            try {
+                const memberIds = selectedFamily.member_ids;
+                if (memberIds.length === 0) {
+                    setFamilyMembers([]);
+                    setFlowState('lending'); // Proceed even if no members
+                    return;
+                }
+
+                const usersRef = collection(db, "users");
+                const q = query(usersRef, where(documentId(), "in", memberIds));
+                const querySnapshot = await getDocs(q);
+                const members = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    full_name: doc.data().full_name
+                } as Member));
+                
+                setFamilyMembers(members);
+                setFlowState('lending'); // Move to the final step
+            } catch (err) {
+                console.error("Failed to fetch family members:", err);
+                setError("Could not load family members. Please try again.");
+                setFlowState('selecting'); // Go back to selection on error
+            }
+        };
+
+        if (selectedFamily) {
+            fetchMembers();
+        }
+    }, [selectedFamily]);
+
+
     const handleFamilySelect = (familyId: string) => {
         const family = families.find(f => f.id === familyId);
         if (family) {
-            setSelectedFamily(family);
-            setFlowState('lending');
+            setSelectedFamily(family); // This will trigger the second useEffect
         }
     };
 
-    // Render loading state
-    if (flowState === 'loading') {
+    // Render loading state for families
+    if (flowState === 'loadingFamilies') {
         return <div className="p-4 text-center">Loading your families...</div>;
     }
 
-    // Render the loan creation form once a family is selected
+    // Render loading state for members
+    if (flowState === 'loadingMembers') {
+        return <div className="p-4 text-center">Loading family members...</div>;
+    }
+
+    // Render the loan creation form once everything is loaded
     if (flowState === 'lending' && selectedFamily) {
-        return <CreateLoanWidget family={selectedFamily} onSuccess={onSuccess} />;
+        return <CreateLoanWidget 
+                    family={selectedFamily} 
+                    members={familyMembers} // Pass the fetched members down
+                    onSuccess={onSuccess} 
+                />;
     }
 
     // Render the family selection screen by default
