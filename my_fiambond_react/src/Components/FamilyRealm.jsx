@@ -1,9 +1,8 @@
 import { useState, lazy, Suspense, useContext, useCallback, useEffect, useRef } from 'react';
 import { AppContext } from '../Context/AppContext.jsx';
 import { db } from '../config/firebase-config.js';
-import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, documentId } from 'firebase/firestore';
 
-// --- LAZY LOADED COMPONENTS ---
 const Modal = lazy(() => import('./Modal.jsx'));
 const FamilyReportChartWidget = lazy(() => import('./FamilyReportChartWidget.jsx'));
 const LoanTrackingWidget = lazy(() => import('./LoanTrackingWidget.jsx'));
@@ -14,7 +13,6 @@ const CreateFamilyGoalWidget = lazy(() => import('./CreateFamilyGoalWidget.jsx')
 const FamilyTransactionsWidget = lazy(() => import('./FamilyTransactionsWidget.jsx'));
 const FamilyMembersView = lazy(() => import('./FamilyMembersView.jsx'));
 
-// --- FULL SKELETON LOADER COMPONENT ---
 const FamilyRealmSkeleton = () => (
     <div className="p-4 md:p-10 animate-pulse">
         <div className="h-8 w-60 bg-slate-200 rounded-md mb-6"></div>
@@ -33,14 +31,11 @@ const FamilyRealmSkeleton = () => (
     </div>
 );
 
-// --- Helper function from FamilyLedgerView to format chart data ---
 const formatDataForChart = (transactions) => {
     if (!transactions || transactions.length === 0) {
         return { labels: [], datasets: [] };
     }
-
     const data = {};
-
     transactions.forEach(tx => {
         if (tx.created_at && typeof tx.created_at.toDate === 'function') {
             const date = tx.created_at.toDate().toLocaleDateString();
@@ -54,31 +49,19 @@ const formatDataForChart = (transactions) => {
             }
         }
     });
-
-    const labels = Object.keys(data).sort((a,b) => new Date(a) - new Date(b));
-    
+    const labels = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
     return {
         labels,
         datasets: [
-            {
-                label: 'Inflow (₱)',
-                data: labels.map(label => data[label].income),
-                backgroundColor: 'rgba(75, 192, 192, 0.5)',
-            },
-            {
-                label: 'Outflow (₱)',
-                data: labels.map(label => data[label].expense),
-                backgroundColor: 'rgba(255, 99, 132, 0.5)',
-            },
-        ],
+            { label: 'Inflow (₱)', data: labels.map(label => data[label].income), backgroundColor: 'rgba(75, 192, 192, 0.5)' },
+            { label: 'Outflow (₱)', data: labels.map(label => data[label].expense), backgroundColor: 'rgba(255, 99, 132, 0.5)' }
+        ]
     };
 };
 
-// --- THE FIX IS HERE (Part 1): Accept the new 'onDataChange' prop ---
-export default function FamilyRealm({ family, onBack, onFamilyUpdate, onDataChange }) {
+export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpdate }) {
     const { user } = useContext(AppContext);
 
-    // --- STATE FOR MODALS ---
     const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -87,7 +70,6 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate, onDataChan
     const [isLoanListModalOpen, setIsLoanListModalOpen] = useState(false);
     const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
 
-    // --- STATE FOR DASHBOARD DATA ---
     const [loading, setLoading] = useState(true);
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
@@ -98,7 +80,8 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate, onDataChan
     const [period, setPeriod] = useState('monthly');
     const isInitialMount = useRef(true);
 
-    // --- DATA FETCHING (Summary Cards) ---
+    const [familyMembers, setFamilyMembers] = useState([]);
+
     const getFamilyBalance = useCallback(async () => {
         if (!user || !family) return;
         try {
@@ -132,7 +115,6 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate, onDataChan
         } catch (error) { console.error("Failed to fetch family loan count", error); }
     }, [user, family]);
 
-    // --- DATA FETCHING (Report Chart) ---
     const getFamilyReport = useCallback(async () => {
         if (!user || !family) return;
         setReportLoading(true);
@@ -175,44 +157,60 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate, onDataChan
             setReportLoading(false);
         }
     }, [user, family, period]);
-
-    // --- INITIAL DATA LOAD ---
-    const fetchDashboardData = useCallback(async () => {
-        setLoading(true);
-        await Promise.all([
-            getFamilyBalance(),
-            getFamilyActiveGoalsCount(),
-            getFamilyActiveLoansCount(),
-            getFamilyReport()
-        ]);
-        setLoading(false);
-    }, [getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport]);
     
     useEffect(() => {
-        fetchDashboardData();
-    }, [fetchDashboardData]);
+        const fetchAllData = async () => {
+            if (!family || !user) return;
+            setLoading(true);
+            try {
+                // Fetch member details first
+                if (family.member_ids && family.member_ids.length > 0) {
+                    const usersRef = collection(db, "users");
+                    const q = query(usersRef, where(documentId(), "in", family.member_ids));
+                    const querySnapshot = await getDocs(q);
+                    const members = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setFamilyMembers(members);
+                } else {
+                    setFamilyMembers([]);
+                }
 
-    // --- EFFECT FOR PERIOD CHANGES ONLY ---
+                // Then fetch the rest of the dashboard data
+                await Promise.all([
+                    getFamilyBalance(),
+                    getFamilyActiveGoalsCount(),
+                    getFamilyActiveLoansCount(),
+                    getFamilyReport()
+                ]);
+
+            } catch (error) {
+                console.error("Error fetching initial Family Realm data:", error);
+                setReportError("Failed to load family details.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAllData();
+    }, [family, user, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport]);
+
+
     useEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false;
-        } else {
+        } else if (user && family) {
             getFamilyReport();
         }
-    }, [period, getFamilyReport]);
+    }, [period, user, family, getFamilyReport]);
 
-    // --- SUCCESS HANDLERS ---
-    // --- THE FIX IS HERE (Part 2): Update the success handler ---
     const handleSuccess = () => {
-        // First, close all relevant modals
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
-        
-        // Then, refresh the data for this component (FamilyRealm)
-        fetchDashboardData();
-        
-        // Finally, call the onDataChange prop to signal the Home component to refresh its data.
+        // Re-fetch everything
+        getFamilyBalance();
+        getFamilyActiveGoalsCount();
+        getFamilyActiveLoansCount();
+        getFamilyReport();
         if (onDataChange) {
             onDataChange();
         }
@@ -288,10 +286,18 @@ export default function FamilyRealm({ family, onBack, onFamilyUpdate, onDataChan
             <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
                 {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Add Transaction for ${family.family_name}`}><CreateFamilyTransactionWidget family={family} onSuccess={handleSuccess} /></Modal>}
                 {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Add Goal for ${family.family_name}`}><CreateFamilyGoalWidget family={family} onSuccess={handleSuccess} /></Modal>}
-                {isLoanModalOpen && <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Lend Money to a Family Member"><CreateLoanWidget family={family} onSuccess={handleSuccess} /></Modal>}
+                {isLoanModalOpen && (
+                    <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Lend Money to a Family Member">
+                        <CreateLoanWidget 
+                            family={family} 
+                            members={familyMembers} 
+                            onSuccess={handleSuccess} 
+                        />
+                    </Modal>
+                )}
                 {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.family_name}`}><FamilyTransactionsWidget family={family} /></Modal>}
                 {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.family_name}`}><GoalListsWidget family={family} /></Modal>}
-                {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Lending Activity for ${family.family_name}`}><LoanTrackingWidget family={family} /></Modal>}
+                {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Lending Activity for ${family.family_name}`}><LoanTrackingWidget family={family} onDataChange={onDataChange} /></Modal>}
                 
                 {isMembersModalOpen && (
                     <Modal isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)} title={`Manage Members for ${family.family_name}`}>

@@ -1,39 +1,25 @@
-import { useContext, useState, useEffect, ChangeEvent, FormEvent } from "react";
+import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../Context/AppContext.jsx";
 import { db } from "../config/firebase-config";
-import {
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  serverTimestamp,
-  Timestamp,
-  documentId,
-  writeBatch, // THE FIX IS HERE: Import writeBatch for atomic operations
-} from "firebase/firestore";
+import { writeBatch, collection, doc, serverTimestamp, Timestamp } from "firebase/firestore";
 
 // --- TypeScript Interfaces ---
 interface Family {
-  id: string; // Firestore document ID
-}
-
-interface User {
-  uid: string; // Firebase Auth UID
+  id: string;
 }
 
 interface Member {
-  id: string; // The user's UID
+  id: string;
   full_name: string;
 }
 
 interface CreateLoanWidgetProps {
   family: Family;
+  members: Member[]; // Expects the list of members as a prop
   onSuccess?: () => void;
 }
 
-export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidgetProps) {
+export default function CreateLoanWidget({ family, members, onSuccess }: CreateLoanWidgetProps) {
   const { user } = useContext(AppContext);
 
   const [formData, setFormData] = useState({
@@ -42,66 +28,17 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
     debtorId: "",
     deadline: "",
   });
-
-  const [members, setMembers] = useState<Member[]>([]);
+  
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true); // Start as true for initial fetch
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Effect to fetch family members to populate the dropdown
-  useEffect(() => {
-    const fetchMembers = async () => {
-      if (!family.id || !user?.uid) {
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-      try {
-        const familyDocRef = doc(db, "families", family.id);
-        const familyDocSnap = await getDoc(familyDocRef);
-
-        if (!familyDocSnap.exists()) {
-          throw new Error("Family not found.");
-        }
-
-        const memberIds = familyDocSnap.data().member_ids || [];
-        const otherMemberIds = memberIds.filter((id: string) => id !== user.uid);
-
-        if (otherMemberIds.length === 0) {
-          setMembers([]);
-          setLoading(false);
-          return;
-        }
-
-        const usersCollectionRef = collection(db, "users");
-        const q = query(usersCollectionRef, where(documentId(), "in", otherMemberIds));
-        
-        const querySnapshot = await getDocs(q);
-        const fetchedMembers = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          full_name: doc.data().full_name
-        } as Member));
-
-        setMembers(fetchedMembers);
-
-      } catch (err) {
-        console.error("Failed to fetch family members:", err);
-        setError("Could not load family members. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMembers();
-  }, [family.id, user?.uid]);
+  // The data-fetching useEffect has been completely removed from this component.
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
   };
 
-  // --- THE FIX IS HERE: This entire function is updated to be atomic ---
   const handleLendMoney = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) {
@@ -112,13 +49,10 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
     setLoading(true);
 
     try {
-        // Find the debtor's name for a more descriptive transaction
         const debtorName = members.find(m => m.id === formData.debtorId)?.full_name || 'Family Member';
-
-        // 1. Create a new write batch to perform multiple operations atomically
+        
         const batch = writeBatch(db);
-
-        // 2. Define the new loan document in the 'loans' collection
+        
         const newLoanRef = doc(collection(db, "loans"));
         const loanData = {
             family_id: family.id,
@@ -131,23 +65,19 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
             status: "outstanding",
             created_at: serverTimestamp(),
         };
-        // Stage the loan creation in the batch
         batch.set(newLoanRef, loanData);
 
-        // 3. Define the corresponding personal expense in the 'transactions' collection
         const newTransactionRef = doc(collection(db, "transactions"));
         const transactionData = {
-            user_id: user.uid, // This expense belongs to the lender (current user)
-            family_id: null,   // This is a personal transaction record
+            user_id: user.uid,
+            family_id: null,
             type: "expense",
             amount: Number(formData.amount),
             description: `Loan to ${debtorName}: ${formData.description}`,
             created_at: serverTimestamp(),
         };
-        // Stage the personal transaction creation in the batch
         batch.set(newTransactionRef, transactionData);
 
-        // 4. Commit the batch. Both documents are created, or neither is.
         await batch.commit();
 
         if (onSuccess) {
@@ -162,15 +92,18 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
     }
   };
 
+  // Filter out the current user from the members list passed in via props
+  const otherMembers = members.filter(member => member.id !== user?.uid);
+
   return (
     <form onSubmit={handleLendMoney} className="space-y-4">
       <div>
         <label htmlFor="debtorId" className="block text-sm font-medium text-gray-700">Lending To:</label>
-        <select id="debtorId" value={formData.debtorId} onChange={handleInputChange} required disabled={loading || members.length === 0} className="w-full p-2 border border-gray-300 rounded-md">
+        <select id="debtorId" value={formData.debtorId} onChange={handleInputChange} required disabled={loading || otherMembers.length === 0} className="w-full p-2 border border-gray-300 rounded-md">
           <option value="">
-            {loading ? "Loading members..." : members.length > 0 ? "Select a family member" : "No other members in this family"}
+            {otherMembers.length > 0 ? "Select a family member" : "No other members to lend to"}
           </option>
-          {members.map(member => (
+          {otherMembers.map(member => (
             <option key={member.id} value={member.id}>{member.full_name}</option>
           ))}
         </select>
@@ -188,7 +121,7 @@ export default function CreateLoanWidget({ family, onSuccess }: CreateLoanWidget
         <input id="deadline" type="date" value={formData.deadline} onChange={handleInputChange} disabled={loading} className="w-full p-2 border border-gray-300 rounded-md" />
       </div>
       {error && <p className="error">{error}</p>}
-      <button type="submit" className="primary-btn w-full" disabled={loading || members.length === 0}>
+      <button type="submit" className="primary-btn w-full" disabled={loading || otherMembers.length === 0}>
         {loading ? 'Processing...' : 'Confirm & Lend Money'}
       </button>
     </form>
