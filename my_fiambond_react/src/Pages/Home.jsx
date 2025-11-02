@@ -6,17 +6,18 @@ import { collection, query, where, getDocs, getCountFromServer, Timestamp, order
 
 // --- WIDGET IMPORTS ---
 const Modal = lazy(() => import("../Components/Modal"));
-const GoalListsWidget = lazy(() => import("../Components/GoalListsWidget"));
-const CreateGoalWidget = lazy(() => import("../Components/CreateGoalWidget"));
-const PersonalTransactionsWidget = lazy(() => import("../Components/PersonalTransactionsWidget.jsx"));
-const CreateTransactionWidget = lazy(() => import("../Components/CreateTransactionWidget"));
-const FamilyManagementWidget = lazy(() => import("../Components/FamilyManagementWidget"));
-const FamilyRealm = lazy(() => import('../Components/FamilyRealm'));
-const PersonalReportChartWidget = lazy(() => import('../Components/PersonalReportChartWidget.jsx'));
-const LoanTrackingWidget = lazy(() => import('../Components/LoanTrackingWidget.jsx'));
-const RecordLoanFlowWidget = lazy(() => import('../Components/RecordLoanFlowWidget.tsx'));
-const RecordLoanChoiceWidget = lazy(() => import('../Components/RecordLoanChoiceWidget.tsx'));
-const CreatePersonalLoanWidget = lazy(() => import('../Components/CreatePersonalLoanWidget.tsx'));
+const GoalListsWidget = lazy(() => import("../Components/Personal/GoalListsWidget.jsx"));
+const CreateGoalWidget = lazy(() => import("../Components/Personal/CreateGoalWidget.tsx"));
+const PersonalTransactionsWidget = lazy(() => import("../Components/Personal/PersonalTransactionsWidget.jsx"));
+const CreateTransactionWidget = lazy(() => import("../Components/Personal/CreateTransactionWidget.tsx"));
+const FamilyManagementWidget = lazy(() => import("../Components/Family/FamilyManagementWidget.jsx"));
+const CreateFamilyWidget = lazy(() => import("../Components/Family/CreateFamilyWidget.tsx"));
+const FamilyRealm = lazy(() => import('../Components/Family/FamilyRealm.jsx'));
+const PersonalReportChartWidget = lazy(() => import('../Components/Personal/PersonalReportChartWidget.jsx'));
+const LoanTrackingWidget = lazy(() => import('../Components/Personal/LoanTrackingWidget.jsx'));
+const RecordLoanFlowWidget = lazy(() => import('../Components/Personal/RecordLoanFlowWidget.tsx'));
+const RecordLoanChoiceWidget = lazy(() => import('../Components/Personal/RecordLoanChoiceWidget.tsx'));
+const CreatePersonalLoanWidget = lazy(() => import('../Components/Personal/CreatePersonalLoanWidget.tsx'));
 
 // --- SKELETON COMPONENT ---
 const DashboardSkeleton = () => (
@@ -76,6 +77,32 @@ const formatDataForChart = (transactions) => {
     };
 };
 
+// --- NEW ICONS FOR THE REDESIGNED CARDS ---
+const WalletIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>);
+const FlagIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H8.5l-1-1H5a2 2 0 00-2 2z"></path></svg>);
+const GiftIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>);
+
+// --- NEW STYLED DASHBOARD CARD COMPONENT ---
+const DashboardCard = ({ title, value, linkText, onClick, icon, colorClass }) => (
+    <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
+        {/* Header with Title and Icon */}
+        <div className="flex justify-between items-start">
+            <h4 className="font-bold text-gray-600 pr-4">{title}</h4>
+            <div className={`flex-shrink-0 ${colorClass}`}>
+                {icon}
+            </div>
+        </div>
+
+        {/* This middle section will grow to push the link to the bottom */}
+        <div className="flex-grow">
+            <p className={`text-4xl font-bold mt-2 ${colorClass}`}>{value}</p>
+        </div>
+
+        {/* Link at the bottom */}
+        <span className="text-link text-sm mt-3 inline-block">{linkText} &rarr;</span>
+    </div>
+);
+
 export default function Home() {
     const { user } = useContext(AppContext);
     const navigate = useNavigate();
@@ -93,6 +120,7 @@ export default function Home() {
     const [isLendingModalOpen, setIsLendingModalOpen] = useState(false);
     const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false);
     const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false);
+    const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
     const [isRecordLoanModalOpen, setIsRecordLoanModalOpen] = useState(false);
     const [loanFlowStep, setLoanFlowStep] = useState('choice');
     
@@ -143,12 +171,17 @@ export default function Home() {
     const getLendingSummary = useCallback(async () => {
         if (!user || !user.emailVerified) return;
         try {
-            const q = query(collection(db, "loans"), where("creditor_id", "==", user.uid), where("status", "==", "outstanding"));
+            const q = query(
+                collection(db, "loans"), 
+                where("creditor_id", "==", user.uid), 
+                where("status", "in", ["outstanding", "pending_confirmation"])
+            );
+
             const querySnapshot = await getDocs(q);
             let totalOutstanding = 0;
             querySnapshot.forEach((doc) => {
                 const loan = doc.data();
-                totalOutstanding += (loan.amount - loan.repaid_amount);
+                totalOutstanding += ((loan.total_owed || loan.amount) - (loan.repaid_amount || 0));
             });
             setLendingSummary({ outstanding: totalOutstanding });
         } catch (error) { 
@@ -230,6 +263,10 @@ export default function Home() {
         setIsCreateGoalModalOpen(false);
         getActiveTotalGoalsCount();
     }, [getActiveTotalGoalsCount]);
+
+    const handleFamilySuccess = useCallback(() => {
+        setIsCreateFamilyModalOpen(false);
+    }, []);
     
     const handleFamilyDataChange = useCallback(() => {
         getSummaryData();
@@ -244,6 +281,7 @@ export default function Home() {
     
     const openCreateFamilyFromLoanFlow = () => {
         setIsRecordLoanModalOpen(false);
+        setIsCreateFamilyModalOpen(true);
     };
 
     // --- MODAL CONTENT RENDERER ---
@@ -291,6 +329,7 @@ export default function Home() {
                 )}
                 {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
                 {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
+                {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
                 {isRecordLoanModalOpen && (
                     <Modal 
                         isOpen={isRecordLoanModalOpen} 
@@ -324,25 +363,31 @@ export default function Home() {
                             </div>
                         </header>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <div className="dashboard-card-interactive" onClick={() => setIsTransactionsModalOpen(true)} role="button" tabIndex="0">
-                                <h4 className="font-bold text-gray-600">Current Money (Net)</h4>
-                                {summaryError ? <p className="text-red-500 text-sm">{summaryError}</p> :
-                                summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
-                                <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
-                            </div>
-                            
-                            <div className="dashboard-card-interactive" onClick={() => setIsGoalsModalOpen(true)} role="button" tabIndex="0">
-                                <h4 className="font-bold text-gray-600">Your Active Goals</h4>
-                                <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
-                                <span className="text-link text-sm mt-2">View Goals &rarr;</span>
-                            </div>
-
-                            <div className="dashboard-card-interactive" onClick={() => setIsLendingModalOpen(true)} role="button" tabIndex="0">
-                                <h4 className="font-bold text-gray-600">Outstanding Loans (Owed to You)</h4>
-                                <p className="text-3xl font-bold text-blue-700 mt-2">₱{lendingSummary.outstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                                <span className="text-link text-sm mt-2">Manage Lending &rarr;</span>
-                            </div>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <DashboardCard 
+                                title="Current Money (Net)"
+                                value={summaryError ? 'Error' : `₱${parseFloat(summaryData?.netPosition || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                                linkText="View Transactions"
+                                onClick={() => setIsTransactionsModalOpen(true)}
+                                icon={<WalletIcon />}
+                                colorClass="text-emerald-600"
+                            />
+                            <DashboardCard 
+                                title="Your Active Goals"
+                                value={activeGoalsCount}
+                                linkText="View Goals"
+                                onClick={() => setIsGoalsModalOpen(true)}
+                                icon={<FlagIcon />}
+                                colorClass="text-rose-600"
+                            />
+                            <DashboardCard 
+                                title="Outstanding Loans (Owed to You)"
+                                value={`₱${lendingSummary.outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                                linkText="Manage Lending"
+                                onClick={() => setIsLendingModalOpen(true)}
+                                icon={<GiftIcon />}
+                                colorClass="text-amber-600"
+                            />
                         </div>
 
                         <div className="dashboard-section">

@@ -1,8 +1,8 @@
 // Components/CreateTransactionWidget.tsx
 
 import { useContext, useState, ChangeEvent, FormEvent, useRef } from "react";
-import { AppContext } from "../Context/AppContext.jsx";
-import { db } from "../config/firebase-config"; // No storage import needed
+import { AppContext } from "../../Context/AppContext.jsx";
+import { db } from "../../config/firebase-config"; // No storage import needed
 import { collection, addDoc, doc, deleteDoc, serverTimestamp } from "firebase/firestore";
 
 // --- TypeScript Interfaces ---

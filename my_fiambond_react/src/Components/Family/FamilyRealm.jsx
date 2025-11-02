@@ -1,15 +1,15 @@
 import { useState, lazy, Suspense, useContext, useCallback, useEffect, useRef } from 'react';
-import { AppContext } from '../Context/AppContext.jsx';
-import { db } from '../config/firebase-config.js';
+import { AppContext } from '../../Context/AppContext.jsx';
+import { db } from '../../config/firebase-config.js';
 import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, documentId } from 'firebase/firestore';
 
-const Modal = lazy(() => import('./Modal.jsx'));
+const Modal = lazy(() => import('../Modal.jsx'));
 const FamilyReportChartWidget = lazy(() => import('./FamilyReportChartWidget.jsx'));
-const LoanTrackingWidget = lazy(() => import('./LoanTrackingWidget.jsx'));
-const GoalListsWidget = lazy(() => import("../Components/GoalListsWidget"));
-const CreateLoanWidget = lazy(() => import('./CreateLoanWidget.jsx'));
-const CreateFamilyTransactionWidget = lazy(() => import('./CreateFamilyTransactionWidget.jsx'));
-const CreateFamilyGoalWidget = lazy(() => import('./CreateFamilyGoalWidget.jsx'));
+const LoanTrackingWidget = lazy(() => import('../Personal/LoanTrackingWidget.jsx'));
+const GoalListsWidget = lazy(() => import("../Personal/GoalListsWidget.jsx"));
+const CreateLoanWidget = lazy(() => import('../Personal/CreateLoanWidget.js'));
+const CreateFamilyTransactionWidget = lazy(() => import('./CreateFamilyTransactionWidget.js'));
+const CreateFamilyGoalWidget = lazy(() => import('./CreateFamilyGoalWidget.js'));
 const FamilyTransactionsWidget = lazy(() => import('./FamilyTransactionsWidget.jsx'));
 const FamilyMembersView = lazy(() => import('./FamilyMembersView.jsx'));
 
@@ -58,6 +58,23 @@ const formatDataForChart = (transactions) => {
         ]
     };
 };
+
+const WalletIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>);
+const FlagIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H8.5l-1-1H5a2 2 0 00-2 2z"></path></svg>);
+const UsersIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.253-1.282-.721-1.742M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.253-1.282.721-1.742m0 0A4.996 4.996 0 0112 13a4.996 4.996 0 014.279 2.258m-8.558 0A4.997 4.997 0 0012 13a4.997 4.997 0 004.279-2.258M12 13a5 5 0 100-10 5 5 0 000 10z"></path></svg>);
+
+// --- STYLED DASHBOARD CARD COMPONENT ---
+
+const DashboardCard = ({ title, value, linkText, onClick, icon, colorClass }) => (
+    <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
+        <div className="flex justify-between items-start">
+            <h4 className="font-bold text-gray-600 pr-4">{title}</h4>
+            <div className={`flex-shrink-0 ${colorClass}`}>{icon}</div>
+        </div>
+        <div className="flex-grow"><p className={`text-4xl font-bold mt-2 ${colorClass}`}>{value}</p></div>
+        <span className="text-link text-sm mt-3 inline-block">{linkText} &rarr;</span>
+    </div>
+);
 
 export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpdate }) {
     const { user } = useContext(AppContext);
@@ -243,23 +260,30 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="dashboard-card-interactive" onClick={() => setIsFamilyTransactionsModalOpen(true)} role="button" tabIndex="0">
-                        <h4 className="font-bold text-gray-600">Family Money (Net)</h4>
-                        {summaryData && (<p className={`text-3xl font-bold mt-2 ${summaryData.netPosition >= 0 ? 'text-green-700' : 'text-red-700'}`}>₱{parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>)}
-                        <span className="text-link text-sm mt-2">View Transactions &rarr;</span>
-                    </div>
-
-                    <div className="dashboard-card-interactive" onClick={() => setIsGoalsListModalOpen(true)} role="button" tabIndex="0">
-                        <h4 className="font-bold text-gray-600">Active Family Goals</h4>
-                        <p className="text-3xl font-bold text-slate-800 mt-2">{activeGoalsCount}</p>
-                        <span className="text-link text-sm mt-2">View Goals &rarr;</span>
-                    </div>
-                    
-                    <div className="dashboard-card-interactive" onClick={() => setIsLoanListModalOpen(true)} role="button" tabIndex="0">
-                        <h4 className="font-bold text-gray-600">Family Lending</h4>
-                        <p className="text-3xl font-bold text-slate-800 mt-2">{activeLoansCount}</p>
-                        <span className="text-link text-sm mt-2">Manage Lending &rarr;</span>
-                    </div>
+                    <DashboardCard 
+                        title="Family Money (Net)"
+                        value={summaryData ? `₱${parseFloat(summaryData.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱0.00'}
+                        linkText="View Transactions"
+                        onClick={() => setIsFamilyTransactionsModalOpen(true)}
+                        icon={<WalletIcon />}
+                        colorClass="text-emerald-600"
+                    />
+                     <DashboardCard 
+                        title="Active Family Goals"
+                        value={activeGoalsCount}
+                        linkText="View Goals"
+                        onClick={() => setIsGoalsListModalOpen(true)}
+                        icon={<FlagIcon />}
+                        colorClass="text-rose-600"
+                    />
+                    <DashboardCard 
+                        title="Active Family Loans"
+                        value={activeLoansCount}
+                        linkText="Manage Lending"
+                        onClick={() => setIsLoanListModalOpen(true)}
+                        icon={<UsersIcon />}
+                        colorClass="text-amber-600"
+                    />
                 </div>
 
                 <div className="dashboard-section">

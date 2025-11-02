@@ -1,16 +1,12 @@
 import { useState, useContext, FormEvent } from 'react';
-import { AppContext } from '../Context/AppContext.jsx';
-import { db } from '../config/firebase-config';
+import { AppContext } from '../../Context/AppContext.jsx';
+import { db } from '../../config/firebase-config.js';
 import { doc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
 
-// --- TypeScript Interfaces ---
-interface Loan {
-    id: string;
-    amount: number;
-    repaid_amount: number;
-    creditor_id: string;
-    description: string;
-}
+// --- THE FIX (Part 1): Import the master Loan type ---
+import { Loan } from '../../types';
+
+// The local "interface Loan" has been removed from this file.
 
 interface MakeRepaymentWidgetProps {
     loan: Loan;
@@ -19,13 +15,15 @@ interface MakeRepaymentWidgetProps {
 
 export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWidgetProps) {
     const { user } = useContext(AppContext);
-    const outstanding = loan.amount - loan.repaid_amount;
+
+    // --- THE FIX (Part 2): Calculate outstanding based on 'total_owed' ---
+    const totalOwed = loan.total_owed || loan.amount;
+    const outstanding = totalOwed - (loan.repaid_amount || 0);
 
     const [amount, setAmount] = useState<string>(outstanding.toFixed(2));
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // THE FIX IS HERE: This entire function is replaced with the new atomic logic.
     const handleSubmitForConfirmation = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const repaymentAmount = parseFloat(amount);
@@ -38,6 +36,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
             setError("Please enter a valid, positive amount.");
             return;
         }
+        // The 'outstanding' variable here is now correctly calculated
         if (repaymentAmount > outstanding) {
             setError(`Payment cannot exceed the outstanding amount of ₱${outstanding.toFixed(2)}.`);
             return;
@@ -47,10 +46,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
         setError(null);
 
         try {
-            // 1. Create a new write batch for atomic operations
             const batch = writeBatch(db);
-
-            // 2. Operation 1: Update the loan document with a pending payment object.
             const loanRef = doc(db, "loans", loan.id);
             batch.update(loanRef, {
                 pending_repayment: {
@@ -60,10 +56,9 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
                 }
             });
 
-            // 3. Operation 2: Create a personal 'expense' transaction FOR THE DEBTOR (the current user).
             const transactionRef = doc(collection(db, "transactions"));
             const transactionData = {
-                user_id: user.uid, // The expense belongs to the person paying.
+                user_id: user.uid,
                 family_id: null,
                 type: 'expense',
                 amount: repaymentAmount,
@@ -72,9 +67,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
             };
             batch.set(transactionRef, transactionData);
 
-            // 4. Commit both writes. They either both succeed or both fail.
             await batch.commit();
-
             onSuccess();
 
         } catch (err: any) {

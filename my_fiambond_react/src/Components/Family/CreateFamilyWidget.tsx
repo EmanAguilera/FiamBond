@@ -1,6 +1,6 @@
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
-import { AppContext } from "../Context/AppContext.jsx";
-import { db } from "../config/firebase-config";
+import { AppContext } from "../../Context/AppContext.jsx";
+import { db } from "../../config/firebase-config";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 // --- TypeScript Interfaces ---
