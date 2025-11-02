@@ -1,8 +1,8 @@
 // Components/CreateGoalWidget.tsx
 
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
-import { AppContext } from "../Context/AppContext.jsx";
-import { db } from "../config/firebase-config"; // Adjust path if necessary
+import { AppContext } from "../../Context/AppContext.jsx";
+import { db } from "../../config/firebase-config.js"; // Adjust path if necessary
 import { collection, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 
 // --- TypeScript interfaces ---

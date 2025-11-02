@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, memo } from 'react'; // useContext is no longer needed
 // AppContext import is no longer needed
-import { db } from '../config/firebase-config';
+import { db } from '../../config/firebase-config';
 import { 
     doc, 
     getDoc, 

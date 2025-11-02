@@ -1,8 +1,8 @@
 // Components/FamilyListItem.jsx
 
 import { useState, useContext, memo } from 'react';
-import { AppContext } from '../Context/AppContext.jsx';
-import { db } from '../config/firebase-config'; // Adjust path
+import { AppContext } from '../../Context/AppContext.jsx';
+import { db } from '../../config/firebase-config.js'; // Adjust path
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {

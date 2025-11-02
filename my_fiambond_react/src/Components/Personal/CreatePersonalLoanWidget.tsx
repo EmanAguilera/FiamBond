@@ -1,6 +1,6 @@
 import { useContext, useState, FormEvent, ChangeEvent } from "react";
-import { AppContext } from "../Context/AppContext.jsx";
-import { db } from "../config/firebase-config";
+import { AppContext } from "../../Context/AppContext.jsx";
+import { db } from "../../config/firebase-config.js";
 import { collection, doc, writeBatch, serverTimestamp, Timestamp } from "firebase/firestore";
 
 interface CreatePersonalLoanWidgetProps {
@@ -12,6 +12,7 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
 
     const [formData, setFormData] = useState({
         amount: "",
+        interest_amount: "",
         description: "",
         debtorName: "", // Text input for the person's name
         deadline: "",
@@ -39,12 +40,18 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
 
             // 1. Define the personal loan document
             const newLoanRef = doc(collection(db, "loans"));
+
+            const principal = Number(formData.amount) || 0;
+            const interest = Number(formData.interest_amount) || 0; // Default to 0 if empty
+
             const loanData = {
                 family_id: null, // This is the key for a personal loan
                 creditor_id: user.uid,
                 debtor_id: null, // No user ID for the debtor
                 debtor_name: formData.debtorName, // Store the name as a string
-                amount: Number(formData.amount),
+                amount: principal,
+                interest_amount: interest,
+                total_owed: principal + interest, 
                 repaid_amount: 0,
                 description: formData.description,
                 deadline: formData.deadline ? Timestamp.fromDate(new Date(formData.deadline)) : null,
@@ -59,7 +66,7 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
                 user_id: user.uid,
                 family_id: null,
                 type: "expense",
-                amount: Number(formData.amount),
+                amount: principal,
                 description: `Personal loan to ${formData.debtorName}: ${formData.description}`,
                 created_at: serverTimestamp(),
             };
@@ -87,8 +94,12 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
                 <input id="debtorName" type="text" placeholder="e.g., John Doe" value={formData.debtorName} onChange={handleInputChange} required disabled={loading} className="w-full p-2 border border-gray-300 rounded-md" />
             </div>
             <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount (₱)</label>
+                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Loan Amount (Principal, ₱)</label>
                 <input id="amount" type="number" step="0.01" placeholder="100.00" value={formData.amount} onChange={handleInputChange} required disabled={loading} className="w-full p-2 border border-gray-300 rounded-md" />
+            </div>
+            <div>
+                <label htmlFor="interest_amount" className="block text-sm font-medium text-gray-700">Interest Amount (Optional, ₱)</label>
+                <input id="interest_amount" type="number" step="0.01" placeholder="10.00" value={formData.interest_amount} onChange={handleInputChange} disabled={loading} className="w-full p-2 border border-gray-300 rounded-md" />
             </div>
             <div>
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700">Reason / Description</label>

@@ -1,6 +1,6 @@
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
-import { AppContext } from "../Context/AppContext.jsx";
-import { db } from "../config/firebase-config";
+import { AppContext } from "../../Context/AppContext.jsx";
+import { db } from "../../config/firebase-config.js";
 import { writeBatch, collection, doc, serverTimestamp, Timestamp } from "firebase/firestore";
 
 // --- TypeScript Interfaces ---
@@ -24,6 +24,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
 
   const [formData, setFormData] = useState({
     amount: "",
+    interest_amount: "",
     description: "",
     debtorId: "",
     deadline: "",
@@ -31,8 +32,6 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-
-  // The data-fetching useEffect has been completely removed from this component.
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -52,17 +51,22 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
         const debtorName = members.find(m => m.id === formData.debtorId)?.full_name || 'Family Member';
         
         const batch = writeBatch(db);
+
+        const principal = Number(formData.amount) || 0;
+        const interest = Number(formData.interest_amount) || 0;
         
         const newLoanRef = doc(collection(db, "loans"));
         const loanData = {
             family_id: family.id,
             creditor_id: user.uid,
             debtor_id: formData.debtorId,
-            amount: Number(formData.amount),
+            amount: principal,
+            interest_amount: interest, // <-- SAVE INTEREST
+            total_owed: principal + interest,
             repaid_amount: 0,
             description: formData.description,
             deadline: formData.deadline ? Timestamp.fromDate(new Date(formData.deadline)) : null,
-            status: "outstanding",
+            status: "pending_confirmation", // <-- THE FIX IS HERE
             created_at: serverTimestamp(),
         };
         batch.set(newLoanRef, loanData);
@@ -72,7 +76,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
             user_id: user.uid,
             family_id: null,
             type: "expense",
-            amount: Number(formData.amount),
+            amount: principal,
             description: `Loan to ${debtorName}: ${formData.description}`,
             created_at: serverTimestamp(),
         };
@@ -109,8 +113,12 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
         </select>
       </div>
       <div>
-        <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount (₱)</label>
+        <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Loan Amount (Principal, ₱)</label>
         <input id="amount" type="number" step="0.01" placeholder="100.00" value={formData.amount} onChange={handleInputChange} required disabled={loading} className="w-full p-2 border border-gray-300 rounded-md" />
+      </div>
+       <div>
+        <label htmlFor="interest_amount" className="block text-sm font-medium text-gray-700">Interest Amount (Optional, ₱)</label>
+        <input id="interest_amount" type="number" step="0.01" placeholder="10.00" value={formData.interest_amount} onChange={handleInputChange} disabled={loading} className="w-full p-2 border border-gray-300 rounded-md" />
       </div>
       <div>
         <label htmlFor="description" className="block text-sm font-medium text-gray-700">Reason / Description</label>

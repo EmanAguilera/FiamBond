@@ -1,6 +1,6 @@
 import { useState, useCallback, useContext, useEffect, memo } from 'react';
-import { AppContext } from '../Context/AppContext.jsx';
-import { db } from '../config/firebase-config'; // Adjust path
+import { AppContext } from '../../Context/AppContext.jsx';
+import { db } from '../../config/firebase-config.js'; // Adjust path
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 
 // --- CHART IMPORTS ---

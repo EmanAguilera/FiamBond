@@ -1,8 +1,8 @@
 import { useState, useEffect, useContext } from 'react';
-import { AppContext } from '../Context/AppContext.jsx';
-import { db } from '../config/firebase-config';
+import { AppContext } from '../../Context/AppContext.jsx';
+import { db } from '../../config/firebase-config.js';
 import { collection, query, where, getDocs, doc, getDoc, documentId } from 'firebase/firestore';
-import CreateLoanWidget from './CreateLoanWidget'; // Ensure path is correct
+import CreateLoanWidget from './CreateLoanWidget.js'; // Ensure path is correct
 
 // --- TypeScript Interfaces ---
 interface Family {

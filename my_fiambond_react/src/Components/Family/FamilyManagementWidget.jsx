@@ -1,6 +1,6 @@
 import { useState, useCallback, useContext, useEffect, lazy, Suspense } from 'react';
-import { AppContext } from '../Context/AppContext.jsx';
-import { db } from '../config/firebase-config';
+import { AppContext } from '../../Context/AppContext.jsx';
+import { db } from '../../config/firebase-config.js';
 import { collection, query, where, getDocs, orderBy, documentId } from 'firebase/firestore';
 import FamilyListItem from './FamilyListItems.jsx';
 
