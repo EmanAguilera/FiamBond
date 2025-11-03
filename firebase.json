@@ -1,10 +1,4 @@
 {
-  "functions": [
-    {
-      "source": "functions",
-      "runtime": "python311"
-    }
-  ],
   "hosting": {
     "public": "my_fiambond_react/dist",
     "ignore": [
@@ -22,9 +16,6 @@
   "emulators": {
     "auth": {
       "port": 9099
-    },
-    "functions": {
-      "port": 5001
     },
     "firestore": {
       "port": 8080
