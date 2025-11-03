@@ -1,4 +1,19 @@
-# Laravel Specific
+# .gitignore
+
+# ----------------------------------------------------------------
+# Firebase Emulator Logs (This is the fix for your current error)
+# ----------------------------------------------------------------
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+pubsub-debug.log
+database-debug.log
+storage-debug.log
+
+
+# ----------------------------------------------------------------
+# Laravel / PHP Specific
+# ----------------------------------------------------------------
 /my_fiambond_api/bootstrap/cache/*.php
 /my_fiambond_api/public/build
 /my_fiambond_api/public/hot
@@ -6,16 +21,29 @@
 /my_fiambond_api/storage/*.key
 /my_fiambond_api/vendor/
 /my_fiambond_api/.env
-
-# React / Node Specific
 /my_fiambond_api/node_modules/
+
+
+# ----------------------------------------------------------------
+# React / Node Specific
+# ----------------------------------------------------------------
 /my_fiambond_react/node_modules/
 /my_fiambond_react/build/
+/my_fiambond_react/dist/
+/my_fiambond_react/.env
 /my_fiambond_react/.env.local
 
-# Root Level Node Modules (to be ignored)
-/node_modules/
 
-# General
+# ----------------------------------------------------------------
+# Python Specific (For the functions folder)
+# ----------------------------------------------------------------
+/functions/venv/
+/functions/__pycache__/
+
+
+# ----------------------------------------------------------------
+# General / OS Specific
+# ----------------------------------------------------------------
 .DS_Store
 npm-debug.log
+/node_modules/
