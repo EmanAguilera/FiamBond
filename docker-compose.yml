@@ -1,0 +1,23 @@
+# docker-compose.yml
+# This is a simplified version JUST for running LocalStack
+
+version: "3.8"
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack-main
+    ports:
+      # This is the most important line. It lets your Python script
+      # on your computer talk to LocalStack in the Docker container.
+      - "4566:4566"
+    environment:
+      # We only need the S3 service for this test.
+      - SERVICES=s3
+    volumes:
+      # This saves the state of LocalStack so your buckets don't disappear
+      # when you restart the container.
+      - localstack-data:/var/lib/localstack
+
+volumes:
+  localstack-data:
