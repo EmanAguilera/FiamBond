@@ -31,18 +31,9 @@ const DashboardSkeleton = () => (
             </div>
         </header>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="h-32 bg-slate-200 rounded-lg p-4">
-                <div className="h-5 w-3/4 bg-slate-300 rounded"></div>
-                <div className="h-8 w-1/2 bg-slate-300 rounded mt-4"></div>
-            </div>
-            <div className="h-32 bg-slate-200 rounded-lg p-4">
-                <div className="h-5 w-3/4 bg-slate-300 rounded"></div>
-                <div className="h-8 w-1/4 bg-slate-300 rounded mt-4"></div>
-            </div>
-            <div className="h-32 bg-slate-200 rounded-lg p-4">
-                <div className="h-5 w-3/4 bg-slate-300 rounded"></div>
-                <div className="h-8 w-1/4 bg-slate-300 rounded mt-4"></div>
-            </div>
+            <div className="h-32 bg-slate-200 rounded-lg p-4"><div className="h-5 w-3/4 bg-slate-300 rounded"></div><div className="h-8 w-1/2 bg-slate-300 rounded mt-4"></div></div>
+            <div className="h-32 bg-slate-200 rounded-lg p-4"><div className="h-5 w-3/4 bg-slate-300 rounded"></div><div className="h-8 w-1/4 bg-slate-300 rounded mt-4"></div></div>
+            <div className="h-32 bg-slate-200 rounded-lg p-4"><div className="h-5 w-3/4 bg-slate-300 rounded"></div><div className="h-8 w-1/4 bg-slate-300 rounded mt-4"></div></div>
         </div>
         <div className="w-full h-96 bg-slate-200 rounded-lg"></div>
     </div>
@@ -77,28 +68,20 @@ const formatDataForChart = (transactions) => {
     };
 };
 
-// --- NEW ICONS FOR THE REDESIGNED CARDS ---
+// --- ICONS & CARD COMPONENT ---
 const WalletIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>);
 const FlagIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H8.5l-1-1H5a2 2 0 00-2 2z"></path></svg>);
 const GiftIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>);
 
-// --- NEW STYLED DASHBOARD CARD COMPONENT ---
 const DashboardCard = ({ title, value, linkText, onClick, icon, colorClass }) => (
     <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
-        {/* Header with Title and Icon */}
         <div className="flex justify-between items-start">
             <h4 className="font-bold text-gray-600 pr-4">{title}</h4>
-            <div className={`flex-shrink-0 ${colorClass}`}>
-                {icon}
-            </div>
+            <div className={`flex-shrink-0 ${colorClass}`}>{icon}</div>
         </div>
-
-        {/* This middle section will grow to push the link to the bottom */}
         <div className="flex-grow">
             <p className={`text-4xl font-bold mt-2 ${colorClass}`}>{value}</p>
         </div>
-
-        {/* Link at the bottom */}
         <span className="text-link text-sm mt-3 inline-block">{linkText} &rarr;</span>
     </div>
 );
@@ -113,7 +96,7 @@ export default function Home() {
         }
     }, [user, navigate]);
 
-    // --- STATE FOR MODAL VISIBILITY ---
+    // --- STATE MANAGEMENT ---
     const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
     const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
     const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
@@ -123,11 +106,7 @@ export default function Home() {
     const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
     const [isRecordLoanModalOpen, setIsRecordLoanModalOpen] = useState(false);
     const [loanFlowStep, setLoanFlowStep] = useState('choice');
-    
-    // --- STATE FOR VIEW MANAGEMENT ---
     const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
-
-    // --- STATE FOR DATA & LOADING ---
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [summaryData, setSummaryData] = useState(null);
     const [summaryError, setSummaryError] = useState(null);
@@ -171,12 +150,7 @@ export default function Home() {
     const getLendingSummary = useCallback(async () => {
         if (!user || !user.emailVerified) return;
         try {
-            const q = query(
-                collection(db, "loans"), 
-                where("creditor_id", "==", user.uid), 
-                where("status", "in", ["outstanding", "pending_confirmation"])
-            );
-
+            const q = query(collection(db, "loans"), where("creditor_id", "==", user.uid), where("status", "in", ["outstanding", "pending_confirmation"]));
             const querySnapshot = await getDocs(q);
             let totalOutstanding = 0;
             querySnapshot.forEach((doc) => {
@@ -199,24 +173,15 @@ export default function Home() {
             if (period === 'weekly') startDate = new Date(now.setDate(now.getDate() - 7));
             else if (period === 'yearly') startDate = new Date(now.setFullYear(now.getFullYear() - 1));
             else startDate = new Date(now.setMonth(now.getMonth() - 1));
-
-            const q = query(
-                collection(db, "transactions"),
-                where("user_id", "==", user.uid),
-                where("family_id", "==", null),
-                where("created_at", ">=", Timestamp.fromDate(startDate)),
-                orderBy("created_at", "desc")
-            );
+            const q = query(collection(db, "transactions"), where("user_id", "==", user.uid), where("family_id", "==", null), where("created_at", ">=", Timestamp.fromDate(startDate)), orderBy("created_at", "desc"));
             const querySnapshot = await getDocs(q);
             const transactions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-
             let totalInflow = 0;
             let totalOutflow = 0;
             transactions.forEach(tx => {
                 if (tx.type === 'income') totalInflow += tx.amount;
                 else totalOutflow += tx.amount;
             });
-
             setReport({
                 chartData: formatDataForChart(transactions),
                 totalInflow,
@@ -234,49 +199,55 @@ export default function Home() {
         }
     }, [user, period]);
 
+    
+    // --- *** KEY CHANGE #1: CREATE THE MASTER REFRESH FUNCTION *** ---
+    const handleDashboardRefresh = useCallback(() => {
+        console.log("Refreshing all dashboard data triggered by a child component...");
+        getSummaryData();
+        getActiveTotalGoalsCount();
+        getLendingSummary();
+        getReport();
+    }, [getSummaryData, getActiveTotalGoalsCount, getLendingSummary, getReport]);
+
+
     // --- EFFECTS ---
     useEffect(() => {
         if (user && user.emailVerified) {
             const fetchInitialData = async () => {
                 setIsInitialLoading(true);
-                await Promise.all([ getSummaryData(), getActiveTotalGoalsCount(), getLendingSummary(), getReport() ]);
+                // Use the master refresh function for the initial data load
+                await handleDashboardRefresh();
                 setIsInitialLoading(false);
             };
             fetchInitialData();
         } else {
             setIsInitialLoading(false);
         }
-    }, [user, getSummaryData, getActiveTotalGoalsCount, getLendingSummary, getReport]);
+    }, [user, handleDashboardRefresh]); // Depend on handleDashboardRefresh
 
     useEffect(() => {
         if (!isInitialLoading && user && user.emailVerified) { getReport(); }
     }, [period, isInitialLoading, user, getReport]);
 
-    // --- SUCCESS HANDLERS ---
+
+    // --- SUCCESS HANDLERS (Updated to use the master refresh function) ---
     const handleTransactionSuccess = useCallback(() => {
         setIsCreateTransactionModalOpen(false);
-        getSummaryData();
-        getReport();
-    }, [getSummaryData, getReport]);
+        handleDashboardRefresh();
+    }, [handleDashboardRefresh]);
     
     const handleGoalSuccess = useCallback(() => {
         setIsCreateGoalModalOpen(false);
-        getActiveTotalGoalsCount();
+        getActiveTotalGoalsCount(); // Only this count needs updating on create
     }, [getActiveTotalGoalsCount]);
 
     const handleFamilySuccess = useCallback(() => {
         setIsCreateFamilyModalOpen(false);
     }, []);
-    
-    const handleFamilyDataChange = useCallback(() => {
-        getSummaryData();
-        getReport();
-        getLendingSummary();
-    }, [getSummaryData, getReport, getLendingSummary]);
 
     const handleRecordLoanSuccess = () => {
         setIsRecordLoanModalOpen(false);
-        handleFamilyDataChange();
+        handleDashboardRefresh();
     };
     
     const openCreateFamilyFromLoanFlow = () => {
@@ -284,26 +255,18 @@ export default function Home() {
         setIsCreateFamilyModalOpen(true);
     };
 
-    // --- MODAL CONTENT RENDERER ---
     const renderLoanModalContent = () => {
         switch (loanFlowStep) {
             case 'family':
-                return <RecordLoanFlowWidget 
-                            onSuccess={handleRecordLoanSuccess} 
-                            onRequestCreateFamily={openCreateFamilyFromLoanFlow} 
-                        />;
+                return <RecordLoanFlowWidget onSuccess={handleRecordLoanSuccess} onRequestCreateFamily={openCreateFamilyFromLoanFlow} />;
             case 'personal':
                 return <CreatePersonalLoanWidget onSuccess={handleRecordLoanSuccess} />;
             case 'choice':
             default:
-                return <RecordLoanChoiceWidget 
-                            onSelectFamilyLoan={() => setLoanFlowStep('family')}
-                            onSelectPersonalLoan={() => setLoanFlowStep('personal')}
-                        />;
+                return <RecordLoanChoiceWidget onSelectFamilyLoan={() => setLoanFlowStep('family')} onSelectPersonalLoan={() => setLoanFlowStep('personal')} />;
         }
     };
 
-    // --- NAVIGATION HANDLERS ---
     const handleEnterFamilyRealm = (family) => {
         setActiveFamilyRealm(family);
         setIsFamilyModalOpen(false);
@@ -313,30 +276,35 @@ export default function Home() {
         setActiveFamilyRealm(null);
     };
     
-    // --- CONDITIONAL RENDERING ---
     if (user && !user.emailVerified) { return <DashboardSkeleton />; }
 
     return (
         <>
             <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
                 {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><PersonalTransactionsWidget /></Modal>}
-                {isGoalsModalOpen && <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals"><GoalListsWidget /></Modal>}
-                {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget onEnterRealm={handleEnterFamilyRealm} /></Modal>}
-                {isLendingModalOpen && (
-                    <Modal isOpen={isLendingModalOpen} onClose={() => setIsLendingModalOpen(false)} title="Your Lending Activity">
-                        <LoanTrackingWidget onDataChange={handleFamilyDataChange} />
+                
+                {/* --- *** KEY CHANGE #2: PASS THE REFRESH FUNCTION AS A PROP *** --- */}
+                {isGoalsModalOpen && (
+                    <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals">
+                        <GoalListsWidget onDataChange={handleDashboardRefresh} />
                     </Modal>
                 )}
+                
+                {isFamilyModalOpen && <Modal isOpen={isFamilyModalOpen} onClose={() => setIsFamilyModalOpen(false)} title="Family Management"><FamilyManagementWidget onEnterRealm={handleEnterFamilyRealm} /></Modal>}
+                
+                {isLendingModalOpen && (
+                    <Modal isOpen={isLendingModalOpen} onClose={() => setIsLendingModalOpen(false)} title="Your Lending Activity">
+                        <LoanTrackingWidget onDataChange={handleDashboardRefresh} />
+                    </Modal>
+                )}
+
                 {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
                 {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
                 {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
                 {isRecordLoanModalOpen && (
                     <Modal 
                         isOpen={isRecordLoanModalOpen} 
-                        onClose={() => {
-                            setIsRecordLoanModalOpen(false);
-                            setLoanFlowStep('choice');
-                        }} 
+                        onClose={() => { setIsRecordLoanModalOpen(false); setLoanFlowStep('choice'); }} 
                         title="Record a New Loan"
                     >
                         {renderLoanModalContent()}
@@ -346,7 +314,7 @@ export default function Home() {
 
             {activeFamilyRealm ? (
                 <Suspense fallback={<DashboardSkeleton />}>
-                    <FamilyRealm family={activeFamilyRealm} onBack={handleExitFamilyRealm} onDataChange={handleFamilyDataChange} />
+                    <FamilyRealm family={activeFamilyRealm} onBack={handleExitFamilyRealm} onDataChange={handleDashboardRefresh} />
                 </Suspense>
             ) : user ? (
                 isInitialLoading ? <DashboardSkeleton /> : (
@@ -354,10 +322,7 @@ export default function Home() {
                         <header className="dashboard-header">
                             <div className="flex flex-wrap gap-4">
                                 <button onClick={() => setIsCreateTransactionModalOpen(true)} className="primary-btn">+ Add Transaction</button>
-                                <button onClick={() => {
-                                    setLoanFlowStep('choice');
-                                    setIsRecordLoanModalOpen(true);
-                                }} className="primary-btn">+ Record a Loan</button>
+                                <button onClick={() => { setLoanFlowStep('choice'); setIsRecordLoanModalOpen(true); }} className="primary-btn">+ Record a Loan</button>
                                 <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
                                 <button onClick={() => setIsFamilyModalOpen(true)} className="secondary-btn">Manage Families</button>
                             </div>

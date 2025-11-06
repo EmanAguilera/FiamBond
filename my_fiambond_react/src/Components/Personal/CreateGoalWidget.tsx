@@ -1,16 +1,17 @@
-// Components/CreateGoalWidget.tsx
-
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from "../../config/firebase-config.js"; // Adjust path if necessary
+import { db } from "../../config/firebase-config.js";
 import { collection, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+// --- 1. IMPORT THE MASTER GOAL TYPE ---
+import { Goal } from "../../types";
 
 // --- TypeScript interfaces ---
-interface IGoalForm {
-  name: string;
+// Use TypeScript's "Pick" utility to create a simple form type
+// from the master Goal interface. This is a clean pattern.
+type GoalFormData = Pick<Goal, "name"> & {
   target_amount: string;
   target_date: string;
-}
+};
 
 interface CreateGoalWidgetProps {
   onSuccess?: () => void;
@@ -19,7 +20,7 @@ interface CreateGoalWidgetProps {
 export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
   const { user } = useContext(AppContext);
 
-  const [formData, setFormData] = useState<IGoalForm>({
+  const [formData, setFormData] = useState<GoalFormData>({
     name: "",
     target_amount: "",
     target_date: "",
@@ -35,30 +36,31 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
 
   const handleCreateGoal = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
     if (!user) {
       setFormError("You must be logged in to create a goal.");
       return;
     }
-
     setFormError(null);
     setLoading(true);
 
     try {
-      const goalData = {
+      // --- 2. DEFINE THE DATA STRUCTURE STRICTLY ---
+      // This ensures the data we send to Firestore matches our Goal type.
+      // We use Omit to specify which fields we are providing.
+      const newGoalData: Omit<Goal, "id" | "user" | "completed_by" | "family"> = {
         user_id: user.uid,
         family_id: null,
         name: formData.name,
         target_amount: Number(formData.target_amount),
         target_date: Timestamp.fromDate(new Date(formData.target_date)),
         status: "active",
-        created_at: serverTimestamp(),
+        created_at: serverTimestamp() as Timestamp, // Cast to Timestamp
         completed_at: null,
         completed_by_user_id: null,
+        achievement_url: null, // Initialize with null
       };
 
-      const goalsCollectionRef = collection(db, "goals");
-      await addDoc(goalsCollectionRef, goalData);
+      await addDoc(collection(db, "goals"), newGoalData);
 
       setFormData({ name: "", target_amount: "", target_date: "" });
       if (onSuccess) {
@@ -80,7 +82,7 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
           <input
             type="text"
             name="name"
-            placeholder="Goal Name (e.g., Vacation Fund)"
+            placeholder="Goal Name (e.g., New Laptop)"
             value={formData.name}
             onChange={handleInputChange}
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -92,7 +94,7 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
             <input
               type="number"
               name="target_amount"
-              placeholder="Target Amount"
+              placeholder="Target Amount (₱)"
               value={formData.target_amount}
               onChange={handleInputChange}
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -111,9 +113,8 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
             />
           </div>
         </div>
-        {formError && <p className="error">{formError}</p>}
+        {formError && <p className="error text-center">{formError}</p>}
         
-        {/* THE FIX IS HERE: Ensured the button has a proper closing tag */}
         <button type="submit" className="primary-btn w-full" disabled={loading}>
           {loading ? 'Setting Goal...' : 'Set Goal'}
         </button>
