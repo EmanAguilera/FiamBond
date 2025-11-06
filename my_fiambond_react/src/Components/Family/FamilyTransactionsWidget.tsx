@@ -9,8 +9,21 @@ import {
     limit, 
     startAfter, 
     getDocs, 
-    documentId 
+    documentId,
+    DocumentData,
+    QueryDocumentSnapshot
 } from 'firebase/firestore';
+import { Transaction, User } from "../../types"; // Ensure types are imported
+
+// --- TypeScript Interfaces ---
+interface Family {
+  id: string;
+  family_name: string;
+}
+
+interface FamilyTransactionsWidgetProps {
+  family: Family;
+}
 
 // --- STYLED SKELETON LOADER ---
 const TransactionListSkeleton = () => (
@@ -31,7 +44,7 @@ const TransactionListSkeleton = () => (
 const TRANSACTIONS_PER_PAGE = 15;
 
 // --- HELPER FUNCTION TO FORMAT DATE HEADERS ---
-const formatDateHeader = (dateString) => {
+const formatDateHeader = (dateString: string): string => {
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -41,10 +54,12 @@ const formatDateHeader = (dateString) => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
-// --- NEW, STYLED TRANSACTION ITEM COMPONENT (WITH USER'S NAME) ---
-const TransactionItem = ({ transaction }) => {
+// --- STYLED TRANSACTION ITEM COMPONENT ---
+const TransactionItem = ({ transaction }: { transaction: Transaction }) => {
     const isIncome = transaction.type === 'income';
     const Icon = () => (<svg className={`w-5 h-5 ${isIncome ? 'text-green-600' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">{isIncome ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 12H6"></path>}</svg>);
+    const ReceiptIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>);
+
     return (
         <div className="flex items-center p-4 border-b last:border-b-0 border-gray-100 hover:bg-gray-50 transition-colors duration-150">
             <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isIncome ? 'bg-green-100' : 'bg-red-100'}`}>
@@ -52,28 +67,41 @@ const TransactionItem = ({ transaction }) => {
             </div>
             <div className="ml-4 flex-grow min-w-0">
                 <p className="font-semibold text-gray-800 truncate">{transaction.description}</p>
-                <p className="text-sm text-gray-500">By: {transaction.user?.full_name || 'Unknown'}</p>
+                <div className="flex items-center gap-3 mt-1">
+                    <p className="text-sm text-gray-500">By: {transaction.user?.full_name || 'Unknown'}</p>
+                    {/* --- Link to the attachment if it exists --- */}
+                    {transaction.attachment_url && (
+                        <a 
+                            href={transaction.attachment_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline hover:text-blue-800"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <ReceiptIcon />
+                            View Receipt
+                        </a>
+                    )}
+                </div>
             </div>
             <div className={`ml-4 font-semibold text-right ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
-                {isIncome ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {isIncome ? '+' : '-'} ₱{parseFloat(transaction.amount.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
         </div>
     );
 };
 
 
-export default function FamilyTransactionsWidget({ family }) {
+export default function FamilyTransactionsWidget({ family }: FamilyTransactionsWidgetProps) {
   const { user } = useContext(AppContext);
-  const [transactions, setTransactions] = useState([]);
-  const [groupedTransactions, setGroupedTransactions] = useState({});
-  const [lastVisible, setLastVisible] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [groupedTransactions, setGroupedTransactions] = useState<{ [key: string]: Transaction[] }>({});
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // --- ROBUST, LOOP-FREE DATA LOADING LOGIC ---
-
-  // Effect for the INITIAL data load. Runs only when the family changes.
+  // Effect for the INITIAL data load
   useEffect(() => {
     if (!user || !family?.id) return;
     
@@ -89,27 +117,28 @@ export default function FamilyTransactionsWidget({ family }) {
                 limit(TRANSACTIONS_PER_PAGE)
             );
             const documentSnapshots = await getDocs(firstPageQuery);
-            const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
+            const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1] || null;
             setLastVisible(newLastVisible);
+
             if (documentSnapshots.docs.length < TRANSACTIONS_PER_PAGE) setHasMore(false);
             
-            const fetchedTransactions = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const fetchedTransactions = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
 
-            // Enrich transactions with user data
             if (fetchedTransactions.length === 0) {
               setTransactions([]);
+              setLoading(false);
               return;
             }
+
+            // Enrich transactions with user data
             const userIds = [...new Set(fetchedTransactions.map(tx => tx.user_id))];
-            const usersRef = collection(db, "users");
-            const usersQuery = query(usersRef, where(documentId(), "in", userIds));
+            const usersQuery = query(collection(db, "users"), where(documentId(), "in", userIds));
             const usersSnapshot = await getDocs(usersQuery);
-            const usersMap = {};
-            usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data(); });
-            const enrichedTransactions = fetchedTransactions.map(tx => ({ ...tx, user: usersMap[tx.user_id] || { full_name: "Unknown" } }));
+            const usersMap: { [key: string]: User } = {};
+            usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data() as User; });
+            const enrichedTransactions = fetchedTransactions.map(tx => ({ ...tx, user: usersMap[tx.user_id] || { full_name: "Unknown" } as User }));
             
             setTransactions(enrichedTransactions);
-
         } catch (err) {
             console.error("Failed to fetch initial family transactions:", err);
             setError("Could not load transactions.");
@@ -119,11 +148,12 @@ export default function FamilyTransactionsWidget({ family }) {
     };
 
     fetchInitialTransactions();
-  }, [user, family.id]); // This hook ONLY depends on user and family.id, preventing loops.
+  }, [user, family.id]);
 
-  // Function for loading MORE pages when the button is clicked.
+  // Function for loading MORE pages
   const handleLoadMore = async () => {
-    if (!lastVisible || !hasMore) return;
+    if (!lastVisible || !hasMore || loading) return;
+
     setLoading(true);
     try {
         const nextPageQuery = query(
@@ -134,21 +164,22 @@ export default function FamilyTransactionsWidget({ family }) {
             limit(TRANSACTIONS_PER_PAGE)
         );
         const documentSnapshots = await getDocs(nextPageQuery);
-        const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
+        const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1] || null;
         setLastVisible(newLastVisible);
+
         if (documentSnapshots.docs.length < TRANSACTIONS_PER_PAGE) setHasMore(false);
 
-        const fetchedTransactions = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const fetchedTransactions = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
 
-        // Enrich the new batch of transactions
         if (fetchedTransactions.length === 0) return;
+        
+        // Enrich the new batch of transactions
         const userIds = [...new Set(fetchedTransactions.map(tx => tx.user_id))];
-        const usersRef = collection(db, "users");
-        const usersQuery = query(usersRef, where(documentId(), "in", userIds));
+        const usersQuery = query(collection(db, "users"), where(documentId(), "in", userIds));
         const usersSnapshot = await getDocs(usersQuery);
-        const usersMap = {};
-        usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data(); });
-        const enrichedTransactions = fetchedTransactions.map(tx => ({ ...tx, user: usersMap[tx.user_id] || { full_name: "Unknown" } }));
+        const usersMap: { [key: string]: User } = {};
+        usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data() as User; });
+        const enrichedTransactions = fetchedTransactions.map(tx => ({ ...tx, user: usersMap[tx.user_id] || { full_name: "Unknown" } as User }));
 
         setTransactions(prev => [...prev, ...enrichedTransactions]);
     } catch (err) {
@@ -159,14 +190,14 @@ export default function FamilyTransactionsWidget({ family }) {
     }
   };
 
-  // Effect to group transactions
+  // Effect to group transactions by date
   useEffect(() => {
     const groups = transactions.reduce((acc, transaction) => {
       const dateKey = transaction.created_at.toDate().toDateString();
       if (!acc[dateKey]) { acc[dateKey] = []; }
       acc[dateKey].push(transaction);
       return acc;
-    }, {});
+    }, {} as { [key: string]: Transaction[] });
     setGroupedTransactions(groups);
   }, [transactions]);
   
@@ -177,9 +208,9 @@ export default function FamilyTransactionsWidget({ family }) {
     <div className="dashboard-card p-0">
         {Object.keys(groupedTransactions).length > 0 ? (
             <div className="divide-y divide-gray-200">
-                {Object.keys(groupedTransactions).sort((a,b) => new Date(b) - new Date(a)).map(dateKey => (
+                {Object.keys(groupedTransactions).sort((a,b) => new Date(b).getTime() - new Date(a).getTime()).map(dateKey => (
                     <div key={dateKey}>
-                        <h4 className="bg-gray-50 px-4 py-2 text-sm font-bold text-gray-700 border-b border-gray-200">
+                        <h4 className="bg-gray-50 px-4 py-2 text-sm font-bold text-gray-700 border-b border-gray-200 sticky top-0 z-10">
                             {formatDateHeader(dateKey)}
                         </h4>
                         <div>
@@ -191,12 +222,12 @@ export default function FamilyTransactionsWidget({ family }) {
                 ))}
             </div>
         ) : (
-            <div className="p-6 text-center text-gray-500 italic">This family has no transactions yet.</div>
+            !loading && <div className="p-6 text-center text-gray-500 italic">This family has no transactions yet.</div>
         )}
       
       {hasMore && (
-        <div className="p-4">
-          <button onClick={handleLoadMore} disabled={loading} className="w-full px-4 py-2 font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-colors duration-200">
+        <div className="p-4 bg-white border-t border-gray-200">
+          <button onClick={handleLoadMore} disabled={loading} className="w-full px-4 py-2 font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-colors duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed">
             {loading ? 'Loading...' : 'Load More'}
           </button>
         </div>

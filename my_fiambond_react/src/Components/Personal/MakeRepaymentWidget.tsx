@@ -1,12 +1,15 @@
-import { useState, useContext, FormEvent } from 'react';
+import { useState, useContext, FormEvent, ChangeEvent } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
 import { db } from '../../config/firebase-config.js';
 import { doc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
+import { Loan } from '../../types'; // Assumes your master Loan type is here
 
-// --- THE FIX (Part 1): Import the master Loan type ---
-import { Loan } from '../../types';
+// --- YOUR CLOUDINARY DETAILS ---
+// This should be the same configuration as your other widget.
+const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; // Replace with your Cloud Name
+const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
-// The local "interface Loan" has been removed from this file.
 
 interface MakeRepaymentWidgetProps {
     loan: Loan;
@@ -16,13 +19,26 @@ interface MakeRepaymentWidgetProps {
 export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWidgetProps) {
     const { user } = useContext(AppContext);
 
-    // --- THE FIX (Part 2): Calculate outstanding based on 'total_owed' ---
     const totalOwed = loan.total_owed || loan.amount;
     const outstanding = totalOwed - (loan.repaid_amount || 0);
 
     const [amount, setAmount] = useState<string>(outstanding.toFixed(2));
+    
+    // --- ADD THIS --- State for the attachment file and status message
+    const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+    const [statusMessage, setStatusMessage] = useState<string>('Submit for Confirmation');
+
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+
+    // --- ADD THIS --- Handler for the new file input
+    const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setAttachmentFile(e.target.files[0]);
+        } else {
+            setAttachmentFile(null);
+        }
+    };
 
     const handleSubmitForConfirmation = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -36,7 +52,6 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
             setError("Please enter a valid, positive amount.");
             return;
         }
-        // The 'outstanding' variable here is now correctly calculated
         if (repaymentAmount > outstanding) {
             setError(`Payment cannot exceed the outstanding amount of ₱${outstanding.toFixed(2)}.`);
             return;
@@ -46,15 +61,43 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
         setError(null);
 
         try {
+            let receiptUrl = null;
+
+            // --- ADD THIS: UPLOAD LOGIC ---
+            if (attachmentFile) {
+                setStatusMessage("Uploading receipt...");
+
+                const uploadFormData = new FormData();
+                uploadFormData.append('file', attachmentFile);
+                uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+                const response = await fetch(CLOUDINARY_API_URL, {
+                    method: 'POST',
+                    body: uploadFormData,
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to upload receipt to Cloudinary.');
+                }
+
+                const data = await response.json();
+                receiptUrl = data.secure_url;
+            }
+            
+            setStatusMessage("Submitting for confirmation...");
+
             const batch = writeBatch(db);
             const loanRef = doc(db, "loans", loan.id);
-            batch.update(loanRef, {
-                pending_repayment: {
-                    amount: repaymentAmount,
-                    submitted_by: user.uid,
-                    submitted_at: serverTimestamp()
-                }
-            });
+            
+            // --- UPDATE THIS: Add the receipt URL to the pending_repayment object ---
+            const pendingRepaymentData = {
+                amount: repaymentAmount,
+                submitted_by: user.uid,
+                submitted_at: serverTimestamp(),
+                ...(receiptUrl && { receipt_url: receiptUrl }), // Conditionally add the URL
+            };
+
+            batch.update(loanRef, { pending_repayment: pendingRepaymentData });
 
             const transactionRef = doc(collection(db, "transactions"));
             const transactionData = {
@@ -75,6 +118,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
             setError("Could not submit payment. Please check your connection and try again.");
         } finally {
             setLoading(false);
+            setStatusMessage('Submit for Confirmation');
         }
     };
 
@@ -101,11 +145,29 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
                     className="w-full p-2 border border-gray-300 rounded-md" 
                 />
             </div>
+            
+            {/* --- ADD THIS: The new file input for the repayment receipt --- */}
+            <div>
+                <label htmlFor="repaymentAttachment" className="block text-sm font-medium text-gray-700">
+                    Attach Proof of Payment (Optional)
+                </label>
+                <input 
+                    id="repaymentAttachment" 
+                    type="file" 
+                    accept="image/*,.pdf"
+                    onChange={handleAttachmentChange} 
+                    disabled={loading} 
+                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                />
+            </div>
+
             {error && <p className="error">{error}</p>}
             <button type="submit" className="primary-btn w-full" disabled={loading}>
-                {loading ? 'Submitting...' : 'Submit for Confirmation'}
+                {loading ? statusMessage : 'Submit for Confirmation'}
             </button>
-            <p className="text-xs text-center text-gray-500">This will be deducted from your personal balance. The lender must confirm this payment.</p>
+            <p className="text-xs text-center text-gray-500">
+                This will be deducted from your personal balance. The lender must confirm this payment.
+            </p>
         </form>
     );
 }
