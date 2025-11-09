@@ -197,7 +197,7 @@ export default function PersonalTransactionsWidget() {
             <div className="divide-y divide-gray-200">
                 {Object.keys(groupedTransactions).sort((a,b) => new Date(b).getTime() - new Date(a).getTime()).map(dateKey => (
                     <div key={dateKey}>
-                        <h4 className="bg-gray-50 px-4 py-2 text-sm font-bold text-gray-700 border-b border-gray-200 sticky top-0 z-10">
+                        <h4 className="bg-gray-50 px-4 py-2 text-sm font-bold text-gray-700 border-b border-gray-200">
                             {formatDateHeader(dateKey)}
                         </h4>
                         <div>
