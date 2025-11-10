@@ -22,6 +22,16 @@ Verify Email Address
 
 <img width="1830" height="910" alt="image" src="https://github.com/user-attachments/assets/37ada9a7-827d-49a3-a11a-db4a8b515bd7" />
 
+Firebase Confirmation:
+
+<img width="1855" height="918" alt="image" src="https://github.com/user-attachments/assets/90494758-6e81-48fe-90f1-0e5654e8c0b0" />
+
+<img width="1826" height="907" alt="image" src="https://github.com/user-attachments/assets/b9c4115e-0550-47e8-b2a5-d2ebe70f7ee5" />
+
+<img width="1854" height="914" alt="image" src="https://github.com/user-attachments/assets/65ee4de1-0ca2-435d-9b0a-3fd743fe3c0d" />
+
+
+
 Forgot Password
 
 <img width="1833" height="910" alt="image" src="https://github.com/user-attachments/assets/7eb5a126-3743-43a1-82c0-bd8da3f9617e" />
