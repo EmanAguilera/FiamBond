@@ -3,6 +3,7 @@ import { useNavigate, NavLink, useLocation } from "react-router-dom";
 import { auth, db, googleProvider } from "../../config/firebase-config";
 import { signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import toast from 'react-hot-toast';
 
 interface LoginFormData {
   email: string;
@@ -14,44 +15,34 @@ export default function Login() {
   const location = useLocation();
   const [formData, setFormData] = useState<LoginFormData>({ email: "", password: "" });
   const [generalError, setGeneralError] = useState<string | null>(null);
-  const [resetMessage, setResetMessage] = useState<string | null>(null);
   
-  // State and logic for the success toast notification
+  // This effect checks for a message passed from the registration page
   const registrationMessage = location.state?.message;
-  const [showToast, setShowToast] = useState(false);
 
-  // This effect runs when the component loads. If it finds a registration message,
-  // it shows the toast for 5 seconds and then hides it.
   useEffect(() => {
     if (registrationMessage) {
-      setShowToast(true);
-      const timer = setTimeout(() => {
-        setShowToast(false);
-        // This clears the message from the route state so it doesn't reappear
-        // if the user navigates back to this page.
-        navigate(location.pathname, { replace: true, state: {} });
-      }, 5000); // Toast is visible for 5 seconds
-
-      // Cleanup function to clear the timer if the component unmounts early
-      return () => clearTimeout(timer);
+      // Display the registration success message as a toast
+      toast.success(registrationMessage);
+      // Clear the message from location state to prevent it from re-appearing
+      navigate(location.pathname, { replace: true, state: {} });
     }
   }, [registrationMessage, navigate, location.pathname]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
-    setGeneralError(null); // Clear errors when user starts typing
-    setResetMessage(null);
+    // Clear the main form error whenever the user types
+    setGeneralError(null);
   };
 
   async function handleLoginSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setGeneralError(null);
-    setResetMessage(null);
     try {
       await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      navigate("/"); // Navigate to home/dashboard on success
+      navigate("/"); // Navigate to home/dashboard on successful login
     } catch (error: any) {
+      // For the main login error, an inline message is often better UX
       setGeneralError("Incorrect email or password. Please try again.");
       console.error('Login error:', error);
     }
@@ -59,7 +50,6 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     setGeneralError(null);
-    setResetMessage(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
@@ -82,27 +72,37 @@ export default function Login() {
       
       navigate("/"); // Navigate to home/dashboard on success
     } catch (error) {
-      setGeneralError("Failed to sign in with Google. Please check your configuration.");
+      // Use a toast for less critical errors like this
+      toast.error("Failed to sign in with Google. Please try again.");
       console.error('Google sign-in error:', error);
     }
   };
 
   const handlePasswordReset = async () => {
+    // First, validate that the email field is not empty
     if (!formData.email) {
       setGeneralError("Please enter your email address to reset your password.");
       return;
     }
     setGeneralError(null);
-    setResetMessage(null);
+    
+    // Show a loading toast while the email is being sent
+    const toastId = toast.loading('Sending password reset email...');
+
     try {
       await sendPasswordResetEmail(auth, formData.email);
-      setResetMessage("Password reset email sent! Please check your inbox.");
+      // On success, update the toast to a success message
+      toast.success("Password reset email sent! Please check your inbox.", { id: toastId });
     } catch (error: any) {
+      // On failure, update the toast to an error message
       if (error.code === 'auth/user-not-found') {
+        // For this specific error, an inline message is better
+        toast.dismiss(toastId); // Dismiss the loading toast
         setGeneralError("No account found with this email address.");
       } else {
-        setGeneralError("Failed to send password reset email. Please try again.");
+        toast.error("Failed to send password reset email. Please try again.", { id: toastId });
       }
+      console.error('Password reset error:', error);
     }
   };
 
@@ -156,10 +156,10 @@ export default function Login() {
               </div>
             </div>
             
+            {/* Inline error for primary form actions */}
             {generalError && <p className="error">{generalError}</p>}
-            {resetMessage && <p className="success">{resetMessage}</p>}
 
-            <button className="primary-btn" type="submit"> Sign In </button>
+            <button className="primary-btn w-full" type="submit"> Sign In </button>
           </form>
           
           <p className="text-center text-sm text-gray-600 mt-6">
@@ -168,19 +168,6 @@ export default function Login() {
           </p>
         </div>
       </main>
-
-      {/* Toast Notification JSX */}
-      {showToast && (
-        <div className="toast-notification">
-          <div className="toast-content">
-            <svg className="toast-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
-            <p className="toast-message">{registrationMessage}</p>
-          </div>
-        </div>
-      )}
     </>
   );
 }

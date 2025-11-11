@@ -11,7 +11,6 @@ const CreateGoalWidget = lazy(() => import("../Components/Personal/CreateGoalWid
 const PersonalTransactionsWidget = lazy(() => import("../Components/Personal/PersonalTransactionsWidget.jsx"));
 const CreateTransactionWidget = lazy(() => import("../Components/Personal/CreateTransactionWidget.tsx"));
 const FamilyManagementWidget = lazy(() => import("../Components/Family/FamilyManagementWidget.jsx"));
-const CreateFamilyWidget = lazy(() => import("../Components/Family/CreateFamilyWidget.tsx"));
 const FamilyRealm = lazy(() => import('../Components/Family/FamilyRealm.jsx'));
 const PersonalReportChartWidget = lazy(() => import('../Components/Personal/PersonalReportChartWidget.jsx'));
 const LoanTrackingWidget = lazy(() => import('../Components/Personal/LoanTrackingWidget.jsx'));
@@ -103,7 +102,6 @@ export default function Home() {
     const [isLendingModalOpen, setIsLendingModalOpen] = useState(false);
     const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false);
     const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false);
-    const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
     const [isRecordLoanModalOpen, setIsRecordLoanModalOpen] = useState(false);
     const [loanFlowStep, setLoanFlowStep] = useState('choice');
     const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
@@ -241,18 +239,14 @@ export default function Home() {
         getActiveTotalGoalsCount(); // Only this count needs updating on create
     }, [getActiveTotalGoalsCount]);
 
-    const handleFamilySuccess = useCallback(() => {
-        setIsCreateFamilyModalOpen(false);
-    }, []);
-
     const handleRecordLoanSuccess = () => {
         setIsRecordLoanModalOpen(false);
         handleDashboardRefresh();
     };
     
     const openCreateFamilyFromLoanFlow = () => {
-        setIsRecordLoanModalOpen(false);
-        setIsCreateFamilyModalOpen(true);
+        setIsRecordLoanModalOpen(false); // Close the current loan modal
+        setIsFamilyModalOpen(true);      // Open the full Family Management modal
     };
 
     const renderLoanModalContent = () => {
@@ -300,7 +294,7 @@ export default function Home() {
 
                 {isCreateTransactionModalOpen && <Modal isOpen={isCreateTransactionModalOpen} onClose={() => setIsCreateTransactionModalOpen(false)} title="Add a New Transaction"><CreateTransactionWidget onSuccess={handleTransactionSuccess} /></Modal>}
                 {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="Create a New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
-                {isCreateFamilyModalOpen && <Modal isOpen={isCreateFamilyModalOpen} onClose={() => setIsCreateFamilyModalOpen(false)} title="Create a New Family"><CreateFamilyWidget onSuccess={handleFamilySuccess} /></Modal>}
+
                 {isRecordLoanModalOpen && (
                     <Modal 
                         isOpen={isRecordLoanModalOpen} 
