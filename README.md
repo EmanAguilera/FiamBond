@@ -87,7 +87,7 @@ Figure 1. The Fiambond Opening demonstrates the introductory interface of the ap
 Figure 2. FiamBond V2 will have the option of manual authentication and Sign In With Google, thus allowing an immediate registration and a login with Firebase.
 
 ---
-<img width="1830" height="910" alt="image" src="https://github.com/user-attachments/assets/37ada9a7-827d-49a3-a11a-db4a8b515bd7" />
+<img width="1365" height="677" alt="image" src="https://github.com/user-attachments/assets/fc9db7f5-17b9-4707-8bfb-8a35b0bcbb4b" />
 Figure 3. Once registered, one must verify their e-mail address.
 
 ---
@@ -95,12 +95,12 @@ Figure 3. Once registered, one must verify their e-mail address.
 Figure 4. When the verification link is being clicked, the Firebase provides this screen which guarantees the user that he is now authorized to sign in.
 
 ---
-<img width="1833" height="910" alt="image" src="https://github.com/user-attachments/assets/7eb5a126-3743-43a1-82c0-bd8da3f9617e" />
-<img width="1854" height="914" alt="image" src="https://github.com/user-attachments/assets/65ee4de1-0ca2-435d-9b0a-3fd743fe3c0d" />
+<img width="1360" height="674" alt="image" src="https://github.com/user-attachments/assets/474f3434-c986-4e74-b7f1-465cab9d7140" />
+<img width="1383" height="678" alt="image" src="https://github.com/user-attachments/assets/d67db565-70a2-43c2-a25d-a3d7e2055b98" />
 Figure 5. The Forgot Password option sends a secure connection through Firebase, which allows the user to modify their password.
 
 ---
-<img width="1832" height="1338" alt="image" src="https://github.com/user-attachments/assets/4d2e9798-659a-454d-8ec2-f2d481dd54a1" />
+<img width="998" height="724" alt="image" src="https://github.com/user-attachments/assets/caa46d75-11b1-4484-b932-c228f4b9a5c1" />
 Figure 6. The Account Settings page enables the user to change their profile information and change the password.
 
 </details>
@@ -230,7 +230,7 @@ Figure 31. The form to include the new financial goal of the family.
 Figure 32. The form that enables a creditor to document a loan to another family member, with specification of interest, and the reason why it is so.  
 
 ---
-<img width="1829" height="907" alt="image" src="https://github.com/user-attachments/assets/829350e9-6f8a-40f1-b832-5627f0daecd2" />
+<img width="1467" height="718" alt="image" src="https://github.com/user-attachments/assets/4fa61417-9139-4bf6-a4a1-8ec3a01eaa2c" />
 Figure 33. The interface application, Manage Members which allows users to invite others to join to their family realm through email.  
 
 </details>
