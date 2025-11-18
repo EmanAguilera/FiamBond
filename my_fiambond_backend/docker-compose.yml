@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # This is your Node.js API service
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URI=mongodb://db:27017/fiambondv3
+    volumes:
+      - .:/usr/src/app
+    depends_on:
+      - db
+
+  # This is your MongoDB database service
+  db:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
