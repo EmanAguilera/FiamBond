@@ -47,3 +47,6 @@ storage-debug.log
 .DS_Store
 npm-debug.log
 /node_modules/
+
+# Practice files to be ignored by Git
+git rm --cached my_fiambond_react/src/Components/Personal/PracticeWidget.jsx
