@@ -2,18 +2,32 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
-const app = express();
-const port = 3000;
+// Load environment variables if we are working locally (optional, but good practice)
+// require('dotenv').config(); 
 
-app.use(cors());
+const app = express();
+const port = process.env.PORT || 3000; // Let Vercel decide the port
+
+// Enable CORS so your Vercel Frontend can talk to this Vercel Backend
+app.use(cors({
+    origin: "*", // For production, you can replace "*" with your frontend domain later
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+    credentials: true
+}));
+
 app.use(express.json());
 
 // --- DATABASE CONNECTION ---
+// Vercel will inject MONGO_URI automatically from the dashboard settings.
 const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/fiambond_v3'; 
 
+if (!process.env.MONGO_URI) {
+    console.log("⚠️  Running on Local Database. If deploying, check Vercel Environment Variables.");
+}
+
 mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('✅ MongoDB Connected!'))
-  .catch(err => console.error('❌ MongoDB Error:', err));
+  .then(() => console.log('✅ MongoDB Connected Successfully!'))
+  .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 // ==========================================
 //               SCHEMAS
@@ -98,7 +112,7 @@ const Family = mongoose.model('Family', FamilySchema);
 //                ROUTES
 // ==========================================
 
-app.get('/', (req, res) => res.send('FiamBond V3 API is Online'));
+app.get('/', (req, res) => res.send('FiamBond V3 API is Online 🚀'));
 
 // --- TRANSACTION ROUTES ---
 app.get('/api/transactions', async (req, res) => {
@@ -107,13 +121,10 @@ app.get('/api/transactions', async (req, res) => {
     
     let query = {};
 
-    // FIX: Explicitly check for string 'undefined' which Fetch sometimes sends
-    const hasFamily = family_id && family_id !== 'undefined' && family_id !== 'null';
-    const hasUser = user_id && user_id !== 'undefined' && user_id !== 'null';
-
-    if (hasFamily) {
+    // Robust check: Handle "undefined" string literal which fetch sometimes sends
+    if (family_id && family_id !== 'undefined' && family_id !== 'null') {
         query.family_id = family_id;
-    } else if (hasUser) {
+    } else if (user_id && user_id !== 'undefined' && user_id !== 'null') {
         query.user_id = user_id;
     } else {
         return res.status(400).json({ error: "User ID or Family ID required" });
@@ -149,12 +160,9 @@ app.get('/api/loans', async (req, res) => {
     const { user_id, family_id } = req.query;
     let query = {};
 
-    const hasFamily = family_id && family_id !== 'undefined' && family_id !== 'null';
-    const hasUser = user_id && user_id !== 'undefined' && user_id !== 'null';
-
-    if (hasFamily) {
+    if (family_id && family_id !== 'undefined' && family_id !== 'null') {
         query.family_id = family_id;
-    } else if (hasUser) {
+    } else if (user_id && user_id !== 'undefined' && user_id !== 'null') {
         query.$or = [{ creditor_id: user_id }, { debtor_id: user_id }];
     } else {
         return res.status(400).json({ error: "User ID or Family ID required" });
@@ -249,26 +257,13 @@ app.get('/api/families', async (req, res) => {
 
 app.get('/api/families/:id', async (req, res) => {
   try {
-    const familyId = req.params.id;
-    
-    // Debug log to see exactly what the frontend is sending
-    // console.log(`🔍 [GET] Checking Family ID: '${familyId}'`);
-
-    if (!mongoose.Types.ObjectId.isValid(familyId)) {
-        console.log(`❌ Invalid ID Format: ${familyId}`);
-        return res.status(404).json({ error: "Invalid ID format" });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(404).json({ error: "Invalid Family ID format" });
     }
-
-    const family = await Family.findById(familyId);
-    
-    if (!family) {
-        console.log(`❌ Family not found in DB for ID: ${familyId}`);
-        return res.status(404).json({ error: "Family not found" });
-    }
-
+    const family = await Family.findById(req.params.id);
+    if (!family) return res.status(404).json({ error: "Family not found" });
     res.json(family);
   } catch (err) {
-    console.error("Server Error Get Family:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -276,24 +271,18 @@ app.get('/api/families/:id', async (req, res) => {
 app.post('/api/families', async (req, res) => {
   try {
     const { family_name, owner_id, member_ids } = req.body;
-
-    // Logic: Ensure the owner is in the member list
     let finalMembers = member_ids || [];
     if (owner_id && !finalMembers.includes(owner_id)) {
         finalMembers.push(owner_id);
     }
-
     const newFamily = new Family({
         family_name,
         owner_id,
         member_ids: finalMembers
     });
-
     const savedFamily = await newFamily.save();
-    console.log(`✅ Created Family: ${savedFamily.family_name} (${savedFamily._id})`);
     res.status(201).json(savedFamily);
   } catch (err) {
-    console.error("Create Family Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -321,7 +310,6 @@ app.post('/api/families/:id/members', async (req, res) => {
   try {
     const { newMemberId } = req.body; 
     const familyId = req.params.id;
-
     if (!newMemberId) return res.status(400).json({ error: "Member ID required" });
 
     const family = await Family.findById(familyId);
@@ -333,7 +321,6 @@ app.post('/api/families/:id/members', async (req, res) => {
 
     family.member_ids.push(newMemberId);
     await family.save();
-    
     res.json(family);
   } catch (err) {
     res.status(500).json({ error: err.message });
