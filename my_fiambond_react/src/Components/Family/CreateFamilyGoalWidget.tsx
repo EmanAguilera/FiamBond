@@ -2,13 +2,11 @@
 
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from "../../config/firebase-config.js"; // Adjust path if necessary
-import { collection, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+// Removed Firebase Imports
 
-// Define TypeScript interfaces for better type-checking
+// Define TypeScript interfaces
 interface Family {
-  id: string; // Firestore document IDs are strings
-  // Add any other properties of the family object if available
+  id: string;
   family_name?: string;
 }
 
@@ -23,11 +21,11 @@ interface IGoalForm {
   target_date: string;
 }
 
-// NOTE: The IApiError interface is no longer needed as Firebase client-side errors are simpler.
-
 export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFamilyGoalWidgetProps) {
-  // Get the user object from context to access the user's UID
   const { user } = useContext(AppContext);
+  
+  // Use Vite env variable or fallback to localhost
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
   const [formData, setFormData] = useState<IGoalForm>({
     name: "",
@@ -46,7 +44,6 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
   const handleCreateGoal = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // Guard clause: Ensure a user is logged in before proceeding.
     if (!user) {
       setFormError("You must be logged in to create a goal.");
       return;
@@ -56,25 +53,34 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
     setLoading(true);
     
     try {
-      // Prepare the data object to be saved in Firestore.
-      // It must match the structure of your 'goals' collection.
-      const goalData = {
+      // Prepare the payload for the Node.js Backend
+      // Matches the Mongoose GoalSchema
+      const payload = {
         user_id: user.uid,
-        family_id: family.id, // Link to the family using its document ID
+        family_id: family.id, // IMPORTANT: Links this goal to the family
         name: formData.name,
-        target_amount: Number(formData.target_amount), // Convert amount to a number
-        target_date: Timestamp.fromDate(new Date(formData.target_date)), // Convert date string to Firestore Timestamp
+        target_amount: Number(formData.target_amount),
+        target_date: new Date(formData.target_date), // Send standard JS Date
         status: "active",
-        created_at: serverTimestamp(),
-        completed_at: null,
-        completed_by_user_id: null,
+        // created_at is handled automatically by Mongoose default: Date.now
       };
 
-      // Get a reference to the 'goals' collection and add the new document.
-      const goalsCollectionRef = collection(db, "goals");
-      await addDoc(goalsCollectionRef, goalData);
+      // Send POST request
+      const response = await fetch(`${API_URL}/goals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create goal on server');
+      }
       
-      // If the operation is successful, call the onSuccess callback if it exists.
+      // Reset form
+      setFormData({ name: "", target_amount: "", target_date: "" });
+
       if (onSuccess) {
         onSuccess();
       }
@@ -94,10 +100,10 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
           <input
             type="text"
             name="name"
-            placeholder="Goal Name"
+            placeholder="Goal Name (e.g. Family Vacation)"
             value={formData.name}
             onChange={handleInputChange}
-            className="w-full p-2 border rounded-md"
+            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             disabled={loading}
             required
           />
@@ -110,10 +116,10 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
               placeholder="Target Amount"
               value={formData.target_amount}
               onChange={handleInputChange}
-              className="w-full p-2 border rounded-md"
+              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
               disabled={loading}
               required
-              step="0.01" // Allow decimal values for money
+              step="0.01"
             />
           </div>
           <div>
@@ -122,15 +128,15 @@ export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFami
               name="target_date"
               value={formData.target_date}
               onChange={handleInputChange}
-              className="w-full p-2 border rounded-md text-gray-500"
+              className="w-full p-2 border border-gray-300 rounded-md text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               disabled={loading}
               required
             />
           </div>
         </div>
-        {formError && <p className="error">{formError}</p>}
+        {formError && <p className="error text-center">{formError}</p>}
         <button type="submit" className="primary-btn w-full" disabled={loading}>
-          {loading ? 'Setting Goal...' : 'Set Goal'}
+          {loading ? 'Setting Goal...' : 'Set Family Goal'}
         </button>
       </form>
     </div>

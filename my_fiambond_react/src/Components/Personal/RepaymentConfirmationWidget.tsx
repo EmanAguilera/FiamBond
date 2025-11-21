@@ -1,16 +1,17 @@
 import { useState, useContext, FormEvent } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
-import { db } from '../../config/firebase-config.js';
-import { doc, writeBatch, serverTimestamp, collection, increment, deleteField } from 'firebase/firestore';
-import { Loan } from '../../types'; // Import the master Loan type
+// Removed Firebase Imports
+import { Loan } from '../../types'; 
 
 interface RepaymentConfirmationWidgetProps {
-    loan: Loan;
+    loan: any; // using any for flexibility with MongoDB _id
     onSuccess: () => void;
 }
 
 export default function RepaymentConfirmationWidget({ loan, onSuccess }: RepaymentConfirmationWidgetProps) {
     const { user } = useContext(AppContext);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -29,34 +30,60 @@ export default function RepaymentConfirmationWidget({ loan, onSuccess }: Repayme
         setError(null);
 
         try {
-            const batch = writeBatch(db);
-            const loanRef = doc(db, "loans", loan.id);
-            const repaymentAmount = loan.pending_repayment.amount;
+            const repaymentAmount = parseFloat(loan.pending_repayment.amount);
+            const currentRepaid = parseFloat(loan.repaid_amount || 0);
+            const totalOwed = parseFloat(loan.total_owed || loan.amount);
 
-            // Operation 1: Update the loan document itself.
-            const newRepaidAmount = (loan.repaid_amount || 0) + repaymentAmount;
-            const newStatus = newRepaidAmount >= loan.amount ? "repaid" : "outstanding";
-            
-            batch.update(loanRef, {
-                repaid_amount: increment(repaymentAmount),
+            // 1. Calculate New Values
+            const newRepaidAmount = currentRepaid + repaymentAmount;
+            // Check if fully paid (allow for tiny floating point differences)
+            const newStatus = newRepaidAmount >= (totalOwed - 0.01) ? "repaid" : "outstanding";
+
+            // 2. Preserve Receipt: Move it from 'pending' to 'history'
+            let updatedReceipts = loan.repayment_receipts || [];
+            if (loan.pending_repayment.receipt_url) {
+                updatedReceipts = [...updatedReceipts, {
+                    url: loan.pending_repayment.receipt_url,
+                    amount: repaymentAmount,
+                    recorded_at: new Date() // Save current time
+                }];
+            }
+
+            // 3. PATCH Loan: Update amounts, status, receipts, and CLEAR pending_repayment
+            const loanUpdatePayload = {
+                repaid_amount: newRepaidAmount,
                 status: newStatus,
-                pending_repayment: deleteField() // Atomically remove the pending field
+                pending_repayment: null, // Setting to null removes it in Mongoose
+                repayment_receipts: updatedReceipts
+            };
+
+            const loanResponse = await fetch(`${API_URL}/loans/${loan.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(loanUpdatePayload)
             });
 
-            // Operation 2: Create the corresponding 'income' transaction for the CREDITOR (the current user).
-            const transactionRef = doc(collection(db, "transactions"));
-            const debtorName = loan.debtor?.full_name || 'the borrower';
+            if (!loanResponse.ok) throw new Error("Failed to update loan status.");
+
+            // 4. POST Transaction: Record Income for Creditor
+            const debtorName = loan.debtor?.full_name || loan.debtor_name || 'the borrower';
             const transactionData = {
-                user_id: user.uid, // This income belongs to you, the creditor.
-                family_id: null,   // Repayments credit your personal balance.
+                user_id: user.uid, // Income for YOU (Creditor)
+                family_id: null,   // Personal balance
                 type: 'income',
                 amount: repaymentAmount,
                 description: `Repayment received from ${debtorName} for: ${loan.description}`,
-                created_at: serverTimestamp()
+                attachment_url: loan.pending_repayment.receipt_url || null
+                // created_at handled by backend
             };
-            batch.set(transactionRef, transactionData);
 
-            await batch.commit();
+            const txResponse = await fetch(`${API_URL}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transactionData)
+            });
+
+            if (!txResponse.ok) throw new Error("Loan updated, but failed to record income transaction.");
 
             if (onSuccess) {
                 onSuccess();
@@ -70,8 +97,7 @@ export default function RepaymentConfirmationWidget({ loan, onSuccess }: Repayme
         }
     };
     
-    // Find the debtor's name for a friendly display.
-    const debtorDisplayName = loan.debtor?.full_name || 'The borrower';
+    const debtorDisplayName = loan.debtor?.full_name || loan.debtor_name || 'The borrower';
 
     return (
         <form onSubmit={handleConfirmRepayment} className="space-y-4">
@@ -83,10 +109,23 @@ export default function RepaymentConfirmationWidget({ loan, onSuccess }: Repayme
                     <p className="text-lg font-bold text-green-600 mt-2">
                         Amount: ₱{Number(pendingAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
+                    
+                    {loan.pending_repayment?.receipt_url && (
+                        <div className="mt-2 pt-2 border-t border-blue-200">
+                            <a 
+                                href={loan.pending_repayment.receipt_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 underline hover:text-blue-800"
+                            >
+                                View Attached Receipt
+                            </a>
+                        </div>
+                    )}
                 </div>
             </div>
             <hr />
-            {error && <p className="error">{error}</p>}
+            {error && <p className="error text-center">{error}</p>}
             <button type="submit" className="primary-btn w-full" disabled={loading}>
                 {loading ? 'Confirming...' : 'Confirm Repayment Received'}
             </button>

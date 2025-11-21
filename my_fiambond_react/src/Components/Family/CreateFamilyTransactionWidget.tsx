@@ -1,14 +1,13 @@
 import { useContext, useState, ChangeEvent, FormEvent, useRef } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from "../../config/firebase-config.js";
-import { collection, serverTimestamp, writeBatch, doc } from "firebase/firestore";
+// Removed Firebase Imports
 
 // --- YOUR CLOUDINARY DETAILS ---
 const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; 
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
-// --- FIX: Define interfaces for props and form state ---
+// --- Interfaces ---
 interface Family {
   id: string;
   family_name: string;
@@ -16,7 +15,7 @@ interface Family {
 
 interface CreateFamilyTransactionWidgetProps {
   family: Family;
-  onSuccess?: () => void; // Optional function that returns nothing
+  onSuccess?: () => void;
 }
 
 interface ITransactionForm {
@@ -25,11 +24,12 @@ interface ITransactionForm {
   type: "expense" | "income";
 }
 
-// --- FIX: Apply the props interface to the component ---
 export default function CreateFamilyTransactionWidget({ family, onSuccess }: CreateFamilyTransactionWidgetProps) {
   const { user } = useContext(AppContext);
-  // --- FIX: Provide the correct type for the form ref ---
   const formRef = useRef<HTMLFormElement>(null);
+  
+  // Use Vite env variable or fallback
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
   const [formData, setFormData] = useState<ITransactionForm>({
     description: "",
@@ -39,17 +39,14 @@ export default function CreateFamilyTransactionWidget({ family, onSuccess }: Cre
   
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('Save Transaction');
-  // --- FIX: Tell useState that the error can be a string OR null ---
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // --- FIX: Add type for the event object ---
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value as any }));
   };
   
-  // --- FIX: Add type for the event object ---
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           setAttachmentFile(e.target.files[0]);
@@ -58,7 +55,6 @@ export default function CreateFamilyTransactionWidget({ family, onSuccess }: Cre
       }
   };
 
-  // --- FIX: Add type for the event object ---
   const handleCreateTransaction = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) {
@@ -72,6 +68,7 @@ export default function CreateFamilyTransactionWidget({ family, onSuccess }: Cre
     try {
       let uploadedUrl: string | null = null;
 
+      // 1. Upload to Cloudinary (Client-side)
       if (attachmentFile) {
         setStatusMessage("Uploading receipt...");
         const uploadFormData = new FormData();
@@ -85,41 +82,53 @@ export default function CreateFamilyTransactionWidget({ family, onSuccess }: Cre
 
       setStatusMessage("Recording transactions...");
 
-      const batch = writeBatch(db);
-
-      const familyTransactionRef = doc(collection(db, "transactions"));
-      const familyTransactionData = {
+      // 2. Create FAMILY Transaction (POST to Backend)
+      const familyTransactionPayload = {
         user_id: user.uid,
         family_id: family.id,
         description: formData.description,
         amount: Number(formData.amount),
         type: formData.type,
-        created_at: serverTimestamp(),
         attachment_url: uploadedUrl,
+        // created_at is handled by Mongoose default
       };
-      batch.set(familyTransactionRef, familyTransactionData);
 
-      const personalTransactionRef = doc(collection(db, "transactions"));
+      const famResponse = await fetch(`${API_URL}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(familyTransactionPayload)
+      });
+
+      if (!famResponse.ok) throw new Error("Failed to record family transaction.");
+
+      // 3. Create PERSONAL Transaction (POST to Backend)
+      // Logic: Whether family income or expense, it counts as an EXPENSE to the individual user.
       const personalDescription = formData.type === 'income' 
         ? `Family Income (${family.family_name}): ${formData.description}` 
         : `Family Expense (${family.family_name}): ${formData.description}`;
-      const personalTransactionData = {
+
+      const personalTransactionPayload = {
         user_id: user.uid,
-        family_id: null,
+        family_id: null, // Personal scope
         description: personalDescription,
         amount: Number(formData.amount),
-        type: 'expense',
-        created_at: serverTimestamp(),
+        type: 'expense', // Always expense for the individual contributing
         attachment_url: uploadedUrl,
       };
-      batch.set(personalTransactionRef, personalTransactionData);
-      
-      await batch.commit();
 
+      const personalResponse = await fetch(`${API_URL}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(personalTransactionPayload)
+      });
+
+      if (!personalResponse.ok) throw new Error("Recorded family data, but failed to update personal balance.");
+
+      // Success
       setFormData({ description: "", amount: "", type: "expense" });
       setAttachmentFile(null);
-      // This will now work because formRef.current is typed correctly
       formRef.current?.reset();
+      
       if (onSuccess) onSuccess();
 
     } catch (err: any) {

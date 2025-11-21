@@ -1,19 +1,17 @@
 import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
+// Hybrid Approach: Keep Firebase imports ONLY for User Profile lookup
 import { db } from '../../config/firebase-config.js';
 import { 
     collection, 
     query, 
     where, 
-    orderBy, 
-    limit, 
-    startAfter, 
     getDocs, 
-    documentId,
-    DocumentData,
-    QueryDocumentSnapshot
+    documentId
 } from 'firebase/firestore';
-import { Transaction, User } from "../../types/index.js"; // Ensure types are imported
+
+// Remove 'Transaction' from here to avoid conflict with local interface
+import { User } from "../../types/index"; 
 
 // --- TypeScript Interfaces ---
 interface Family {
@@ -23,6 +21,19 @@ interface Family {
 
 interface FamilyTransactionsWidgetProps {
   family: Family;
+}
+
+// Local Transaction Interface (Matches API + Shim)
+interface Transaction {
+  id: string;
+  user_id: string;
+  family_id: string | null;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  created_at: any; // using any for the shim object (.toDate)
+  attachment_url?: string;
+  user?: User | { full_name: string };
 }
 
 // --- STYLED SKELETON LOADER ---
@@ -40,8 +51,6 @@ const TransactionListSkeleton = () => (
     ))}
   </div>
 );
-
-const TRANSACTIONS_PER_PAGE = 15;
 
 // --- HELPER FUNCTION TO FORMAT DATE HEADERS ---
 const formatDateHeader = (dateString: string): string => {
@@ -69,7 +78,6 @@ const TransactionItem = ({ transaction }: { transaction: Transaction }) => {
                 <p className="font-semibold text-gray-800 truncate">{transaction.description}</p>
                 <div className="flex items-center gap-3 mt-1">
                     <p className="text-sm text-gray-500">By: {transaction.user?.full_name || 'Unknown'}</p>
-                    {/* --- Link to the attachment if it exists --- */}
                     {transaction.attachment_url && (
                         <a 
                             href={transaction.attachment_url} 
@@ -91,38 +99,36 @@ const TransactionItem = ({ transaction }: { transaction: Transaction }) => {
     );
 };
 
-
 export default function FamilyTransactionsWidget({ family }: FamilyTransactionsWidgetProps) {
   const { user } = useContext(AppContext);
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [groupedTransactions, setGroupedTransactions] = useState<{ [key: string]: Transaction[] }>({});
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [hasMore, setHasMore] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Effect for the INITIAL data load
   useEffect(() => {
     if (!user || !family?.id) return;
     
-    const fetchInitialTransactions = async () => {
+    const fetchTransactions = async () => {
         setLoading(true);
         setError(null);
-        setHasMore(true);
         try {
-            const firstPageQuery = query(
-                collection(db, "transactions"),
-                where("family_id", "==", family.id),
-                orderBy("created_at", "desc"),
-                limit(TRANSACTIONS_PER_PAGE)
-            );
-            const documentSnapshots = await getDocs(firstPageQuery);
-            const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1] || null;
-            setLastVisible(newLastVisible);
-
-            if (documentSnapshots.docs.length < TRANSACTIONS_PER_PAGE) setHasMore(false);
+            // 1. Call Node.js Backend
+            const response = await fetch(`${API_URL}/transactions?family_id=${family.id}`);
             
-            const fetchedTransactions = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+            if (!response.ok) throw new Error('Failed to fetch transactions');
+            
+            const rawTransactions = await response.json();
+
+            // 2. Transform Data
+            const fetchedTransactions = rawTransactions.map((tx: any) => ({
+                ...tx,
+                id: tx._id,
+                // Shim: Create fake Firebase Timestamp for compatibility
+                created_at: { toDate: () => new Date(tx.created_at) }
+            }));
 
             if (fetchedTransactions.length === 0) {
               setTransactions([]);
@@ -130,65 +136,34 @@ export default function FamilyTransactionsWidget({ family }: FamilyTransactionsW
               return;
             }
 
-            // Enrich transactions with user data
-            const userIds = [...new Set(fetchedTransactions.map(tx => tx.user_id))];
-            const usersQuery = query(collection(db, "users"), where(documentId(), "in", userIds));
-            const usersSnapshot = await getDocs(usersQuery);
-            const usersMap: { [key: string]: User } = {};
-            usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data() as User; });
-            const enrichedTransactions = fetchedTransactions.map(tx => ({ ...tx, user: usersMap[tx.user_id] || { full_name: "Unknown" } as User }));
+            // 3. Enrich with User Data (Firebase Hybrid)
+            const userIds = [...new Set(fetchedTransactions.map((tx: any) => tx.user_id))];
+            const usersMap: { [key: string]: any } = {};
+            
+            if (userIds.length > 0) {
+                // Limit to 10 for Firebase 'in' query limitation
+                const usersQuery = query(collection(db, "users"), where(documentId(), "in", userIds.slice(0, 10)));
+                const usersSnapshot = await getDocs(usersQuery);
+                usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data(); });
+            }
+            
+            const enrichedTransactions = fetchedTransactions.map((tx: any) => ({
+                ...tx,
+                user: usersMap[tx.user_id] || { full_name: "Unknown" }
+            }));
             
             setTransactions(enrichedTransactions);
+
         } catch (err) {
-            console.error("Failed to fetch initial family transactions:", err);
+            console.error("Failed to fetch family transactions:", err);
             setError("Could not load transactions.");
         } finally {
             setLoading(false);
         }
     };
 
-    fetchInitialTransactions();
-  }, [user, family.id]);
-
-  // Function for loading MORE pages
-  const handleLoadMore = async () => {
-    if (!lastVisible || !hasMore || loading) return;
-
-    setLoading(true);
-    try {
-        const nextPageQuery = query(
-            collection(db, "transactions"),
-            where("family_id", "==", family.id),
-            orderBy("created_at", "desc"),
-            startAfter(lastVisible),
-            limit(TRANSACTIONS_PER_PAGE)
-        );
-        const documentSnapshots = await getDocs(nextPageQuery);
-        const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1] || null;
-        setLastVisible(newLastVisible);
-
-        if (documentSnapshots.docs.length < TRANSACTIONS_PER_PAGE) setHasMore(false);
-
-        const fetchedTransactions = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-
-        if (fetchedTransactions.length === 0) return;
-        
-        // Enrich the new batch of transactions
-        const userIds = [...new Set(fetchedTransactions.map(tx => tx.user_id))];
-        const usersQuery = query(collection(db, "users"), where(documentId(), "in", userIds));
-        const usersSnapshot = await getDocs(usersQuery);
-        const usersMap: { [key: string]: User } = {};
-        usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data() as User; });
-        const enrichedTransactions = fetchedTransactions.map(tx => ({ ...tx, user: usersMap[tx.user_id] || { full_name: "Unknown" } as User }));
-
-        setTransactions(prev => [...prev, ...enrichedTransactions]);
-    } catch (err) {
-        console.error("Failed to fetch more family transactions:", err);
-        setError("Could not load more transactions.");
-    } finally {
-        setLoading(false);
-    }
-  };
+    fetchTransactions();
+  }, [user, family.id, API_URL]);
 
   // Effect to group transactions by date
   useEffect(() => {
@@ -224,14 +199,6 @@ export default function FamilyTransactionsWidget({ family }: FamilyTransactionsW
         ) : (
             !loading && <div className="p-6 text-center text-gray-500 italic">This family has no transactions yet.</div>
         )}
-      
-      {hasMore && (
-        <div className="p-4 bg-white border-t border-gray-200">
-          <button onClick={handleLoadMore} disabled={loading} className="w-full px-4 py-2 font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-colors duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed">
-            {loading ? 'Loading...' : 'Load More'}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

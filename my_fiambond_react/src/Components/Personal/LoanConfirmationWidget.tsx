@@ -1,18 +1,17 @@
 import { useState, useContext, FormEvent } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
-import { db } from '../../config/firebase-config.js';
-import { doc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
-
-// Import the master Loan type from your central types file
-import { Loan } from '../../types';
+// Removed Firebase Imports
+// import { Loan } from '../../types'; // Optional if using TS
 
 interface LoanConfirmationWidgetProps {
-    loan: Loan;
+    loan: any; // Use 'any' or your Loan interface
     onSuccess: () => void;
 }
 
 export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirmationWidgetProps) {
     const { user } = useContext(AppContext);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -28,39 +27,39 @@ export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirma
         setError(null);
 
         try {
-            // Use a batch for an atomic operation
-            const batch = writeBatch(db);
-
-            // Operation 1: Update the loan's status to 'outstanding'
-            const loanRef = doc(db, "loans", loan.id);
-            batch.update(loanRef, {
-                status: "outstanding",
-                confirmed_at: serverTimestamp() // Optional: track when it was confirmed
+            // 1. Update Loan Status (PATCH)
+            const loanResponse = await fetch(`${API_URL}/loans/${loan.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: "outstanding",
+                    confirmed_at: new Date() // JS Date
+                })
             });
 
-            // Operation 2: Create the corresponding 'income' transaction for the debtor (current user)
-            const transactionRef = doc(collection(db, "transactions"));
+            if (!loanResponse.ok) throw new Error("Failed to update loan status.");
+
+            // 2. Create Income Transaction for Debtor (POST)
             const creditorName = loan.creditor?.full_name || 'the lender';
+            
             const transactionData = {
-                user_id: user.uid, // This income transaction belongs to the debtor
-                
-                // --- THE FIX IS HERE ---
-                // The family_id must be null for it to appear in the user's personal transactions.
-                family_id: null, 
-                
+                user_id: user.uid, 
+                family_id: null, // Personal income
                 type: 'income',
                 amount: Number(loan.total_owed || loan.amount),
                 description: `Loan received from ${creditorName}: ${loan.description}`,
-                created_at: serverTimestamp()
+                // created_at handled by backend
             };
-            batch.set(transactionRef, transactionData);
 
-            // Commit both operations. They will either both succeed or both fail.
-            await batch.commit();
+            const txResponse = await fetch(`${API_URL}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transactionData)
+            });
 
-            if (onSuccess) {
-                onSuccess();
-            }
+            if (!txResponse.ok) throw new Error("Loan confirmed, but failed to record income transaction.");
+
+            if (onSuccess) onSuccess();
 
         } catch (err: any) {
             console.error("Failed to confirm loan receipt:", err);
@@ -76,14 +75,14 @@ export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirma
                 <p className="text-sm text-gray-600">Please confirm you have received the funds for the following loan:</p>
                 <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-200">
                     <p className="font-semibold text-gray-800">{loan.description}</p>
-                    <p className="text-sm text-gray-500 mt-1">From: <span className="font-medium">{loan.creditor.full_name}</span></p>
+                    <p className="text-sm text-gray-500 mt-1">From: <span className="font-medium">{loan.creditor?.full_name || 'Lender'}</span></p>
                     <p className="text-lg font-bold text-green-600 mt-2">
                         Amount: ₱{Number(loan.total_owed || loan.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
             </div>
             <hr />
-            {error && <p className="error">{error}</p>}
+            {error && <p className="error text-center">{error}</p>}
             <button type="submit" className="primary-btn w-full" disabled={loading}>
                 {loading ? 'Confirming...' : 'Confirm Funds Received'}
             </button>

@@ -1,22 +1,22 @@
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
-import { db } from '../../config/firebase-config.js';
-// FIX: Add `serverTimestamp` back to the import list
-import { doc, writeBatch, collection, increment, Timestamp, serverTimestamp } from 'firebase/firestore'; 
-import { Loan } from '../../types';
+// Removed Firebase Imports
+// import { Loan } from '../../types';
 
 // --- YOUR CLOUDINARY DETAILS ---
-const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; // Replace with your Cloud Name
+const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; 
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 interface RecordPersonalRepaymentWidgetProps {
-    loan: Loan;
+    loan: any; // using any to allow for flexible MongoDB _id/id handling
     onSuccess: () => void;
 }
 
 export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: RecordPersonalRepaymentWidgetProps) {
     const { user } = useContext(AppContext);
+    // Use Vite env variable for API URL
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     
     const totalOwed = loan.total_owed || loan.amount;
     const outstanding = totalOwed - (loan.repaid_amount || 0);
@@ -47,6 +47,7 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
         try {
             let receiptUrl = null;
 
+            // 1. Upload Receipt to Cloudinary
             if (attachmentFile) {
                 setStatusMessage("Uploading receipt...");
                 const uploadFormData = new FormData();
@@ -63,40 +64,58 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
 
             setStatusMessage("Recording payment...");
             
-            const batch = writeBatch(db);
-            const loanRef = doc(db, "loans", loan.id);
-            const newRepaidAmount = (loan.repaid_amount || 0) + repaymentAmount;
+            // 2. Calculate Updates (Client-side logic replaced Firestore 'increment')
+            const currentRepaid = loan.repaid_amount || 0;
+            const newRepaidAmount = currentRepaid + repaymentAmount;
+            // Update status: if paid in full, mark as 'repaid' (or 'paid')
             const newStatus = newRepaidAmount >= totalOwed ? "repaid" : "outstanding";
 
-            const loanUpdateData: { [key: string]: any } = {
-                repaid_amount: increment(repaymentAmount),
+            // Prepare Receipt Object
+            const newReceipt = receiptUrl ? {
+                url: receiptUrl,
+                amount: repaymentAmount,
+                recorded_at: new Date() // Use JS Date instead of Timestamp
+            } : null;
+
+            // Construct the existing receipts array + new one
+            const existingReceipts = loan.repayment_receipts || [];
+            const updatedReceipts = newReceipt ? [...existingReceipts, newReceipt] : existingReceipts;
+
+            // 3. PATCH Loan (Update loan document)
+            const updatePayload = {
+                repaid_amount: newRepaidAmount,
                 status: newStatus,
+                repayment_receipts: updatedReceipts
             };
 
-            if (receiptUrl) {
-                const existingReceipts = loan.repayment_receipts || [];
-                loanUpdateData.repayment_receipts = [...existingReceipts, {
-                    url: receiptUrl,
-                    amount: repaymentAmount,
-                    recorded_at: Timestamp.now()
-                }];
-            }
+            const loanResponse = await fetch(`${API_URL}/loans/${loan.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatePayload)
+            });
 
-            batch.update(loanRef, loanUpdateData);
+            if (!loanResponse.ok) throw new Error("Failed to update loan record.");
 
-            const transactionRef = doc(collection(db, "transactions"));
+            // 4. POST Transaction (Record Income)
             const debtorName = loan.debtor?.full_name || loan.debtor_name || 'the borrower';
             const transactionData = {
                 user_id: user.uid,
-                family_id: null,
+                family_id: null, // Personal income
                 type: 'income',
                 amount: repaymentAmount,
                 description: `Repayment received from ${debtorName} for: ${loan.description}`,
-                created_at: serverTimestamp() // This now works because it's imported correctly
+                attachment_url: receiptUrl
+                // created_at is handled by backend default
             };
-            batch.set(transactionRef, transactionData);
 
-            await batch.commit();
+            const txResponse = await fetch(`${API_URL}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transactionData)
+            });
+
+            if (!txResponse.ok) throw new Error("Loan updated, but failed to record income transaction.");
+
             onSuccess();
 
         } catch (err: any) {

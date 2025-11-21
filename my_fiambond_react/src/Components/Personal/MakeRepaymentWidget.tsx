@@ -1,37 +1,30 @@
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
-import { db } from '../../config/firebase-config.js';
-import { doc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
-import { Loan } from '../../types'; // Assumes your master Loan type is here
+// Removed Firebase Imports
 
-// --- YOUR CLOUDINARY DETAILS ---
-// This should be the same configuration as your other widget.
-const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; // Replace with your Cloud Name
+const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; 
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
-
 interface MakeRepaymentWidgetProps {
-    loan: Loan;
+    loan: any;
     onSuccess: () => void;
 }
 
 export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWidgetProps) {
     const { user } = useContext(AppContext);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
     const totalOwed = loan.total_owed || loan.amount;
     const outstanding = totalOwed - (loan.repaid_amount || 0);
 
     const [amount, setAmount] = useState<string>(outstanding.toFixed(2));
-    
-    // --- ADD THIS --- State for the attachment file and status message
     const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>('Submit for Confirmation');
 
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // --- ADD THIS --- Handler for the new file input
     const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setAttachmentFile(e.target.files[0]);
@@ -63,58 +56,63 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
         try {
             let receiptUrl = null;
 
-            // --- ADD THIS: UPLOAD LOGIC ---
+            // 1. Upload Receipt to Cloudinary
             if (attachmentFile) {
                 setStatusMessage("Uploading receipt...");
-
                 const uploadFormData = new FormData();
                 uploadFormData.append('file', attachmentFile);
                 uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-                const response = await fetch(CLOUDINARY_API_URL, {
-                    method: 'POST',
-                    body: uploadFormData,
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to upload receipt to Cloudinary.');
-                }
-
+                const response = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: uploadFormData });
+                if (!response.ok) throw new Error('Failed to upload receipt.');
+                
                 const data = await response.json();
                 receiptUrl = data.secure_url;
             }
             
             setStatusMessage("Submitting for confirmation...");
 
-            const batch = writeBatch(db);
-            const loanRef = doc(db, "loans", loan.id);
-            
-            // --- UPDATE THIS: Add the receipt URL to the pending_repayment object ---
+            // 2. Update Loan (PATCH) to add pending_repayment
+            // We send the object structure that the backend expects
             const pendingRepaymentData = {
                 amount: repaymentAmount,
                 submitted_by: user.uid,
-                submitted_at: serverTimestamp(),
-                ...(receiptUrl && { receipt_url: receiptUrl }), // Conditionally add the URL
+                submitted_at: new Date(),
+                receipt_url: receiptUrl || null,
             };
 
-            batch.update(loanRef, { pending_repayment: pendingRepaymentData });
+            const loanResponse = await fetch(`${API_URL}/loans/${loan.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pending_repayment: pendingRepaymentData 
+                })
+            });
 
-            const transactionRef = doc(collection(db, "transactions"));
+            if (!loanResponse.ok) throw new Error("Failed to submit repayment to server.");
+
+            // 3. Create Expense Transaction (POST)
             const transactionData = {
                 user_id: user.uid,
                 family_id: null,
                 type: 'expense',
                 amount: repaymentAmount,
                 description: `Loan repayment for: ${loan.description}`,
-                created_at: serverTimestamp()
+                attachment_url: receiptUrl
             };
-            batch.set(transactionRef, transactionData);
 
-            await batch.commit();
+            const txResponse = await fetch(`${API_URL}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transactionData)
+            });
+
+            if (!txResponse.ok) throw new Error("Repayment submitted, but failed to record expense.");
+
             onSuccess();
 
         } catch (err: any) {
-            console.error("Failed to submit repayment for confirmation:", err);
+            console.error("Failed to submit repayment:", err);
             setError("Could not submit payment. Please check your connection and try again.");
         } finally {
             setLoading(false);
@@ -146,7 +144,6 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
                 />
             </div>
             
-            {/* --- ADD THIS: The new file input for the repayment receipt --- */}
             <div>
                 <label htmlFor="repaymentAttachment" className="block text-sm font-medium text-gray-700">
                     Attach Proof of Payment (Optional)
@@ -161,7 +158,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
                 />
             </div>
 
-            {error && <p className="error">{error}</p>}
+            {error && <p className="error text-center">{error}</p>}
             <button type="submit" className="primary-btn w-full" disabled={loading}>
                 {loading ? statusMessage : 'Submit for Confirmation'}
             </button>

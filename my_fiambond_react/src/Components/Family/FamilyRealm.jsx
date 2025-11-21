@@ -1,7 +1,9 @@
 import { useState, lazy, Suspense, useContext, useCallback, useEffect } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
+
+// --- FIREBASE IMPORTS (RESTORED) ---
 import { db } from '../../config/firebase-config.js';
-import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, documentId } from 'firebase/firestore';
+import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
 // --- WIDGET IMPORTS ---
 const Modal = lazy(() => import('../Modal.jsx'));
@@ -21,35 +23,25 @@ const FamilyRealmSkeleton = () => (
         <div className="flex flex-wrap gap-4 mb-8">
             <div className="h-10 w-48 bg-slate-200 rounded"></div>
             <div className="h-10 w-40 bg-slate-200 rounded"></div>
-            <div className="h-10 w-40 bg-slate-200 rounded"></div>
-            <div className="h-10 w-44 bg-slate-200 rounded"></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="h-32 bg-slate-200 rounded-lg"></div>
             <div className="h-32 bg-slate-200 rounded-lg"></div>
             <div className="h-32 bg-slate-200 rounded-lg"></div>
         </div>
-        <div className="w-full h-96 bg-slate-200 rounded-lg"></div>
     </div>
 );
 
 // --- HELPER FUNCTION ---
 const formatDataForChart = (transactions) => {
-    if (!transactions || transactions.length === 0) {
-        return { labels: [], datasets: [] };
-    }
+    if (!transactions || transactions.length === 0) return { labels: [], datasets: [] };
     const data = {};
     transactions.forEach(tx => {
         if (tx.created_at && typeof tx.created_at.toDate === 'function') {
             const date = tx.created_at.toDate().toLocaleDateString();
-            if (!data[date]) {
-                data[date] = { income: 0, expense: 0 };
-            }
-            if (tx.type === 'income') {
-                data[date].income += tx.amount;
-            } else {
-                data[date].expense += tx.amount;
-            }
+            if (!data[date]) data[date] = { income: 0, expense: 0 };
+            if (tx.type === 'income') data[date].income += tx.amount;
+            else data[date].expense += tx.amount;
         }
     });
     const labels = Object.keys(data).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
@@ -63,9 +55,9 @@ const formatDataForChart = (transactions) => {
 };
 
 // --- ICON & CARD COMPONENTS ---
-const WalletIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>);
-const FlagIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H8.5l-1-1H5a2 2 0 00-2 2z"></path></svg>);
-const UsersIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.253-1.282-.721-1.742M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.253-1.282.721-1.742m0 0A4.996 4.996 0 0112 13a4.996 4.996 0 014.279 2.258m-8.558 0A4.997 4.997 0 0012 13a4.997 4.997 0 004.279-2.258M12 13a5 5 0 100-10 5 5 0 000 10z"></path></svg>);
+const WalletIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>);
+const FlagIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H8.5l-1-1H5a2 2 0 00-2 2z"></path></svg>);
+const UsersIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.253-1.282-.721-1.742M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.253-1.282.721-1.742m0 0A4.996 4.996 0 0112 13a4.996 4.996 0 014.279 2.258m-8.558 0A4.997 4.997 0 0012 13a4.997 4.997 0 004.279-2.258M12 13a5 5 0 100-10 5 5 0 000 10z"></path></svg>);
 
 const DashboardCard = ({ title, value, linkText, onClick, icon, colorClass }) => (
     <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
@@ -80,6 +72,7 @@ const DashboardCard = ({ title, value, linkText, onClick, icon, colorClass }) =>
 
 export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpdate }) {
     const { user } = useContext(AppContext);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
     const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -88,7 +81,9 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
     const [isFamilyTransactionsModalOpen, setIsFamilyTransactionsModalOpen] = useState(false);
     const [isLoanListModalOpen, setIsLoanListModalOpen] = useState(false);
     const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+    
     const [loading, setLoading] = useState(true);
+    const [familyNotFound, setFamilyNotFound] = useState(false);
     const [summaryData, setSummaryData] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
     const [activeLoansCount, setActiveLoansCount] = useState(0);
@@ -98,41 +93,88 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
     const [period, setPeriod] = useState('monthly');
     const [familyMembers, setFamilyMembers] = useState([]);
 
+    // --- 1. Fetch Family Members (FIXED: Uses Firebase directly) ---
+    const getFamilyMembers = useCallback(async () => {
+        if (!family) return;
+        try {
+            // 1. Get latest ID list from MongoDB
+            const famRes = await fetch(`${API_URL}/families/${family.id}`);
+            if (!famRes.ok) return;
+            const freshFamily = await famRes.json();
+            const memberIds = freshFamily.member_ids || [];
+            
+            if (memberIds.length === 0) {
+                setFamilyMembers([]);
+                return;
+            }
+
+            // 2. Get actual profiles from Firebase (Since Mongo 'users' collection is likely empty)
+            // Note: Firebase 'in' query is limited to 10 items.
+            const usersRef = collection(db, "users");
+            const safeMemberIds = memberIds.slice(0, 10); 
+            
+            const q = query(usersRef, where(documentId(), "in", safeMemberIds));
+            const usersSnapshot = await getDocs(q);
+            
+            const fetchedMembers = usersSnapshot.docs.map(doc => ({ 
+                id: doc.id, // Firebase UID
+                ...doc.data() 
+            }));
+
+            console.log("✅ Loaded Members from Firebase:", fetchedMembers); // Debug Log
+            setFamilyMembers(fetchedMembers);
+            
+        } catch (error) {
+            console.error("Failed to fetch members from Firebase", error);
+        }
+    }, [family, API_URL]);
+
+    // 2. Calculate Balance
     const getFamilyBalance = useCallback(async () => {
-        if (!user || !family) return;
+        if (!user || !family || familyNotFound) return;
         try {
-            const q = query(collection(db, "transactions"), where("family_id", "==", family.id));
-            const querySnapshot = await getDocs(q);
-            let netPosition = 0;
-            querySnapshot.forEach(doc => {
-                const tx = doc.data();
-                if (tx.type === 'income') netPosition += tx.amount;
-                else netPosition -= tx.amount;
-            });
-            setSummaryData({ netPosition });
+            const response = await fetch(`${API_URL}/transactions?family_id=${family.id}`);
+            if (response.ok) {
+                const transactions = await response.json();
+                let netPosition = 0;
+                transactions.forEach(tx => {
+                    if (tx.type === 'income') netPosition += tx.amount;
+                    else netPosition -= tx.amount;
+                });
+                setSummaryData({ netPosition });
+            }
         } catch (error) { console.error("Failed to fetch family balance", error); }
-    }, [user, family]);
+    }, [user, family, familyNotFound, API_URL]);
 
+    // 3. Active Goals
     const getFamilyActiveGoalsCount = useCallback(async () => {
-        if (!user || !family) return;
+        if (!user || !family || familyNotFound) return;
         try {
-            const q = query(collection(db, "goals"), where("family_id", "==", family.id), where("status", "==", "active"));
-            const snapshot = await getCountFromServer(q);
-            setActiveGoalsCount(snapshot.data().count);
+            const response = await fetch(`${API_URL}/goals?family_id=${family.id}`);
+            if (response.ok) {
+                const goals = await response.json();
+                const activeCount = goals.filter(g => g.status === 'active').length;
+                setActiveGoalsCount(activeCount);
+            }
         } catch (error) { console.error("Failed to fetch family goal count", error); }
-    }, [user, family]);
+    }, [user, family, familyNotFound, API_URL]);
 
+    // 4. Active Loans
     const getFamilyActiveLoansCount = useCallback(async () => {
-        if (!user || !family) return;
+        if (!user || !family || familyNotFound) return;
         try {
-            const q = query(collection(db, "loans"), where("family_id", "==", family.id), where("status", "==", "outstanding"));
-            const snapshot = await getCountFromServer(q);
-            setActiveLoansCount(snapshot.data().count);
+            const response = await fetch(`${API_URL}/loans?family_id=${family.id}`);
+            if (response.ok) {
+                const loans = await response.json();
+                const activeCount = loans.filter(l => l.status === 'outstanding' || l.status === 'pending_confirmation').length;
+                setActiveLoansCount(activeCount);
+            }
         } catch (error) { console.error("Failed to fetch family loan count", error); }
-    }, [user, family]);
+    }, [user, family, familyNotFound, API_URL]);
 
+    // 5. Report
     const getFamilyReport = useCallback(async () => {
-        if (!user || !family) return;
+        if (!user || !family || familyNotFound) return;
         setReportLoading(true);
         setReportError(null);
         try {
@@ -141,15 +183,29 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             if (period === 'weekly') startDate = new Date(now.setDate(now.getDate() - 7));
             else if (period === 'yearly') startDate = new Date(now.setFullYear(now.getFullYear() - 1));
             else startDate = new Date(now.setMonth(now.getMonth() - 1));
-            const q = query(collection(db, "transactions"), where("family_id", "==", family.id), where("created_at", ">=", Timestamp.fromDate(startDate)), orderBy("created_at", "desc"));
-            const querySnapshot = await getDocs(q);
-            const transactions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            
+            const queryParams = new URLSearchParams({
+                family_id: family.id,
+                startDate: startDate.toISOString()
+            });
+
+            const response = await fetch(`${API_URL}/transactions?${queryParams}`);
+            if (!response.ok) throw new Error('API Error');
+            const rawData = await response.json();
+            
+            const transactions = rawData.map(tx => ({
+                ...tx,
+                id: tx._id,
+                created_at: { toDate: () => new Date(tx.created_at) }
+            }));
+
             let totalInflow = 0;
             let totalOutflow = 0;
             transactions.forEach(tx => {
                 if (tx.type === 'income') totalInflow += tx.amount;
                 else totalOutflow += tx.amount;
             });
+
             setReport({
                 chartData: formatDataForChart(transactions),
                 totalInflow, totalOutflow,
@@ -159,58 +215,80 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             });
         } catch (err) {
             console.error('Failed to fetch family report:', err);
-            setReportError(err.message);
+            setReportError("No report data available yet.");
         } finally {
             setReportLoading(false);
         }
-    }, [user, family, period]);
+    }, [user, family, period, familyNotFound, API_URL]);
 
+    // --- MASTER REFRESH ---
     const handleRealmRefresh = useCallback(async () => {
-        console.log("Refreshing Family Realm data...");
+        if (familyNotFound) return;
         setIsTransactionModalOpen(false);
         setIsGoalModalOpen(false);
         setIsLoanModalOpen(false);
-        await Promise.all([ getFamilyBalance(), getFamilyActiveGoalsCount(), getFamilyActiveLoansCount(), getFamilyReport() ]);
-        if (onDataChange) {
-            onDataChange();
-        }
-    }, [getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport, onDataChange]);
+        await Promise.all([ 
+            getFamilyBalance(), 
+            getFamilyActiveGoalsCount(), 
+            getFamilyActiveLoansCount(), 
+            getFamilyReport(),
+            getFamilyMembers() // Ensure members are re-fetched
+        ]);
+        if (onDataChange) onDataChange();
+    }, [getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport, getFamilyMembers, onDataChange, familyNotFound]);
 
+    // --- INITIAL LOAD ---
     useEffect(() => {
         const fetchAllData = async () => {
             if (!family || !user) return;
             setLoading(true);
+            
             try {
-                if (family.member_ids && family.member_ids.length > 0) {
-                    const q = query(collection(db, "users"), where(documentId(), "in", family.member_ids));
-                    const querySnapshot = await getDocs(q);
-                    const members = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setFamilyMembers(members);
-                } else {
-                    setFamilyMembers([]);
+                const checkResponse = await fetch(`${API_URL}/families/${family.id}`);
+                if (checkResponse.status === 404) {
+                    setFamilyNotFound(true);
+                    setLoading(false);
+                    return; 
                 }
-                await handleRealmRefresh();
+                
+                await Promise.all([ 
+                    getFamilyBalance(), 
+                    getFamilyActiveGoalsCount(), 
+                    getFamilyActiveLoansCount(), 
+                    getFamilyReport(),
+                    getFamilyMembers()
+                ]);
+                
             } catch (error) {
-                console.error("Error fetching initial Family Realm data:", error);
+                console.error("Error initializing Family Realm:", error);
                 setReportError("Failed to load family details.");
             } finally {
                 setLoading(false);
             }
         };
         fetchAllData();
-    }, [family, user, handleRealmRefresh]);
+    }, [family, user, API_URL]);
 
     useEffect(() => {
-        if (!loading) { getFamilyReport(); }
-    }, [period, loading, getFamilyReport]);
+        if (!loading && !familyNotFound) { getFamilyReport(); }
+    }, [period, loading, familyNotFound]);
 
     const handleMembersUpdate = (updatedFamily) => {
-        if (onFamilyUpdate) {
-            onFamilyUpdate(updatedFamily);
-        }
+        console.log("Family Updated, refreshing members...");
+        getFamilyMembers(); 
+        if (onFamilyUpdate) onFamilyUpdate(updatedFamily);
     };
     
     if (loading) return <FamilyRealmSkeleton />;
+
+    if (familyNotFound) {
+        return (
+            <div className="p-10 flex flex-col items-center justify-center min-h-[50vh] text-center">
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">Family Not Found</h2>
+                <button onClick={onBack} className="primary-btn">Return to Dashboard</button>
+            </div>
+        );
+    }
 
     return (
         <>
@@ -245,7 +323,9 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                     {reportLoading ? (
                         <div className="w-full h-96 bg-slate-100 rounded-lg flex justify-center items-center"><p className="text-slate-500">Generating Family Report...</p></div>
                     ) : reportError ? (
-                        <p className="error text-center py-10">{reportError}</p>
+                        <div className="w-full h-96 bg-slate-50 rounded-lg flex flex-col justify-center items-center border border-dashed border-slate-300">
+                            <p className="text-slate-500 mb-2">No transaction data available for this period.</p>
+                        </div>
                     ) : (
                         <Suspense fallback={<div className="h-96 bg-slate-100 rounded-lg"></div>}>
                             <FamilyReportChartWidget family={family} report={report} />
@@ -255,9 +335,10 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             </div>
 
             <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
+                {/* Pass the Firebase-fetched familyMembers to CreateLoanWidget */}
+                {isLoanModalOpen && <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Lend Money to a Family Member"><CreateLoanWidget family={family} members={familyMembers} onSuccess={handleRealmRefresh} /></Modal>}
                 {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Add Transaction for ${family.family_name}`}><CreateFamilyTransactionWidget family={family} onSuccess={handleRealmRefresh} /></Modal>}
                 {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Add Goal for ${family.family_name}`}><CreateFamilyGoalWidget family={family} onSuccess={handleRealmRefresh} /></Modal>}
-                {isLoanModalOpen && <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Lend Money to a Family Member"><CreateLoanWidget family={family} members={familyMembers} onSuccess={handleRealmRefresh} /></Modal>}
                 {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Transactions for ${family.family_name}`}><FamilyTransactionsWidget family={family} /></Modal>}
                 {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Goals for ${family.family_name}`}><GoalListsWidget family={family} onDataChange={handleRealmRefresh} /></Modal>}
                 {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Lending Activity for ${family.family_name}`}><LoanTrackingWidget family={family} onDataChange={handleRealmRefresh} /></Modal>}

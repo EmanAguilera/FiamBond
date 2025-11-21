@@ -1,11 +1,12 @@
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
-import { db } from '../../config/firebase-config.js';
-import { doc, serverTimestamp, writeBatch, collection } from 'firebase/firestore';
+// Remove Firebase imports
+// import { db } from '../../config/firebase-config.js'; 
+// import { doc, serverTimestamp, writeBatch, collection } from 'firebase/firestore';
 
-// The Goal interface is correct
+// The Goal interface
 interface Goal {
-    id: string;
+    id: string; // This maps to _id from MongoDB
     name: string;
     target_amount: number;
     family_id: string | null;
@@ -19,11 +20,9 @@ interface CompleteGoalWidgetProps {
     onSuccess: () => void;
 }
 
-// Cloudinary details remain the same
 const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy";
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-
 
 export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidgetProps) {
     const { user } = useContext(AppContext);
@@ -47,60 +46,63 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
         try {
             let achievementUrl: string | null = null;
 
+            // 1. Upload Image to Cloudinary
             if (attachmentFile) {
-                // ... (Cloudinary upload logic is unchanged) ...
                 setStatusMessage("Uploading photo...");
                 const uploadFormData = new FormData();
                 uploadFormData.append('file', attachmentFile);
                 uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                
                 const response = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: uploadFormData });
                 if (!response.ok) throw new Error('Failed to upload achievement photo.');
+                
                 const data = await response.json();
                 achievementUrl = data.secure_url;
             }
 
-            setStatusMessage("Finalizing...");
-            const batch = writeBatch(db);
-
-            // 1. Update the Goal Document (this is always the same)
-            const goalDocRef = doc(db, "goals", goal.id);
-            batch.update(goalDocRef, {
+            // 2. Update the Goal Status (PATCH request)
+            setStatusMessage("Updating Goal...");
+            
+            const goalUpdatePayload = {
                 status: "completed",
-                completed_at: serverTimestamp(),
+                completed_at: new Date(), // Use JS Date, not serverTimestamp
                 completed_by_user_id: user.uid,
                 ...(achievementUrl && { achievement_url: achievementUrl }),
+            };
+
+            const goalResponse = await fetch(`http://localhost:3000/api/goals/${goal.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(goalUpdatePayload)
             });
 
-            // --- THIS IS THE FIX ---
-            if (goal.family_id) {
-                // IT IS A FAMILY GOAL: Create ONLY ONE transaction for the family.
-                // The expense comes from the family's shared fund.
-                const familyTransactionRef = doc(collection(db, "transactions"));
-                batch.set(familyTransactionRef, {
-                    user_id: user.uid, // We still track WHO completed it
-                    family_id: goal.family_id,
-                    type: 'expense',
-                    amount: goal.target_amount,
-                    description: `Family Goal Achieved: ${goal.name}`,
-                    created_at: serverTimestamp(),
-                    attachment_url: achievementUrl,
-                });
+            if (!goalResponse.ok) throw new Error("Failed to update goal status on server.");
 
-            } else {
-                // IT IS A PERSONAL GOAL: Create one personal transaction (original logic is correct here)
-                const personalTransactionRef = doc(collection(db, "transactions"));
-                batch.set(personalTransactionRef, {
-                    user_id: user.uid,
-                    family_id: null,
-                    type: 'expense',
-                    amount: goal.target_amount,
-                    description: `Goal Achieved: ${goal.name}`,
-                    created_at: serverTimestamp(),
-                    attachment_url: achievementUrl,
-                });
-            }
+            // 3. Create the Transaction (POST request)
+            setStatusMessage("Recording Transaction...");
+
+            const transactionPayload = {
+                user_id: user.uid,
+                // Use logic to determine if this is family or personal
+                family_id: goal.family_id || null, 
+                type: 'expense',
+                amount: goal.target_amount,
+                description: goal.family_id 
+                    ? `Family Goal Achieved: ${goal.name}`
+                    : `Goal Achieved: ${goal.name}`,
+                created_at: new Date(),
+                attachment_url: achievementUrl,
+            };
+
+            const transactionResponse = await fetch('http://localhost:3000/api/transactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transactionPayload)
+            });
+
+            if (!transactionResponse.ok) throw new Error("Goal updated, but failed to record transaction.");
             
-            await batch.commit();
+            // Both succeeded
             onSuccess();
 
         } catch (err: any) {
@@ -108,6 +110,7 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
             setError(err.message || "Could not complete the goal. Please try again.");
         } finally {
             setLoading(false);
+            setStatusMessage('Confirm & Complete Goal');
         }
     };
 
@@ -117,7 +120,6 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
                 <p className="text-sm text-gray-600">You are about to complete the goal:</p>
                 <p className="font-semibold text-lg text-gray-800 mt-1">{goal.name}</p>
                 
-                {/* --- FIX: Updated disclaimer text to be accurate --- */}
                 <p className="text-sm text-gray-500 mt-2">
                     {goal.family_id 
                         ? `An expense of ₱${goal.target_amount.toLocaleString()} will be recorded from the family's shared balance.`

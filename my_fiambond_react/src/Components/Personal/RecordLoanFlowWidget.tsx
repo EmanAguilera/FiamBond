@@ -1,14 +1,16 @@
 import { useState, useEffect, useContext } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
+import CreateLoanWidget from './CreateLoanWidget'; 
+
+// --- 1. ADD FIREBASE IMPORTS ---
 import { db } from '../../config/firebase-config.js';
-import { collection, query, where, getDocs, doc, getDoc, documentId } from 'firebase/firestore';
-import CreateLoanWidget from './CreateLoanWidget.js'; // Ensure path is correct
+import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
 // --- TypeScript Interfaces ---
 interface Family {
     id: string;
     family_name: string;
-    member_ids: string[]; // We need member_ids to fetch the members
+    member_ids: string[];
 }
 
 interface Member {
@@ -23,119 +25,113 @@ interface RecordLoanFlowWidgetProps {
 
 export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily }: RecordLoanFlowWidgetProps) {
     const { user } = useContext(AppContext);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     
-    // State to manage the view: 'loadingFamilies', 'selecting', 'loadingMembers', or 'lending'
     const [flowState, setFlowState] = useState<'loadingFamilies' | 'selecting' | 'loadingMembers' | 'lending'>('loadingFamilies');
     const [families, setFamilies] = useState<Family[]>([]);
     const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
-    const [familyMembers, setFamilyMembers] = useState<Member[]>([]); // State to hold the fetched members
+    const [familyMembers, setFamilyMembers] = useState<Member[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // Effect 1: Fetch the user's families
+    // 1. Fetch Families (This works fine with MongoDB)
     useEffect(() => {
         const fetchFamilies = async () => {
             if (!user?.uid) return;
             setFlowState('loadingFamilies');
             setError(null);
             try {
-                const q = query(collection(db, "families"), where("member_ids", "array-contains", user.uid));
-                const querySnapshot = await getDocs(q);
-                const fetchedFamilies = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                } as Family));
+                const response = await fetch(`${API_URL}/families?user_id=${user.uid}`);
+                if (!response.ok) throw new Error('Failed to fetch families');
                 
-                setFamilies(fetchedFamilies);
+                const fetchedFamilies = await response.json();
+                
+                const formattedFamilies = fetchedFamilies.map((f: any) => ({
+                    ...f,
+                    id: f._id || f.id,
+                    member_ids: f.member_ids || [] 
+                }));
 
-                if (fetchedFamilies.length === 0) {
+                setFamilies(formattedFamilies);
+
+                if (formattedFamilies.length === 0) {
                     setFlowState('selecting');
-                } else if (fetchedFamilies.length === 1) {
-                    // Auto-select the only family and trigger member fetching
-                    setSelectedFamily(fetchedFamilies[0]);
+                } else if (formattedFamilies.length === 1) {
+                    setSelectedFamily(formattedFamilies[0]);
                 } else {
                     setFlowState('selecting');
                 }
             } catch (err) {
-                console.error("Failed to fetch families for loan flow:", err);
-                setError("Could not load your families. Please try again.");
+                console.error("Failed to fetch families:", err);
+                setError("Could not load your families.");
                 setFlowState('selecting');
             }
         };
-
         fetchFamilies();
-    }, [user]);
+    }, [user, API_URL]);
 
-    // THE FIX IS HERE: Effect 2: Fetch members *after* a family has been selected
+    // 2. Fetch Members (THE FIX: USE FIREBASE DIRECTLY)
     useEffect(() => {
         const fetchMembers = async () => {
-            if (!selectedFamily || !selectedFamily.member_ids) return;
+            if (!selectedFamily) return;
 
-            setFlowState('loadingMembers'); // Show a loading state for members
+            setFlowState('loadingMembers');
             setError(null);
             try {
-                const memberIds = selectedFamily.member_ids;
+                const memberIds = selectedFamily.member_ids || [];
+
                 if (memberIds.length === 0) {
                     setFamilyMembers([]);
-                    setFlowState('lending'); // Proceed even if no members
+                    setFlowState('lending');
                     return;
                 }
 
+                // --- DIRECT FIREBASE QUERY ---
                 const usersRef = collection(db, "users");
-                const q = query(usersRef, where(documentId(), "in", memberIds));
-                const querySnapshot = await getDocs(q);
-                const members = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    full_name: doc.data().full_name
-                } as Member));
+                // Firebase 'in' limit is 10. Slice to prevent crash if family is huge.
+                const safeIds = memberIds.slice(0, 10); 
                 
-                setFamilyMembers(members);
-                setFlowState('lending'); // Move to the final step
+                const q = query(usersRef, where(documentId(), "in", safeIds));
+                const querySnapshot = await getDocs(q);
+                
+                const formattedMembers = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as Member[];
+                
+                setFamilyMembers(formattedMembers);
+                setFlowState('lending');
+                
             } catch (err) {
-                console.error("Failed to fetch family members:", err);
-                setError("Could not load family members. Please try again.");
-                setFlowState('selecting'); // Go back to selection on error
+                console.error("Failed to fetch members:", err);
+                setError("Could not load family members.");
+                setFlowState('selecting');
             }
         };
 
         if (selectedFamily) {
             fetchMembers();
         }
-    }, [selectedFamily]);
+    }, [selectedFamily]); // Removed API_URL dependency
 
 
     const handleFamilySelect = (familyId: string) => {
         const family = families.find(f => f.id === familyId);
-        if (family) {
-            setSelectedFamily(family); // This will trigger the second useEffect
-        }
+        if (family) setSelectedFamily(family);
     };
 
-    // Render loading state for families
-    if (flowState === 'loadingFamilies') {
-        return <div className="p-4 text-center">Loading your families...</div>;
-    }
+    if (flowState === 'loadingFamilies') return <div className="p-4 text-center animate-pulse">Loading your families...</div>;
+    if (flowState === 'loadingMembers') return <div className="p-4 text-center animate-pulse">Loading members...</div>;
 
-    // Render loading state for members
-    if (flowState === 'loadingMembers') {
-        return <div className="p-4 text-center">Loading family members...</div>;
-    }
-
-    // Render the loan creation form once everything is loaded
     if (flowState === 'lending' && selectedFamily) {
-        return <CreateLoanWidget 
-                    family={selectedFamily} 
-                    members={familyMembers} // Pass the fetched members down
-                    onSuccess={onSuccess} 
-                />;
+        return <CreateLoanWidget family={selectedFamily} members={familyMembers} onSuccess={onSuccess} />;
     }
 
-    // Render the family selection screen by default
     return (
         <div className="space-y-4 p-2">
             <h3 className="text-lg font-medium text-center text-gray-800">Select a Family</h3>
             <p className="text-sm text-center text-gray-500">Choose which family this loan belongs to.</p>
             
-            {error && <p className="error text-center">{error}</p>}
+            {error && <p className="text-red-500 text-center text-sm">{error}</p>}
             
             {families.length > 0 ? (
                 <div className="space-y-2">
@@ -143,21 +139,17 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
                         <button
                             key={family.id}
                             onClick={() => handleFamilySelect(family.id)}
-                            className="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md"
+                            className="w-full text-left p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md flex justify-between group"
                         >
-                            {family.family_name}
+                            <span className="font-semibold text-gray-700">{family.family_name}</span>
+                            <span className="text-gray-400 group-hover:text-blue-500">&rarr;</span>
                         </button>
                     ))}
                 </div>
             ) : (
                 <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <p className="text-yellow-800">You must be a member of a family to record a loan.</p>
-                    <button
-                        onClick={onRequestCreateFamily}
-                        className="primary-btn-sm mt-3"
-                    >
-                        + Create a Family
-                    </button>
+                    <p className="text-yellow-800 text-sm">You must be a member of a family to record a loan.</p>
+                    <button onClick={onRequestCreateFamily} className="text-blue-600 underline text-sm mt-2">Create a Family now</button>
                 </div>
             )}
         </div>
