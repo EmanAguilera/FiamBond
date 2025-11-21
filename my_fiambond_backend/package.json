@@ -4,7 +4,7 @@
   "description": "Backend API for FiamBond",
   "main": "server.js",
   "engines": {
-    "node": "18.x"
+    "node": "22.x"
   },
   "scripts": {
     "start": "node server.js",
