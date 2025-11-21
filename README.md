@@ -3,9 +3,11 @@
 <p align="center">
   <img alt="React" src="https://img.shields.io/badge/React-%2361DAFB.svg?style=for-the-badge&logo=react&logoColor=black"/>
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-%233178C6.svg?style=for-the-badge&logo=typescript&logoColor=white"/>
+  <img alt="NodeJS" src="https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white"/>
+  <img alt="Express.js" src="https://img.shields.io/badge/express.js-%23404d59.svg?style=for-the-badge&logo=express&logoColor=%2361DAFB"/>
+  <img alt="MongoDB" src="https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white"/>
   <img alt="Firebase" src="https://img.shields.io/badge/Firebase-%23FFCA28.svg?style=for-the-badge&logo=firebase&logoColor=black"/>
   <img alt="Cloudinary" src="https://img.shields.io/badge/Cloudinary-%233448C5.svg?style=for-the-badge&logo=cloudinary&logoColor=white"/>
-  <img alt="Laravel" src="https://img.shields.io/badge/Laravel-%23FF2D20.svg?style=for-the-badge&logo=laravel&logoColor=white"/>
 </p>
 
 Fiamband is a complete full-stack finance tracking app that was designed to help individuals and families manage their income and expenses and financial goals in a systematic way. The Fiambond, which is based on a React front end and Firebase back end (previously based on the original Laravel API), provides an easy-to-understand, easy-to-read, and fully-responsive interface.  Depending on a mobile phone, tablet, and desktop computer, the user can easily track the financial well-being.  
@@ -39,10 +41,12 @@ The platform is divided into two major realms, each with specialized features:
 | Stack Component | Technologies Used |
 |---|---|
 | **Frontend** | React, TypeScript, Vite |
-| **Backend & Database**| Firebase (Authentication, Firestore) |
+| **Backend API**| Node.js, Express.js |
+| **Hybrid Database**| MongoDB (Core Data) & Firebase Firestore (User Profiles) |
+| **Authentication**| Firebase Auth |
 | **Image Hosting** | Cloudinary |
-| **Deployment** | Firebase Hosting, Cloudflare Pages |
-| **Archived / Explored** | Laravel, PHP, Python, Docker Desktop, LocalStack (for AWS S3 simulation), Render, Back4app, Supabase (PostgreSQL) |
+| **Deployment** | Firebase Hosting |
+| **Archived / Explored** | Cloudflare Pages, Render, Laravel, PHP, Python, Docker Desktop, LocalStack, Supabase (PostgreSQL) |
 
 ---
 
@@ -54,11 +58,12 @@ The first release made use of a **Laravel-based API** server. In spite of its us
 - **Service Expiration:** Services provided by providers like **Render** do expire in 90 days, which makes them not suitable in long-term projects.
 - **Temporary URLs:** **Back4app** the free version provides temporary URLs that are rotating. Whenever it is reinstated after the application has been put into an idle position, the API endpoint differs, which requires a painstaking, manual deployment process and constant updates of the frontend environment variables on **Cloudflare** to keep connected.
 
-The above limitations had pointed to the need to have a more stable, server-free architecture. As a result, there was a strategic pivot:
-- **Firebase** Ultimatively replaced the entire Laravel backend with its powerful server-less solutions (Authentication and Firestore), which offer a stable infrastructure, albeit permanent, even on the free plan.
--To store files, **Cloudinary** was chosen due to its large free option and efficient media APIs, hence eliminating the necessity of a custom backend or paid cloud storage software.
+The above limitations had pointed to the need to have a more stable, server-free architecture. As a result, there was a strategic pivot to a Hybrid Architecture:
+- **Node.js, Express.js, & MongoDB:** To ensure complete control over data relationships and API logic, the core backend was migrated to a custom RESTful API using Node.js and Express. This is backed by MongoDB (Atlas), which provides a permanent, scalable database solution for handling complex financial transactions and loan records without the risk of data loss or service expiration.
+- **Firebase:** To leverage robust security without reinventing the wheel, Firebase Authentication and Firestore were retained to h[4]andle user identity and profile management, working in sync with the Node.js backend.
+- **Cloudinary:** To store files, Cloudinary was chosen due to its large free option and efficient media APIs, eliminatin[1][2][5]g the necessity of a custom backend file system or paid cloud storage.
 
-This transformation is a typical example of a practical attitude to software development as it recognizes the constraints of the original design but transitions to a more long-term viable design that ensures stability in the long term and a professional user experience.
+This transformation is a typical example of a practical attitude to software development; it recognizes the constraints of the original design but transitions to a long-term viable MERN-Hybrid design that ensures stability and a professional user experience.
 
 ---
 
