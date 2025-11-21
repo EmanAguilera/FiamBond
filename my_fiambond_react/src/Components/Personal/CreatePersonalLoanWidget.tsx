@@ -1,10 +1,8 @@
 import { useContext, useState, FormEvent, ChangeEvent } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from "../../config/firebase-config.js";
-import { collection, doc, writeBatch, serverTimestamp, Timestamp } from "firebase/firestore";
+// Removed Firebase Imports
 
-// --- YOUR CLOUDINARY DETAILS ---
-const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; // Replace with your Cloud Name
+const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; 
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
@@ -14,19 +12,18 @@ interface CreatePersonalLoanWidgetProps {
 
 export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLoanWidgetProps) {
     const { user } = useContext(AppContext);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
     const [formData, setFormData] = useState({
         amount: "",
         interest_amount: "",
         description: "",
-        debtorName: "", // Text input for the person's name
+        debtorName: "",
         deadline: "",
     });
 
-    // --- ADD THIS: State for file and status message ---
     const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>('Confirm & Lend Money');
-
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
 
@@ -35,7 +32,6 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    // --- ADD THIS: Handler for the file input ---
     const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setAttachmentFile(e.target.files[0]);
@@ -56,68 +52,68 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
         try {
             let attachmentUrl = null;
 
-            // --- ADD THIS: UPLOAD LOGIC ---
+            // 1. Upload Logic
             if (attachmentFile) {
                 setStatusMessage("Uploading attachment...");
-
                 const uploadFormData = new FormData();
                 uploadFormData.append('file', attachmentFile);
                 uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-                const response = await fetch(CLOUDINARY_API_URL, {
-                    method: 'POST',
-                    body: uploadFormData,
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to upload attachment to Cloudinary.');
-                }
-
+                const response = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: uploadFormData });
+                if (!response.ok) throw new Error('Failed to upload attachment to Cloudinary.');
+                
                 const data = await response.json();
                 attachmentUrl = data.secure_url;
             }
             
             setStatusMessage("Saving loan data...");
             
-            const batch = writeBatch(db);
-            const newLoanRef = doc(collection(db, "loans"));
             const principal = Number(formData.amount) || 0;
             const interest = Number(formData.interest_amount) || 0;
 
-            const loanData = {
+            // 2. Create Personal Loan (POST)
+            const loanPayload = {
                 family_id: null,
                 creditor_id: user.uid,
-                debtor_id: null,
-                debtor_name: formData.debtorName,
+                debtor_id: null, // External person has no system ID
+                debtor_name: formData.debtorName, // Manual name entry
                 amount: principal,
                 interest_amount: interest,
                 total_owed: principal + interest, 
                 repaid_amount: 0,
                 description: formData.description,
-                deadline: formData.deadline ? Timestamp.fromDate(new Date(formData.deadline)) : null,
-                status: "outstanding", // Personal loans are outstanding immediately
-                created_at: serverTimestamp(),
-                // --- ADD THIS: Conditionally add the URL ---
-                ...(attachmentUrl && { attachment_url: attachmentUrl }),
+                deadline: formData.deadline ? new Date(formData.deadline) : null,
+                status: "outstanding", // Personal loans are active immediately
+                attachment_url: attachmentUrl,
             };
-            batch.set(newLoanRef, loanData);
 
-            const newTransactionRef = doc(collection(db, "transactions"));
-            const transactionData = {
+            const loanResponse = await fetch(`${API_URL}/loans`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(loanPayload)
+            });
+
+            if (!loanResponse.ok) throw new Error("Failed to create loan record.");
+
+            // 3. Create Expense Transaction (POST)
+            const transactionPayload = {
                 user_id: user.uid,
                 family_id: null,
                 type: "expense",
                 amount: principal,
                 description: `Personal loan to ${formData.debtorName}: ${formData.description}`,
-                created_at: serverTimestamp(),
+                attachment_url: attachmentUrl,
             };
-            batch.set(newTransactionRef, transactionData);
 
-            await batch.commit();
+            const txResponse = await fetch(`${API_URL}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transactionPayload)
+            });
 
-            if (onSuccess) {
-                onSuccess();
-            }
+            if (!txResponse.ok) throw new Error("Loan recorded, but failed to save transaction.");
+
+            if (onSuccess) onSuccess();
 
         } catch (err: any) {
             console.error("Failed to record personal loan:", err);
@@ -151,7 +147,6 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
                 <input id="deadline" type="date" value={formData.deadline} onChange={handleInputChange} disabled={loading} className="w-full p-2 border border-gray-300 rounded-md" />
             </div>
 
-            {/* --- ADD THIS: The new file input --- */}
             <div>
                 <label htmlFor="attachment" className="block text-sm font-medium text-gray-700">Attachment (Optional)</label>
                 <input 

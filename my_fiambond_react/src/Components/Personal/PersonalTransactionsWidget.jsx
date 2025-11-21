@@ -1,15 +1,5 @@
 import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from '../../config/firebase-config';
-import { 
-    collection, 
-    query, 
-    where, 
-    orderBy, 
-    limit, 
-    startAfter, 
-    getDocs 
-} from 'firebase/firestore';
 
 // --- STYLED SKELETON LOADER ---
 const TransactionListSkeleton = () => (
@@ -26,8 +16,6 @@ const TransactionListSkeleton = () => (
     ))}
   </div>
 );
-
-const TRANSACTIONS_PER_PAGE = 15;
 
 // --- HELPER FUNCTION TO FORMAT DATE HEADERS ---
 const formatDateHeader = (dateString) => {
@@ -72,6 +60,7 @@ const TransactionItem = ({ transaction }) => {
                 <p className="font-semibold text-gray-800 truncate">{transaction.description}</p>
                 <div className="flex items-center gap-3 mt-1">
                     <p className="text-sm text-gray-500">
+                        {/* We use .toDate() here because we shimmed it in the fetch function */}
                         {transaction.created_at.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                     </p>
                     {transaction.attachment_url && (
@@ -95,86 +84,60 @@ const TransactionItem = ({ transaction }) => {
     );
 };
 
-
 export default function PersonalTransactionsWidget() {
   const { user } = useContext(AppContext);
   const [transactions, setTransactions] = useState([]);
   const [groupedTransactions, setGroupedTransactions] = useState({});
-  const [lastVisible, setLastVisible] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Use Vite env variable or fallback to localhost
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
   // Effect for the INITIAL data load. Runs only when the user changes.
   useEffect(() => {
     if (!user) return;
     
-    const fetchInitialTransactions = async () => {
+    const fetchTransactions = async () => {
         setLoading(true);
         setError(null);
-        setHasMore(true);
         try {
-            const firstPageQuery = query(
-                collection(db, "transactions"),
-                where("user_id", "==", user.uid),
-                where("family_id", "==", null),
-                orderBy("created_at", "desc"),
-                limit(TRANSACTIONS_PER_PAGE)
-            );
-            const documentSnapshots = await getDocs(firstPageQuery);
-            const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1] || null;
+            // 1. Call your new Node.js Backend
+            const response = await fetch(`${API_URL}/transactions?user_id=${user.uid}`);
             
-            setLastVisible(newLastVisible);
-            if (documentSnapshots.docs.length < TRANSACTIONS_PER_PAGE) {
-                setHasMore(false);
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.statusText}`);
             }
-            const fetchedTransactions = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setTransactions(fetchedTransactions);
+
+            const data = await response.json();
+
+            // 2. Transform Data to match old Firebase format
+            // MongoDB gives dates as strings. Firebase gave objects with .toDate().
+            // We manually create the .toDate() function here so the UI code above doesn't crash.
+            const formattedData = data.map(tx => ({
+                ...tx,
+                id: tx._id, // Map MongoDB _id to id
+                created_at: { 
+                    toDate: () => new Date(tx.created_at) // Create the helper function
+                }
+            }));
+
+            setTransactions(formattedData);
         } catch (err) {
-            console.error("Failed to fetch initial transactions:", err);
-            setError("Could not load transactions.");
+            console.error("Failed to fetch transactions:", err);
+            setError("Could not load transactions from FiamBond V3.");
         } finally {
             setLoading(false);
         }
     };
 
-    fetchInitialTransactions();
-  }, [user]);
-
-  // Function for loading MORE pages.
-  const handleLoadMore = async () => {
-    if (!lastVisible || !hasMore || loading) return;
-
-    setLoading(true);
-    try {
-        const nextPageQuery = query(
-            collection(db, "transactions"),
-            where("user_id", "==", user.uid),
-            where("family_id", "==", null),
-            orderBy("created_at", "desc"),
-            startAfter(lastVisible),
-            limit(TRANSACTIONS_PER_PAGE)
-        );
-        const documentSnapshots = await getDocs(nextPageQuery);
-        const newLastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1] || null;
-        
-        setLastVisible(newLastVisible);
-        if (documentSnapshots.docs.length < TRANSACTIONS_PER_PAGE) {
-            setHasMore(false);
-        }
-        const fetchedTransactions = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTransactions(prev => [...prev, ...fetchedTransactions]);
-    } catch (err) {
-        console.error("Failed to fetch more transactions:", err);
-        setError("Could not load more transactions.");
-    } finally {
-        setLoading(false);
-    }
-  };
+    fetchTransactions();
+  }, [user, API_URL]);
 
   // Effect to group transactions by date whenever the main list changes.
   useEffect(() => {
     const groups = transactions.reduce((acc, transaction) => {
+      // The .toDate() works here because we added it in the transform step above
       const dateKey = transaction.created_at.toDate().toDateString();
       if (!acc[dateKey]) { 
           acc[dateKey] = []; 
@@ -212,18 +175,8 @@ export default function PersonalTransactionsWidget() {
              // Only show this message if not loading and still no transactions
             !loading && <div className="p-6 text-center text-gray-500 italic">You have no personal transactions yet.</div>
         )}
-      
-      {hasMore && (
-        <div className="p-4 bg-white border-t border-gray-200">
-          <button 
-            onClick={handleLoadMore} 
-            disabled={loading} 
-            className="w-full px-4 py-2 font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-colors duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Loading...' : 'Load More'}
-          </button>
-        </div>
-      )}
+        
+        {/* Removed Load More button because basic V3 API currently returns everything */}
     </div>
   );
 }

@@ -1,13 +1,8 @@
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from "../../config/firebase-config.js";
-import { collection, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
-// --- 1. IMPORT THE MASTER GOAL TYPE ---
+// Removed Firebase DB imports
 import { Goal } from "../../types";
 
-// --- TypeScript interfaces ---
-// Use TypeScript's "Pick" utility to create a simple form type
-// from the master Goal interface. This is a clean pattern.
 type GoalFormData = Pick<Goal, "name"> & {
   target_amount: string;
   target_date: string;
@@ -19,6 +14,8 @@ interface CreateGoalWidgetProps {
 
 export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
   const { user } = useContext(AppContext);
+
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
   const [formData, setFormData] = useState<GoalFormData>({
     name: "",
@@ -44,23 +41,28 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
     setLoading(true);
 
     try {
-      // --- 2. DEFINE THE DATA STRUCTURE STRICTLY ---
-      // This ensures the data we send to Firestore matches our Goal type.
-      // We use Omit to specify which fields we are providing.
-      const newGoalData: Omit<Goal, "id" | "user" | "completed_by" | "family"> = {
+      // Prepare data for MongoDB
+      const payload = {
         user_id: user.uid,
-        family_id: null,
+        family_id: null, // Or pass family.id if this widget supports family goals
         name: formData.name,
         target_amount: Number(formData.target_amount),
-        target_date: Timestamp.fromDate(new Date(formData.target_date)),
+        target_date: new Date(formData.target_date), // JS Date Object
         status: "active",
-        created_at: serverTimestamp() as Timestamp, // Cast to Timestamp
-        completed_at: null,
-        completed_by_user_id: null,
-        achievement_url: null, // Initialize with null
+        // created_at is handled by MongoDB defaults
       };
 
-      await addDoc(collection(db, "goals"), newGoalData);
+      const response = await fetch(`${API_URL}/goals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Server error');
+      }
 
       setFormData({ name: "", target_amount: "", target_date: "" });
       if (onSuccess) {

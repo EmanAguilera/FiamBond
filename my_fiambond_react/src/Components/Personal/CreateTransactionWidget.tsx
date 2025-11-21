@@ -2,14 +2,11 @@
 
 import { useContext, useState, ChangeEvent, FormEvent, useRef } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from "../../config/firebase-config";
-import { collection, addDoc, doc, deleteDoc, serverTimestamp } from "firebase/firestore";
 
-// --- YOUR CLOUDINARY DETAILS (ensure these are correct) ---
+// --- YOUR CLOUDINARY DETAILS ---
 const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; 
 const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-
 
 // --- TypeScript Interfaces ---
 interface ITransactionForm {
@@ -27,7 +24,7 @@ interface CreateTransactionWidgetProps {
   onSuccess?: () => void;
 }
 
-// --- CoinTossModal Component (Remains unchanged) ---
+// --- CoinTossModal Component ---
 function CoinTossModal({ goal, onAbandon, onAcknowledge }: { goal: IGoal; onAbandon: () => void; onAcknowledge: () => void; }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -55,8 +52,10 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
   const { user } = useContext(AppContext);
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Use Vite env variable or fallback to localhost
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
   const [formData, setFormData] = useState<ITransactionForm>({ description: "", amount: "", type: "expense" });
-  // --- ADD THIS: State for the attachment file ---
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('Save Transaction');
   
@@ -69,7 +68,6 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
     setFormData(prev => ({ ...prev, [name]: value as any }));
   };
 
-  // --- ADD THIS: Handler for the file input ---
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           setAttachmentFile(e.target.files[0]);
@@ -91,7 +89,7 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
     try {
       let uploadedUrl = null;
 
-      // --- ADD THIS: File upload logic ---
+      // 1. Upload to Cloudinary (Front-end Logic)
       if (attachmentFile) {
         setStatusMessage("Uploading attachment...");
         const uploadFormData = new FormData();
@@ -113,22 +111,32 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
       
       setStatusMessage("Saving transaction...");
       
-      const transactionData = {
-        user_id: user.uid,
-        family_id: null,
-        description: formData.description,
-        amount: Number(formData.amount),
-        type: formData.type,
-        // --- UPDATE THIS: Use the URL from the upload ---
-        attachment_url: uploadedUrl,
-        created_at: serverTimestamp(),
-      };
+      // 2. Send Data to Node.js Backend (POST)
+      const response = await fetch(`${API_URL}/transactions`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: user.uid,
+            family_id: null,
+            description: formData.description,
+            amount: Number(formData.amount),
+            type: formData.type,
+            attachment_url: uploadedUrl,
+            // Backend handles created_at automatically
+          })
+      });
 
-      await addDoc(collection(db, "transactions"), transactionData);
+      if (!response.ok) {
+        throw new Error("Backend failed to save transaction.");
+      }
       
+      // Reset Form
       setFormData({ description: "", amount: "", type: "expense" });
-      setAttachmentFile(null); // Clear the file state
+      setAttachmentFile(null); 
       formRef.current?.reset();
+      
       if (onSuccess) onSuccess();
 
     } catch (err) {
@@ -142,16 +150,9 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
   };
 
   const handleAbandon = async () => {
-    if (!conflict) return;
-    setLoading(true);
-    try {
-      await deleteDoc(doc(db, "goals", conflict.id));
-      await handleCreateTransaction();
-    } catch (err) {
-      console.error(err);
-      setFormError("Could not abandon the goal. Please try again.");
-      setLoading(false);
-    }
+     // NOTE: Logic for abandoning goals would need a DELETE endpoint in backend later.
+     // For now, we simply acknowledge to proceed.
+     handleCreateTransaction();
   };
 
   const handleAcknowledge = () => {
@@ -171,7 +172,7 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
       <div className="w-full">
         <form ref={formRef} onSubmit={handleCreateTransaction} className="space-y-6">
           <div className="flex justify-center gap-8 text-gray-700">
-            {/* Radio buttons for type (unchanged) */}
+            {/* Radio buttons */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="type" value="expense" checked={formData.type === "expense"} onChange={handleInputChange} className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"/>
               Expense
@@ -182,15 +183,15 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
             </label>
           </div>
           <div>
-            {/* Description input (unchanged) */}
+            {/* Description */}
             <input type="text" name="description" placeholder="Description (e.g., Groceries, Paycheck)" value={formData.description} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
           </div>
           <div>
-            {/* Amount input (unchanged) */}
+            {/* Amount */}
             <input type="number" name="amount" placeholder="Amount" step="0.01" value={formData.amount} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
           </div>
 
-          {/* --- ADD THIS: File input for the attachment --- */}
+          {/* Attachment */}
           <div>
             <label htmlFor="attachment" className="block text-sm font-medium text-gray-700 mb-1">
               Add Receipt (Optional)

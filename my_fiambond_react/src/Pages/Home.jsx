@@ -1,8 +1,7 @@
 import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AppContext } from "../Context/AppContext.jsx";
-import { db } from "../config/firebase-config";
-import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy } from "firebase/firestore";
+// Removed Firebase Imports
 
 // --- WIDGET IMPORTS ---
 const Modal = lazy(() => import("../Components/Modal"));
@@ -38,13 +37,14 @@ const DashboardSkeleton = () => (
     </div>
 );
 
-// --- Helper function to format transaction data for charts ---
+// --- Helper function to format transaction data for charts (UNCHANGED) ---
 const formatDataForChart = (transactions) => {
     if (!transactions || transactions.length === 0) {
         return { labels: [], datasets: [] };
     }
     const data = {};
     transactions.forEach(tx => {
+        // Shim ensures .toDate() exists
         if (tx.created_at && typeof tx.created_at.toDate === 'function') {
             const date = tx.created_at.toDate().toLocaleDateString();
             if (!data[date]) {
@@ -88,6 +88,7 @@ const DashboardCard = ({ title, value, linkText, onClick, icon, colorClass }) =>
 export default function Home() {
     const { user } = useContext(AppContext);
     const navigate = useNavigate();
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
     useEffect(() => {
         if (user && !user.emailVerified) {
@@ -116,51 +117,70 @@ export default function Home() {
     const [period, setPeriod] = useState('monthly');
 
     // --- DATA FETCHING FUNCTIONS ---
+
+    // 1. Calculate Net Position
     const getSummaryData = useCallback(async () => {
         if (!user || !user.emailVerified) return;
         try {
-            const q = query(collection(db, "transactions"), where("user_id", "==", user.uid), where("family_id", "==", null));
-            const querySnapshot = await getDocs(q);
+            // Fetch all personal transactions
+            const response = await fetch(`${API_URL}/transactions?user_id=${user.uid}`);
+            if (!response.ok) throw new Error('API Error');
+            const transactions = await response.json();
+
+            // Client-side calc (can be moved to backend aggregation later)
             let balance = 0;
-            querySnapshot.forEach((doc) => {
-                const transaction = doc.data();
-                if (transaction.type === 'income') balance += transaction.amount;
-                else balance -= transaction.amount;
+            transactions.forEach((tx) => {
+                // Only count personal transactions here (family_id is null)
+                if (!tx.family_id) {
+                    if (tx.type === 'income') balance += tx.amount;
+                    else balance -= tx.amount;
+                }
             });
             setSummaryData({ netPosition: balance });
         } catch (err) {
             console.error("Failed to fetch summary data:", err);
             setSummaryError("Could not load summary data.");
         }
-    }, [user]);
+    }, [user, API_URL]);
     
+    // 2. Count Active Goals
     const getActiveTotalGoalsCount = useCallback(async () => {
         if (!user || !user.emailVerified) return;
         try {
-            const q = query(collection(db, "goals"), where("user_id", "==", user.uid), where("family_id", "==", null), where("status", "==", "active"));
-            const snapshot = await getCountFromServer(q);
-            setActiveGoalsCount(snapshot.data().count);
+            const response = await fetch(`${API_URL}/goals?user_id=${user.uid}`);
+            if (!response.ok) throw new Error('API Error');
+            const goals = await response.json();
+            
+            // Filter active goals
+            const activeCount = goals.filter(g => g.status === 'active').length;
+            setActiveGoalsCount(activeCount);
         } catch (error) {
             console.error("Error fetching active goals count:", error);
         }
-    }, [user]);
+    }, [user, API_URL]);
     
+    // 3. Calculate Outstanding Loans
     const getLendingSummary = useCallback(async () => {
         if (!user || !user.emailVerified) return;
         try {
-            const q = query(collection(db, "loans"), where("creditor_id", "==", user.uid), where("status", "in", ["outstanding", "pending_confirmation"]));
-            const querySnapshot = await getDocs(q);
+            const response = await fetch(`${API_URL}/loans?user_id=${user.uid}`);
+            if (!response.ok) throw new Error('API Error');
+            const loans = await response.json();
+
             let totalOutstanding = 0;
-            querySnapshot.forEach((doc) => {
-                const loan = doc.data();
-                totalOutstanding += ((loan.total_owed || loan.amount) - (loan.repaid_amount || 0));
+            // Filter: I am the creditor AND status is pending/outstanding
+            loans.forEach((loan) => {
+                if (loan.creditor_id === user.uid && (loan.status === 'outstanding' || loan.status === 'pending_confirmation')) {
+                    totalOutstanding += ((loan.total_owed || loan.amount) - (loan.repaid_amount || 0));
+                }
             });
             setLendingSummary({ outstanding: totalOutstanding });
         } catch (error) { 
             console.error("Error fetching lending summary:", error); 
         }
-    }, [user]);
+    }, [user, API_URL]);
 
+    // 4. Generate Report (Chart)
     const getReport = useCallback(async () => {
         if (!user || !user.emailVerified) return;
         setReportLoading(true);
@@ -171,15 +191,34 @@ export default function Home() {
             if (period === 'weekly') startDate = new Date(now.setDate(now.getDate() - 7));
             else if (period === 'yearly') startDate = new Date(now.setFullYear(now.getFullYear() - 1));
             else startDate = new Date(now.setMonth(now.getMonth() - 1));
-            const q = query(collection(db, "transactions"), where("user_id", "==", user.uid), where("family_id", "==", null), where("created_at", ">=", Timestamp.fromDate(startDate)), orderBy("created_at", "desc"));
-            const querySnapshot = await getDocs(q);
-            const transactions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+
+            // Fetch filtered transactions from API
+            const queryParams = new URLSearchParams({
+                user_id: user.uid,
+                startDate: startDate.toISOString()
+            });
+
+            const response = await fetch(`${API_URL}/transactions?${queryParams}`);
+            if (!response.ok) throw new Error('API Error');
+            const rawData = await response.json();
+
+            // Transform for UI
+            const transactions = rawData
+                .filter(tx => !tx.family_id) // Ensure personal only
+                .map(tx => ({
+                    ...tx,
+                    id: tx._id,
+                    // Shim Date for chart helper
+                    created_at: { toDate: () => new Date(tx.created_at) }
+                }));
+
             let totalInflow = 0;
             let totalOutflow = 0;
             transactions.forEach(tx => {
                 if (tx.type === 'income') totalInflow += tx.amount;
                 else totalOutflow += tx.amount;
             });
+
             setReport({
                 chartData: formatDataForChart(transactions),
                 totalInflow,
@@ -195,12 +234,12 @@ export default function Home() {
         } finally {
             setReportLoading(false);
         }
-    }, [user, period]);
+    }, [user, period, API_URL]);
 
     
-    // --- *** KEY CHANGE #1: CREATE THE MASTER REFRESH FUNCTION *** ---
+    // --- MASTER REFRESH FUNCTION ---
     const handleDashboardRefresh = useCallback(() => {
-        console.log("Refreshing all dashboard data triggered by a child component...");
+        console.log("Refreshing all dashboard data...");
         getSummaryData();
         getActiveTotalGoalsCount();
         getLendingSummary();
@@ -213,7 +252,6 @@ export default function Home() {
         if (user && user.emailVerified) {
             const fetchInitialData = async () => {
                 setIsInitialLoading(true);
-                // Use the master refresh function for the initial data load
                 await handleDashboardRefresh();
                 setIsInitialLoading(false);
             };
@@ -221,14 +259,14 @@ export default function Home() {
         } else {
             setIsInitialLoading(false);
         }
-    }, [user, handleDashboardRefresh]); // Depend on handleDashboardRefresh
+    }, [user, handleDashboardRefresh]); 
 
     useEffect(() => {
         if (!isInitialLoading && user && user.emailVerified) { getReport(); }
     }, [period, isInitialLoading, user, getReport]);
 
 
-    // --- SUCCESS HANDLERS (Updated to use the master refresh function) ---
+    // --- SUCCESS HANDLERS ---
     const handleTransactionSuccess = useCallback(() => {
         setIsCreateTransactionModalOpen(false);
         handleDashboardRefresh();
@@ -236,7 +274,7 @@ export default function Home() {
     
     const handleGoalSuccess = useCallback(() => {
         setIsCreateGoalModalOpen(false);
-        getActiveTotalGoalsCount(); // Only this count needs updating on create
+        getActiveTotalGoalsCount();
     }, [getActiveTotalGoalsCount]);
 
     const handleRecordLoanSuccess = () => {
@@ -245,8 +283,8 @@ export default function Home() {
     };
     
     const openCreateFamilyFromLoanFlow = () => {
-        setIsRecordLoanModalOpen(false); // Close the current loan modal
-        setIsFamilyModalOpen(true);      // Open the full Family Management modal
+        setIsRecordLoanModalOpen(false); 
+        setIsFamilyModalOpen(true);      
     };
 
     const renderLoanModalContent = () => {
@@ -274,10 +312,9 @@ export default function Home() {
 
     return (
         <>
-            <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">Loading...</div>}>
+            <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center text-white">Loading...</div>}>
                 {isTransactionsModalOpen && <Modal isOpen={isTransactionsModalOpen} onClose={() => setIsTransactionsModalOpen(false)} title="Your Personal Transactions"><PersonalTransactionsWidget /></Modal>}
                 
-                {/* --- *** KEY CHANGE #2: PASS THE REFRESH FUNCTION AS A PROP *** --- */}
                 {isGoalsModalOpen && (
                     <Modal isOpen={isGoalsModalOpen} onClose={() => setIsGoalsModalOpen(false)} title="Your Financial Goals">
                         <GoalListsWidget onDataChange={handleDashboardRefresh} />

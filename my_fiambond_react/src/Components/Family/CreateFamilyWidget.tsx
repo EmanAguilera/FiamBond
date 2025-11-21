@@ -1,7 +1,6 @@
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from "../../config/firebase-config";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+// Removed Firebase Imports
 
 // --- TypeScript Interfaces ---
 interface NewFamily {
@@ -11,12 +10,14 @@ interface NewFamily {
 }
 
 interface CreateFamilyWidgetProps {
-  // THE FIX IS HERE (Part 1): The onSuccess prop is updated to pass the new family object.
   onSuccess?: (newFamily: NewFamily) => void;
 }
 
 export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProps) {
   const { user } = useContext(AppContext);
+  // Use Vite env variable or fallback
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
   const [familyName, setFamilyName] = useState<string>("");
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -33,25 +34,37 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
     setLoading(true);
 
     try {
+      // 1. Prepare Payload for MongoDB
       const familyData = {
         family_name: familyName,
         owner_id: user.uid,
-        member_ids: [user.uid],
-        created_at: serverTimestamp(),
+        member_ids: [user.uid], // Creator is automatically a member
+        // created_at handled by Mongoose defaults
       };
 
-      const familiesCollectionRef = collection(db, "families");
-      // THE FIX IS HERE (Part 2): Get the reference to the newly created document.
-      const newDocRef = await addDoc(familiesCollectionRef, familyData);
+      // 2. Send POST Request
+      const response = await fetch(`${API_URL}/families`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(familyData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create family on server.');
+      }
+
+      const newFamilyDoc = await response.json();
 
       setFamilyName("");
       
-      // THE FIX IS HERE (Part 3): Call the onSuccess callback with the new family's data.
+      // 3. Handle Success
       if (onSuccess) {
         onSuccess({
-          id: newDocRef.id,
-          family_name: familyName,
-          owner_id: user.uid,
+          id: newFamilyDoc._id, // Map MongoDB '_id' to 'id'
+          family_name: newFamilyDoc.family_name,
+          owner_id: newFamilyDoc.owner_id,
         });
       }
     } catch (error) {
@@ -80,7 +93,7 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
             required
           />
         </div>
-        {generalError && <p className="error">{generalError}</p>}
+        {generalError && <p className="error text-center">{generalError}</p>}
         <button type="submit" className="primary-btn w-full" disabled={loading}>
           {loading ? 'Creating...' : 'Create Family'}
         </button>

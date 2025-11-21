@@ -1,14 +1,13 @@
 import { useState, useCallback, useContext, useEffect, memo } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
-import { db } from '../../config/firebase-config.js'; // Adjust path
-import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+// Removed Firebase Imports
 
 // --- CHART IMPORTS ---
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-// --- FULL SKELETON LOADER COMPONENT ---
+// --- FULL SKELETON LOADER COMPONENT (UNCHANGED) ---
 const FamilyLedgerSkeleton = () => (
     <div className="animate-pulse">
         <div className="h-8 w-40 bg-slate-200 rounded-md mb-6"></div>
@@ -40,15 +39,16 @@ const FamilyLedgerSkeleton = () => (
     </div>
 );
 
-// --- Helper function to format data for the chart ---
+// --- Helper function to format data for the chart (UNCHANGED) ---
 const formatDataForChart = (transactions) => {
     if (!transactions || transactions.length === 0) {
         return { labels: [], datasets: [] };
     }
 
-    const data = {}; // e.g., { '10/21/2025': { income: 100, expense: 50 } }
+    const data = {}; 
 
     transactions.forEach(tx => {
+        // Shim ensures tx.created_at.toDate() exists
         const date = tx.created_at.toDate().toLocaleDateString();
         if (!data[date]) {
             data[date] = { income: 0, expense: 0 };
@@ -81,14 +81,13 @@ const formatDataForChart = (transactions) => {
 
 
 function FamilyLedgerView({ family, onBack }) {
-    const { user } = useContext(AppContext); // Use user, not token
+    const { user } = useContext(AppContext);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-    // State is now split into raw data and processed data
     const [allTransactions, setAllTransactions] = useState([]);
     const [reportSummary, setReportSummary] = useState(null);
     const [chartData, setChartData] = useState(null);
     
-    // State for pagination
     const [currentPage, setCurrentPage] = useState(1);
     const TRANSACTIONS_PER_PAGE = 10;
 
@@ -113,20 +112,29 @@ function FamilyLedgerView({ family, onBack }) {
                 startDate = new Date(now.setMonth(now.getMonth() - 1));
             }
 
-            // 2. Build the Firestore Query
-            const transactionsRef = collection(db, "transactions");
-            const q = query(
-                transactionsRef,
-                where("family_id", "==", family.id),
-                where("created_at", ">=", Timestamp.fromDate(startDate)),
-                orderBy("created_at", "desc")
-            );
+            // 2. Fetch from Node.js Backend
+            // We pass the startDate as an ISO string query param
+            const queryParams = new URLSearchParams({
+                family_id: family.id,
+                startDate: startDate.toISOString()
+            });
 
-            // 3. Fetch the data
-            const querySnapshot = await getDocs(q);
-            const fetchedTransactions = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
+            const response = await fetch(`${API_URL}/transactions?${queryParams}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch family report data.');
+            }
+
+            const fetchedData = await response.json();
+
+            // 3. Transform Data (Shim for UI compatibility)
+            const fetchedTransactions = fetchedData.map(doc => ({
+                id: doc._id,
+                ...doc,
+                // Create a fake Firebase Timestamp object for compatibility with existing UI code
+                created_at: { 
+                    toDate: () => new Date(doc.created_at) 
+                }
             }));
 
             setAllTransactions(fetchedTransactions);
@@ -147,26 +155,21 @@ function FamilyLedgerView({ family, onBack }) {
             });
             
             setChartData(formatDataForChart(fetchedTransactions));
-            setCurrentPage(1); // Reset to first page on new fetch
+            setCurrentPage(1);
 
         } catch (err) {
             console.error('Failed to fetch family report:', err);
-            // Check for a common error and provide a helpful message
-            if (err.code === 'failed-precondition') {
-                setError("Query requires an index. Please create a composite index for 'transactions' on 'family_id' and 'created_at'.");
-            } else {
-                setError("Could not process the report request.");
-            }
+            setError("Could not process the report request. Please try again later.");
         } finally {
             setLoading(false);
         }
-    }, [user, family.id, period]);
+    }, [user, family.id, period, API_URL]);
 
     useEffect(() => {
         getReport();
-    }, [getReport]); // getReport already depends on period
+    }, [getReport]);
     
-    // --- Client-Side Pagination Logic ---
+    // --- Client-Side Pagination Logic (UNCHANGED) ---
     const pageCount = Math.ceil(allTransactions.length / TRANSACTIONS_PER_PAGE);
     const paginatedTransactions = allTransactions.slice(
         (currentPage - 1) * TRANSACTIONS_PER_PAGE,
@@ -178,7 +181,7 @@ function FamilyLedgerView({ family, onBack }) {
         maintainAspectRatio: false,
         plugins: {
             legend: { position: 'top' },
-            title: { display: true, text: `Family Inflow vs. Outflow for ${family.family_name}` }, // Used family_name
+            title: { display: true, text: `Family Inflow vs. Outflow for ${family.family_name}` },
         },
     };
     
@@ -223,7 +226,6 @@ function FamilyLedgerView({ family, onBack }) {
                                     <p className="transaction-description break-words">{transaction.description}</p>
                                     <small className="transaction-date">
                                     {transaction.created_at.toDate().toLocaleDateString()}
-                                    {/* Note: Displaying "By: Full Name" requires an additional query to the 'users' collection using the 'user_id' from the transaction. This is a good candidate for optimization with Cloud Functions or client-side data caching. */}
                                     </small>
                                 </div>
                                 <p className={`transaction-amount flex-shrink-0 ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>

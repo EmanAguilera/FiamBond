@@ -1,8 +1,7 @@
 import { useContext, useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
 import { db } from '../../config/firebase-config.js';
-import { collection, query, where, getDocs, documentId, Timestamp } from 'firebase/firestore';
-import { Loan, User } from "../../types";
+import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
 // --- LAZY LOADED COMPONENTS ---
 const Modal = lazy(() => import('../Modal.jsx'));
@@ -38,7 +37,6 @@ const LoanListSkeleton = () => (
     </div>
 );
 
-// --- DEADLINE NOTIFICATION HELPER ---
 const DeadlineNotification = ({ deadline, outstanding }: { deadline: Date; outstanding: number; }) => {
     if (!deadline || outstanding <= 0) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -49,8 +47,8 @@ const DeadlineNotification = ({ deadline, outstanding }: { deadline: Date; outst
     return null;
 };
 
-// --- REFINED LOAN ITEM SUB-COMPONENT ---
-const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess: () => void; }) => {
+// --- UPDATED LOAN ITEM COMPONENT ---
+const LoanItem = ({ loan, onRepaymentSuccess }: { loan: any; onRepaymentSuccess: () => void; }) => {
     const { user } = useContext(AppContext);
     const [isRepaymentModalOpen, setIsRepaymentModalOpen] = useState<boolean>(false);
     const [isRecordRepaymentModalOpen, setIsRecordRepaymentModalOpen] = useState<boolean>(false);
@@ -64,9 +62,15 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
     const isBorrower = user.uid === loan.debtor_id;
     const totalOwed = loan.total_owed || loan.amount; 
     const outstanding = totalOwed - (loan.repaid_amount || 0);
+    
+    // Status Checks
     const isPendingInitialConfirmation = isBorrower && loan.status === 'pending_confirmation';
     const isPendingRepaymentConfirmation = isCreditor && !!loan.pending_repayment;
-    const isRepaid = loan.status === 'repaid';
+    const isRepaid = loan.status === 'paid' || loan.status === 'repaid';
+    
+    // --- FIX: Detect if Debtor is waiting for approval ---
+    const isDebtorWaitingForApproval = isBorrower && !!loan.pending_repayment;
+    
     const creationDate = loan.created_at?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const deadlineDate = loan.deadline?.toDate();
     
@@ -83,9 +87,10 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
     const ReceiptIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>);
     const UserIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>);
     const UsersIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>);
+    const ClockIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 
     return (
-        <div className={`bg-white border rounded-lg shadow-sm transition-all hover:shadow-md ${isPendingInitialConfirmation || isPendingRepaymentConfirmation ? 'border-amber-400' : 'border-gray-200'} ${isRepaid ? 'opacity-70' : ''}`}>
+        <div className={`bg-white border rounded-lg shadow-sm transition-all hover:shadow-md ${isPendingInitialConfirmation || isPendingRepaymentConfirmation || isDebtorWaitingForApproval ? 'border-amber-400' : 'border-gray-200'} ${isRepaid ? 'opacity-70' : ''}`}>
             <div className="p-4">
                 <div className="flex justify-between items-start">
                     <div className="min-w-0 pr-4">
@@ -103,7 +108,24 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
                         </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                        {isRepaid ? ( <span className="px-3 py-1 text-xs font-bold text-green-800 bg-green-100 rounded-full">REPAID</span> ) : loan.status !== 'pending_confirmation' ? ( <> <p className={`font-bold text-lg ${outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>₱{outstanding.toLocaleString('en-US', {minimumFractionDigits: 2})}</p> <small className="text-xs text-gray-500">Outstanding</small> </> ) : ( isCreditor && <span className="px-3 py-1 text-xs font-bold text-gray-600 bg-gray-100 rounded-full">PENDING</span> )}
+                        {isRepaid ? (
+                            <span className="px-3 py-1 text-xs font-bold text-green-800 bg-green-100 rounded-full">REPAID</span>
+                        ) : loan.status === 'pending_confirmation' ? (
+                            <span className="px-3 py-1 text-xs font-bold text-gray-600 bg-gray-100 rounded-full">PENDING</span>
+                        ) : isDebtorWaitingForApproval ? (
+                            // --- FIX: Show this status for Debtor when repayment is pending ---
+                            <div className="flex flex-col items-end">
+                                <span className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-amber-800 bg-amber-100 rounded-full">
+                                    <ClockIcon /> APPROVAL
+                                </span>
+                                <small className="text-xs text-gray-500 mt-1">Payment Sent</small>
+                            </div>
+                        ) : (
+                            <>
+                                <p className={`font-bold text-lg ${outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>₱{outstanding.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+                                <small className="text-xs text-gray-500">Outstanding</small>
+                            </>
+                        )}
                     </div>
                 </div>
                 
@@ -112,6 +134,7 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
                     {deadlineDate && !isRepaid && ( <div className="flex items-center gap-2"><span>Deadline: </span><span className="font-semibold text-gray-600">{deadlineDate.toLocaleDateString()}</span><DeadlineNotification deadline={deadlineDate} outstanding={outstanding} /></div> )}
                 </div>
 
+                {/* Attachments Section */}
                 {(loan.attachment_url || loan.pending_repayment?.receipt_url || (loan.repayment_receipts && loan.repayment_receipts.length > 0)) && (
                     <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
                         {(isBorrower || (isCreditor && isPersonalLoan)) && loan.attachment_url && (
@@ -121,24 +144,12 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
                                 </a>
                             </div>
                         )}
-                        {isCreditor && loan.pending_repayment?.receipt_url && (
+                        {/* Allow both Debtor and Creditor to see the pending receipt */}
+                        {loan.pending_repayment?.receipt_url && (
                              <div>
                                 <a href={loan.pending_repayment.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800 hover:underline">
-                                    <ReceiptIcon /> View Pending Repayment Receipt
+                                    <ReceiptIcon /> View Repayment Proof (Pending)
                                 </a>
-                            </div>
-                        )}
-                        {isPersonalLoan && isCreditor && loan.repayment_receipts && loan.repayment_receipts.length > 0 && (
-                            <div>
-                                <h5 className="text-xs font-bold text-gray-500 mb-2">Recorded Repayment Receipts:</h5>
-                                <div className="flex flex-wrap gap-2">
-                                    {loan.repayment_receipts.map((receipt, index) => (
-                                        <a key={index} href={receipt.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800 hover:underline" title={`Receipt for ₱${receipt.amount.toLocaleString()} recorded on ${receipt.recorded_at.toDate().toLocaleDateString()}`}>
-                                            <ReceiptIcon />
-                                            Receipt #{index + 1}
-                                        </a>
-                                    ))}
-                                </div>
                             </div>
                         )}
                     </div>
@@ -146,20 +157,31 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
             </div>
  
             {!isRepaid && (
-                <div className={`px-4 py-2.5 rounded-b-lg border-t flex justify-end items-center space-x-3 ${isPendingInitialConfirmation || isPendingRepaymentConfirmation ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className={`px-4 py-2.5 rounded-b-lg border-t flex justify-end items-center space-x-3 ${isPendingInitialConfirmation || isPendingRepaymentConfirmation || isDebtorWaitingForApproval ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+                    
+                    {/* 1. Initial Loan Acceptance (Borrower) */}
                     {isPendingInitialConfirmation && (
-                        <button onClick={() => setIsConfirmationModalOpen(true)} className="flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-amber-500 rounded-lg shadow-sm hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-colors duration-200">
-                            <BellIcon />
-                            Confirm Funds Receipt
+                        <button onClick={() => setIsConfirmationModalOpen(true)} className="flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-amber-500 rounded-lg shadow-sm hover:bg-amber-600 transition-colors">
+                            <BellIcon /> Confirm Funds Receipt
                         </button>
                     )}
+
+                    {/* 2. Repayment Confirmation (Creditor) */}
                     {isPendingRepaymentConfirmation && (
-                        <button onClick={() => setIsRepayConfirmModalOpen(true)} className="flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-amber-500 rounded-lg shadow-sm hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-opacity-75 transition-colors duration-200">
-                            <BellIcon />
-                            Confirm Repayment
+                        <button onClick={() => setIsRepayConfirmModalOpen(true)} className="flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-amber-500 rounded-lg shadow-sm hover:bg-amber-600 transition-colors">
+                            <BellIcon /> Confirm Repayment
                         </button>
                     )}
-                    {!isPendingInitialConfirmation && !isPendingRepaymentConfirmation && (
+
+                    {/* 3. Waiting State (Borrower) */}
+                    {isDebtorWaitingForApproval && (
+                        <span className="text-xs font-medium text-amber-700 flex items-center gap-1">
+                            <ClockIcon /> Waiting for lender to accept...
+                        </span>
+                    )}
+
+                    {/* 4. Normal Actions */}
+                    {!isPendingInitialConfirmation && !isPendingRepaymentConfirmation && !isDebtorWaitingForApproval && (
                         <>
                             {isBorrower && outstanding > 0 && (
                                 <button onClick={() => setIsRepaymentModalOpen(true)} className="secondary-btn-sm text-xs">Make Repayment</button>
@@ -182,11 +204,8 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
     );
 };
 
-// --- HELPER COMPONENT FOR COLLAPSIBLE SECTIONS ---
 const ChevronDownIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-    </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
 );
 
 interface CollapsibleSectionProps {
@@ -200,30 +219,23 @@ interface CollapsibleSectionProps {
 
 const CollapsibleSection = ({ title, color, count, isOpen, onClick, children }: CollapsibleSectionProps) => (
     <div className="border border-slate-200 rounded-lg overflow-hidden transition-shadow hover:shadow-sm">
-        <button
-            onClick={onClick}
-            className="w-full flex justify-between items-center p-4 bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            aria-expanded={isOpen}
-        >
+        <button onClick={onClick} className="w-full flex justify-between items-center p-4 bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" aria-expanded={isOpen}>
             <div className="flex items-center gap-3">
                 <h4 className={`font-bold text-lg ${color}`}>{title}</h4>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${color.replace('text', 'bg').replace('-700', '-100')} ${color.replace('text', 'text').replace('-700', '-800')}`}>{count}</span>
             </div>
             <ChevronDownIcon className={`text-gray-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
         </button>
-        {isOpen && (
-            <div className="p-4 border-t border-slate-200 bg-white">
-                <div className="space-y-3">{children}</div>
-            </div>
-        )}
+        {isOpen && <div className="p-4 border-t border-slate-200 bg-white"><div className="space-y-3">{children}</div></div>}
     </div>
 );
 
-// --- MAIN WIDGET COMPONENT ---
 export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackingWidgetProps) {
     const { user } = useContext(AppContext);
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
     const [activeTab, setActiveTab] = useState<'outstanding' | 'history'>('outstanding');
-    const [categorizedLoans, setCategorizedLoans] = useState<{ actionRequired: Loan[]; lent: Loan[]; borrowed: Loan[]; repaid: Loan[]; }>({ actionRequired: [], lent: [], borrowed: [], repaid: [] });
+    const [categorizedLoans, setCategorizedLoans] = useState<{ actionRequired: any[]; lent: any[]; borrowed: any[]; repaid: any[]; }>({ actionRequired: [], lent: [], borrowed: [], repaid: [] });
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [openSection, setOpenSection] = useState<'actionRequired' | 'lent' | 'borrowed' | null>('actionRequired');
@@ -237,80 +249,94 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
         setLoading(true); 
         setError(null);
         try {
-            const loansRef = collection(db, "loans");
-            let lentQuery = query(loansRef, where("creditor_id", "==", user.uid));
-            let borrowedQuery = query(loansRef, where("debtor_id", "==", user.uid));
-            if (family && family.id) { 
-                lentQuery = query(lentQuery, where("family_id", "==", family.id)); 
-                borrowedQuery = query(borrowedQuery, where("family_id", "==", family.id)); 
-            }
-            const [lentSnapshot, borrowedSnapshot] = await Promise.all([getDocs(lentQuery), getDocs(borrowedQuery)]);
-            const userLoansMap = new Map<string, any>();
-            lentSnapshot.forEach(doc => userLoansMap.set(doc.id, { id: doc.id, ...doc.data() }));
-            borrowedSnapshot.forEach(doc => userLoansMap.set(doc.id, { id: doc.id, ...doc.data() }));
+            const response = await fetch(`${API_URL}/loans?user_id=${user.uid}`);
+            if (!response.ok) throw new Error("Failed to fetch loans");
             
-            const fetchedLoans = Array.from(userLoansMap.values());
-            if (fetchedLoans.length === 0) { 
+            const rawLoans = await response.json();
+            let filteredLoans = rawLoans;
+            if (family && family.id) {
+                filteredLoans = rawLoans.filter((l: any) => l.family_id === family.id);
+            }
+
+            const allLoans = filteredLoans.map((l: any) => ({
+                ...l,
+                id: l._id, 
+                created_at: l.created_at ? { toDate: () => new Date(l.created_at), toMillis: () => new Date(l.created_at).getTime() } : { toDate: () => new Date(), toMillis: () => Date.now() },
+                deadline: l.deadline ? { toDate: () => new Date(l.deadline) } : null,
+                repayment_receipts: l.repayment_receipts?.map((r: any) => ({
+                    ...r,
+                    recorded_at: { toDate: () => new Date(r.recorded_at) }
+                }))
+            }));
+
+            if (allLoans.length === 0) { 
                 setCategorizedLoans({ actionRequired: [], lent: [], borrowed: [], repaid: [] }); 
                 setLoading(false); 
                 return; 
             }
 
             const userIds = new Set<string>();
-            fetchedLoans.forEach(loan => { 
+            allLoans.forEach((loan: any) => { 
                 if (loan.creditor_id) userIds.add(loan.creditor_id); 
                 if (loan.debtor_id) userIds.add(loan.debtor_id); 
             });
             
-            const usersMap: { [key: string]: User } = {};
+            const usersMap: { [key: string]: any } = {};
             if (userIds.size > 0) { 
                 const usersQuery = query(collection(db, "users"), where(documentId(), "in", [...userIds])); 
                 const usersSnapshot = await getDocs(usersQuery); 
-                usersSnapshot.forEach(doc => { usersMap[doc.id] = { id: doc.id, ...doc.data() } as User; }); 
+                usersSnapshot.forEach(doc => { usersMap[doc.id] = { id: doc.id, ...doc.data() }; }); 
             }
             
-            const enrichedLoans: Loan[] = fetchedLoans
-                .map((loan): Loan => ({ 
+            const enrichedLoans = allLoans
+                .map((loan: any) => ({ 
                     ...loan, 
                     creditor: usersMap[loan.creditor_id] || { id: 'unknown', full_name: "Unknown" }, 
                     debtor: loan.debtor_id ? usersMap[loan.debtor_id] : null 
                 }))
-                .sort((a, b) => b.created_at.toMillis() - a.created_at.toMillis());
+                .sort((a: any, b: any) => b.created_at.toMillis() - a.created_at.toMillis());
 
-            const actionRequired: Loan[] = [], lent: Loan[] = [], borrowed: Loan[] = [], repaid: Loan[] = [];
+            // --- CATEGORIZATION LOGIC ---
+            const actionRequired: any[] = [], lent: any[] = [], borrowed: any[] = [], repaid: any[] = [];
+            
             for (const loan of enrichedLoans) {
-                if (loan.status === 'repaid') { 
+                if (loan.status === 'paid' || loan.status === 'repaid') { 
                     repaid.push(loan); 
                     continue; 
                 }
                 const isCreditor = user.uid === loan.creditor_id;
                 const isBorrower = user.uid === loan.debtor_id;
+                
+                // 1. Initial Loan needs confirmation (Debtor must confirm)
                 const isPendingInitialConfirmation = isBorrower && loan.status === 'pending_confirmation';
+                
+                // 2. Repayment needs confirmation (Creditor must confirm)
                 const isPendingRepaymentConfirmation = isCreditor && !!loan.pending_repayment;
+                
                 if (isPendingInitialConfirmation || isPendingRepaymentConfirmation) { 
                     actionRequired.push(loan); 
                 } else if (isCreditor) { 
                     lent.push(loan); 
                 } else if (isBorrower) { 
+                    // Note: Debtor's pending repayment stays here, but UI changes to "Waiting"
                     borrowed.push(loan); 
                 }
             }
             setCategorizedLoans({ actionRequired, lent, borrowed, repaid });
+
         } catch (err) { 
             console.error("Failed to fetch loans:", err); 
             setError("Could not fetch loan activity."); 
         } finally { 
             setLoading(false); 
         }
-    }, [user, family]);
+    }, [user, family, API_URL]);
 
     useEffect(() => { getLoans(); }, [getLoans]);
 
     const handleRepaymentSuccess = () => { 
         getLoans(); 
-        if (onDataChange) { 
-            onDataChange(); 
-        } 
+        if (onDataChange) { onDataChange(); } 
     };
 
     if (loading) return <LoanListSkeleton />;

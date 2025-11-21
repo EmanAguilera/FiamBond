@@ -1,23 +1,18 @@
 import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
+// We keep DB/Firebase ONLY for User Profile lookup (Hybrid approach)
 import { db } from '../../config/firebase-config.js';
 import {
     collection,
     query,
     where,
     getDocs,
-    doc,
-    deleteDoc,
-    documentId,
-    orderBy
+    documentId
 } from 'firebase/firestore';
 
-// --- LAZY LOADED COMPONENTS ---
 const Modal = lazy(() => import('../Modal.jsx'));
 const CompleteGoalWidget = lazy(() => import('./CompleteGoalWidget.tsx'));
 
-
-// --- STYLED SKELETON LOADER ---
 const GoalListsSkeleton = () => (
     <div className="animate-pulse">
         <div className="h-8 w-1/3 bg-slate-200 rounded mb-4"></div>
@@ -48,6 +43,9 @@ export default function GoalListsWidget({ family, onDataChange }) {
 
     const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
     const [goalToComplete, setGoalToComplete] = useState(null);
+    
+    // Use standard env variable pattern
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
     // --- Data Fetching Logic ---
     const getGoals = useCallback(async () => {
@@ -55,15 +53,31 @@ export default function GoalListsWidget({ family, onDataChange }) {
         setLoading(true);
         setListError(null);
         try {
-            let goalsQuery;
+            // 1. FETCH FROM NODE.JS / MONGODB
+            let url = `${API_URL}/goals?`;
             if (family) {
-                goalsQuery = query(collection(db, "goals"), where("family_id", "==", family.id), where("status", "in", ["active", "completed"]), orderBy("created_at", "desc"));
+                url += `family_id=${family.id}`;
             } else {
-                goalsQuery = query(collection(db, "goals"), where("family_id", "==", null), where("user_id", "==", user.uid), where("status", "in", ["active", "completed"]), orderBy("created_at", "desc"));
+                url += `user_id=${user.uid}`;
             }
-            const goalsSnapshot = await getDocs(goalsQuery);
-            const allGoals = goalsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to fetch goals');
+            
+            const rawGoals = await response.json();
+
+            // 2. TRANSFORM DATA (The Shim)
+            // MongoDB dates are strings. UI expects objects with .toDate().
+            const allGoals = rawGoals.map(g => ({
+                ...g,
+                id: g._id, // Map Mongo _id to id
+                // Create fake Firebase Timestamp objects for compatibility
+                target_date: g.target_date ? { toDate: () => new Date(g.target_date) } : null,
+                created_at: g.created_at ? { toDate: () => new Date(g.created_at) } : { toDate: () => new Date() },
+                completed_at: g.completed_at ? { toDate: () => new Date(g.completed_at) } : null
+            }));
+
+            // 3. FETCH USER PROFILES (Firebase Hybrid Lookup)
             const userIds = new Set();
             allGoals.forEach(goal => {
                 if (goal.user_id) userIds.add(goal.user_id);
@@ -91,7 +105,7 @@ export default function GoalListsWidget({ family, onDataChange }) {
         } finally {
             setLoading(false);
         }
-    }, [user, family]);
+    }, [user, family, API_URL]);
 
     useEffect(() => {
         getGoals();
@@ -102,29 +116,26 @@ export default function GoalListsWidget({ family, onDataChange }) {
         setIsCompleteModalOpen(true);
     }
     
-    // This is the handler that receives the signal from the child widget.
     const handleCompletionSuccess = () => {
         setIsCompleteModalOpen(false);
         setGoalToComplete(null);
-        getGoals(); // 1. Refresh this component's data.
-
-        // 2. Signal to the parent (Home.jsx) that it also needs to refresh.
-        if (onDataChange) {
-            onDataChange();
-        }
+        getGoals(); 
+        if (onDataChange) onDataChange();
     };
 
     async function handleDeleteGoal(goalId) {
-        if (!window.confirm("Are you sure you want to abandon this goal? This action cannot be undone.")) return;
+        if (!window.confirm("Are you sure you want to abandon this goal?")) return;
         setListError(null);
         try {
-            await deleteDoc(doc(db, "goals", goalId));
-            getGoals(); // Refresh this component's own list.
+            // Call Node.js Delete Endpoint
+            const response = await fetch(`${API_URL}/goals/${goalId}`, {
+                method: 'DELETE'
+            });
 
-            // Also signal the parent in case deleting a goal affects the dashboard.
-            if (onDataChange) {
-                onDataChange();
-            }
+            if (!response.ok) throw new Error('Failed to delete');
+
+            getGoals(); 
+            if (onDataChange) onDataChange();
         } catch {
             setListError("Could not delete the goal.");
         }
@@ -135,7 +146,7 @@ export default function GoalListsWidget({ family, onDataChange }) {
 
     return (
         <div>
-            {/* --- Tab Navigation UI --- */}
+            {/* Tab Navigation */}
             <div className="border-b border-gray-200 mb-6">
                 <nav className="-mb-px flex space-x-6">
                     <button onClick={() => setActiveTab('active')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'active' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
@@ -147,12 +158,13 @@ export default function GoalListsWidget({ family, onDataChange }) {
                 </nav>
             </div>
 
-            {/* --- Active Goals Tab --- */}
+            {/* Active Goals Tab */}
             {activeTab === 'active' && (
                 <div>
                     {activeGoals.length > 0 ? (
                         <div className="space-y-4">
                             {activeGoals.map((goal) => {
+                                // .toDate() works now because of the shim
                                 const deadlineDate = goal.target_date?.toDate();
                                 const isOverdue = deadlineDate && new Date() > deadlineDate;
                                 return (
@@ -181,7 +193,7 @@ export default function GoalListsWidget({ family, onDataChange }) {
                 </div>
             )}
 
-            {/* --- Goal History Tab --- */}
+            {/* Goal History Tab */}
             {activeTab === 'history' && (
                 <div>
                     {completedGoals.length > 0 ? (
@@ -220,7 +232,6 @@ export default function GoalListsWidget({ family, onDataChange }) {
                 </div>
             )}
 
-            {/* --- Modal for Completing a Goal --- */}
             <Suspense fallback={<div>Loading...</div>}>
                 {isCompleteModalOpen && goalToComplete && (
                     <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} title="Complete Your Goal">
