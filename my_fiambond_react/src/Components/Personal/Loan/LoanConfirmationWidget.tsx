@@ -1,5 +1,5 @@
 import { useState, useContext, FormEvent } from 'react';
-import { AppContext } from '../../Context/AppContext.jsx';
+import { AppContext } from '../../../Context/AppContext.jsx';
 // Removed Firebase Imports
 // import { Loan } from '../../types'; // Optional if using TS
 

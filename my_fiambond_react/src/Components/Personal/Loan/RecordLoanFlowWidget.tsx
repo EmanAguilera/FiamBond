@@ -1,9 +1,9 @@
 import { useState, useEffect, useContext } from 'react';
-import { AppContext } from '../../Context/AppContext.jsx';
-import CreateLoanWidget from './CreateLoanWidget'; 
+import { AppContext } from '../../../Context/AppContext.jsx';
+import CreateLoanWidget from './CreateLoanWidget.js'; 
 
 // --- 1. ADD FIREBASE IMPORTS ---
-import { db } from '../../config/firebase-config.js';
+import { db } from '../../../config/firebase-config.js';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
 // --- TypeScript Interfaces ---

@@ -1,12 +1,9 @@
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
-import { AppContext } from '../../Context/AppContext.jsx';
-// Remove Firebase imports
-// import { db } from '../../config/firebase-config.js'; 
-// import { doc, serverTimestamp, writeBatch, collection } from 'firebase/firestore';
+import { AppContext } from '../../../Context/AppContext.jsx'; // Fixed Import path (up 3 levels)
 
 // The Goal interface
 interface Goal {
-    id: string; // This maps to _id from MongoDB
+    id: string; 
     name: string;
     target_amount: number;
     family_id: string | null;
@@ -20,12 +17,16 @@ interface CompleteGoalWidgetProps {
     onSuccess: () => void;
 }
 
-const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy";
-const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidgetProps) {
     const { user } = useContext(AppContext);
+    
+    // --- FIX: Use Dynamic API URL ---
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
     const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
         try {
             let achievementUrl: string | null = null;
 
-            // 1. Upload Image to Cloudinary
+            // 1. Upload Image
             if (attachmentFile) {
                 setStatusMessage("Uploading photo...");
                 const uploadFormData = new FormData();
@@ -60,17 +61,17 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
                 achievementUrl = data.secure_url;
             }
 
-            // 2. Update the Goal Status (PATCH request)
+            // 2. Update Goal Status (Use API_URL)
             setStatusMessage("Updating Goal...");
             
             const goalUpdatePayload = {
                 status: "completed",
-                completed_at: new Date(), // Use JS Date, not serverTimestamp
+                completed_at: new Date(), 
                 completed_by_user_id: user.uid,
                 ...(achievementUrl && { achievement_url: achievementUrl }),
             };
 
-            const goalResponse = await fetch(`http://localhost:3000/api/goals/${goal.id}`, {
+            const goalResponse = await fetch(`${API_URL}/goals/${goal.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(goalUpdatePayload)
@@ -78,12 +79,11 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
 
             if (!goalResponse.ok) throw new Error("Failed to update goal status on server.");
 
-            // 3. Create the Transaction (POST request)
+            // 3. Create Transaction (Use API_URL)
             setStatusMessage("Recording Transaction...");
 
             const transactionPayload = {
                 user_id: user.uid,
-                // Use logic to determine if this is family or personal
                 family_id: goal.family_id || null, 
                 type: 'expense',
                 amount: goal.target_amount,
@@ -94,7 +94,7 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
                 attachment_url: achievementUrl,
             };
 
-            const transactionResponse = await fetch('http://localhost:3000/api/transactions', {
+            const transactionResponse = await fetch(`${API_URL}/transactions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(transactionPayload)
@@ -102,12 +102,11 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
 
             if (!transactionResponse.ok) throw new Error("Goal updated, but failed to record transaction.");
             
-            // Both succeeded
             onSuccess();
 
         } catch (err: any) {
             console.error("Failed to complete goal:", err);
-            setError(err.message || "Could not complete the goal. Please try again.");
+            setError(err.message || "Could not complete the goal.");
         } finally {
             setLoading(false);
             setStatusMessage('Confirm & Complete Goal');
@@ -127,9 +126,7 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
                     }
                 </p>
             </div>
-            
             <hr />
-
             <div>
                 <label htmlFor="achievementAttachment" className="block text-sm font-medium text-gray-700">
                     Upload a Photo of Your Achievement (Optional)

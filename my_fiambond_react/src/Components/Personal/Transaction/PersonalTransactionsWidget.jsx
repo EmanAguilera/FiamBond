@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { AppContext } from "../../Context/AppContext.jsx";
+import { AppContext } from "../../../Context/AppContext.jsx";
 
 // --- STYLED SKELETON LOADER ---
 const TransactionListSkeleton = () => (

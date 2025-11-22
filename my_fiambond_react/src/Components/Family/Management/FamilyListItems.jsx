@@ -1,7 +1,7 @@
 // Components/FamilyListItem.jsx
 
 import { useState, useContext, memo } from 'react';
-import { AppContext } from '../../Context/AppContext.jsx';
+import { AppContext } from '../../../Context/AppContext.jsx';
 // Removed Firebase Imports
 
 function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {

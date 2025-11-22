@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
-import { AppContext } from "../../Context/AppContext.jsx";
+import { AppContext } from "../../../Context/AppContext.jsx";
 // We keep DB/Firebase ONLY for User Profile lookup (Hybrid approach)
-import { db } from '../../config/firebase-config.js';
+import { db } from '../../../config/firebase-config.js';
 import {
     collection,
     query,
@@ -10,7 +10,7 @@ import {
     documentId
 } from 'firebase/firestore';
 
-const Modal = lazy(() => import('../Modal.jsx'));
+const Modal = lazy(() => import('../../Modal.jsx'));
 const CompleteGoalWidget = lazy(() => import('./CompleteGoalWidget.tsx'));
 
 const GoalListsSkeleton = () => (

@@ -1,9 +1,9 @@
 import { useContext, useState, FormEvent, ChangeEvent } from "react";
-import { AppContext } from "../../Context/AppContext.jsx";
-// Removed Firebase Imports
+import { AppContext } from "../../../Context/AppContext.jsx"; // Fixed Import Path
 
-const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; 
-const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+// --- CONFIGURATION ---
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 interface CreatePersonalLoanWidgetProps {
@@ -42,10 +42,8 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
 
     const handleLendMoney = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (!user) {
-            setError("You must be logged in.");
-            return;
-        }
+        if (!user) return setError("You must be logged in.");
+        
         setError(null);
         setLoading(true);
 
@@ -73,7 +71,7 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
 
             // 2. Create Personal Loan (POST)
             const loanPayload = {
-                family_id: null,
+                family_id: null, // Explicitly Personal
                 creditor_id: user.uid,
                 debtor_id: null, // External person has no system ID
                 debtor_name: formData.debtorName, // Manual name entry
@@ -83,7 +81,7 @@ export default function CreatePersonalLoanWidget({ onSuccess }: CreatePersonalLo
                 repaid_amount: 0,
                 description: formData.description,
                 deadline: formData.deadline ? new Date(formData.deadline) : null,
-                status: "outstanding", // Personal loans are active immediately
+                status: "outstanding", // Auto-active (no confirmation needed for external)
                 attachment_url: attachmentUrl,
             };
 

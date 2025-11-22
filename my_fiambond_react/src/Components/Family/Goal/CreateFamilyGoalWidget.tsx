@@ -1,7 +1,7 @@
 // Components/CreateFamilyGoalWidget.tsx
 
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
-import { AppContext } from "../../Context/AppContext.jsx";
+import { AppContext } from "../../../Context/AppContext.jsx";
 // Removed Firebase Imports
 
 // Define TypeScript interfaces

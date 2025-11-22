@@ -1,7 +1,7 @@
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
-import { AppContext } from "../../Context/AppContext.jsx";
+import { AppContext } from "../../../Context/AppContext.jsx";
 // Removed Firebase DB imports
-import { Goal } from "../../types";
+import { Goal } from "../../../types/index.js";
 
 type GoalFormData = Pick<Goal, "name"> & {
   target_amount: string;

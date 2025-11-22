@@ -1,14 +1,14 @@
 import { useContext, useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { AppContext } from "../../Context/AppContext.jsx";
-import { db } from '../../config/firebase-config.js';
+import { AppContext } from "../../../Context/AppContext.jsx";
+import { db } from '../../../config/firebase-config.js';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
 // --- LAZY LOADED COMPONENTS ---
-const Modal = lazy(() => import('../Modal.jsx'));
-const MakeRepaymentWidget = lazy(() => import('./MakeRepaymentWidget'));
-const RecordPersonalRepaymentWidget = lazy(() => import('./RecordPersonalRepaymentWidget'));
-const LoanConfirmationWidget = lazy(() => import('./LoanConfirmationWidget'));
-const RepaymentConfirmationWidget = lazy(() => import('./RepaymentConfirmationWidget'));
+const Modal = lazy(() => import('../../Modal.jsx'));
+const MakeRepaymentWidget = lazy(() => import('./MakeRepaymentWidget.js'));
+const RecordPersonalRepaymentWidget = lazy(() => import('./RecordPersonalRepaymentWidget.js'));
+const LoanConfirmationWidget = lazy(() => import('./LoanConfirmationWidget.js'));
+const RepaymentConfirmationWidget = lazy(() => import('./RepaymentConfirmationWidget.js'));
 
 // --- TYPE DEFINITIONS ---
 interface LoanTrackingWidgetProps {
