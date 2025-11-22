@@ -1,5 +1,5 @@
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
-import { AppContext } from "../../Context/AppContext.jsx";
+import { AppContext } from "../../../Context/AppContext.jsx"; // Fixed Import path
 
 interface Family {
   id: string;
@@ -16,9 +16,10 @@ interface CreateLoanWidgetProps {
   onSuccess?: () => void;
 }
 
-// --- YOUR CLOUDINARY DETAILS ---
-const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy";
-const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+// --- CONFIGURATION ---
+// Best Practice: Use .env variables, fallback to hardcoded strings only for dev
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 export default function CreateLoanWidget({ family, members, onSuccess }: CreateLoanWidgetProps) {
@@ -38,7 +39,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
   const [loading, setLoading] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string>('Confirm & Lend Money');
 
-  // Filter out the current user safely (Handle string vs number IDs)
+  // Filter out the current user safely
   const otherMembers = (members || []).filter(member => String(member.id) !== String(user?.uid));
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -63,6 +64,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
     try {
       let attachmentUrl = null;
 
+      // 1. Upload Attachment
       if (attachmentFile) {
         setStatusMessage("Uploading attachment...");
         const uploadFormData = new FormData();
@@ -80,6 +82,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
       const principal = Number(formData.amount) || 0;
       const interest = Number(formData.interest_amount) || 0;
 
+      // 2. Create Loan Record
       const loanPayload = {
         family_id: family.id,
         creditor_id: user.uid,
@@ -100,11 +103,13 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loanPayload)
       });
+      
       if (!loanResponse.ok) throw new Error("Failed to create loan record.");
 
+      // 3. Record Transaction (Expense)
       const transactionPayload = {
         user_id: user.uid,
-        family_id: null,
+        family_id: null, // Personal Expense
         type: "expense",
         amount: principal,
         description: `Loan to ${debtorName}: ${formData.description}`,
@@ -116,6 +121,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(transactionPayload)
       });
+      
       if (!txResponse.ok) throw new Error("Loan created, but failed to record transaction.");
 
       if (onSuccess) onSuccess();

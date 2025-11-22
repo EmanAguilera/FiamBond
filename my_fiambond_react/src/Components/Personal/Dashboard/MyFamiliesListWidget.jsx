@@ -1,11 +1,11 @@
 import { useState, useCallback, useContext, useEffect, lazy, Suspense } from 'react';
-import { AppContext } from '../../Context/AppContext.jsx';
-import { db } from '../../config/firebase-config.js';
+import { AppContext } from '../../../Context/AppContext.jsx';
+import { db } from '../../../config/firebase-config.js';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
-import FamilyListItem from './FamilyListItems.jsx';
+import FamilyListItem from '../../Family/Management/FamilyListItems.jsx';
 
-const CreateFamilyWidget = lazy(() => import('./CreateFamilyWidget.tsx'));
+const CreateFamilyWidget = lazy(() => import('../../Family/Management/CreateFamilyWidget.tsx'));
 
 // --- FULL SKELETON LOADER COMPONENT ---
 const FamilyListSkeleton = () => (

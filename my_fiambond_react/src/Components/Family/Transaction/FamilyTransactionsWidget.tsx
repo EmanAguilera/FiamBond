@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
-import { AppContext } from "../../Context/AppContext.jsx";
+import { AppContext } from "../../../Context/AppContext.jsx";
 // Hybrid Approach: Keep Firebase imports ONLY for User Profile lookup
-import { db } from '../../config/firebase-config.js';
+import { db } from '../../../config/firebase-config.js';
 import { 
     collection, 
     query, 
@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 
 // Remove 'Transaction' from here to avoid conflict with local interface
-import { User } from "../../types/index"; 
+import { User } from "../../../types/index"; 
 
 // --- TypeScript Interfaces ---
 interface Family {

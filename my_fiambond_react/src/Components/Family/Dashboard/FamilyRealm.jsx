@@ -1,20 +1,20 @@
 import { useState, lazy, Suspense, useContext, useCallback, useEffect } from 'react';
-import { AppContext } from '../../Context/AppContext.jsx';
+import { AppContext } from '../../../Context/AppContext.jsx';
 
 // --- FIREBASE IMPORTS (RESTORED) ---
-import { db } from '../../config/firebase-config.js';
+import { db } from '../../../config/firebase-config.js';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
 // --- WIDGET IMPORTS ---
-const Modal = lazy(() => import('../Modal.jsx'));
+const Modal = lazy(() => import('../../Modal.jsx'));
 const FamilyReportChartWidget = lazy(() => import('./FamilyReportChartWidget.jsx'));
-const LoanTrackingWidget = lazy(() => import('../Personal/LoanTrackingWidget.jsx'));
-const GoalListsWidget = lazy(() => import("../Personal/GoalListsWidget.jsx"));
-const CreateLoanWidget = lazy(() => import('../Personal/CreateLoanWidget.js'));
-const CreateFamilyTransactionWidget = lazy(() => import('./CreateFamilyTransactionWidget.js'));
-const CreateFamilyGoalWidget = lazy(() => import('./CreateFamilyGoalWidget.js'));
-const FamilyTransactionsWidget = lazy(() => import('./FamilyTransactionsWidget.jsx'));
-const FamilyMembersView = lazy(() => import('./FamilyMembersView.jsx'));
+const LoanTrackingWidget = lazy(() => import('../../Personal/Loan/LoanTrackingWidget.js'));
+const GoalListsWidget = lazy(() => import("../../Personal/Goal/GoalListsWidget.jsx"));
+const CreateLoanWidget = lazy(() => import('../../Personal/Loan/CreateLoanWidget.js'));
+const CreateFamilyTransactionWidget = lazy(() => import('../Transaction/CreateFamilyTransactionWidget.js'));
+const CreateFamilyGoalWidget = lazy(() => import('../Goal/CreateFamilyGoalWidget.js'));
+const FamilyTransactionsWidget = lazy(() => import('../Transaction/FamilyTransactionsWidget.js'));
+const FamilyMembersView = lazy(() => import('../Management/FamilyMembersView.jsx'));
 
 // --- SKELETON COMPONENT ---
 const FamilyRealmSkeleton = () => (
@@ -232,12 +232,12 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             getFamilyActiveGoalsCount(), 
             getFamilyActiveLoansCount(), 
             getFamilyReport(),
-            getFamilyMembers() // Ensure members are re-fetched
+            getFamilyMembers() 
         ]);
         if (onDataChange) onDataChange();
     }, [getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport, getFamilyMembers, onDataChange, familyNotFound]);
 
-    // --- INITIAL LOAD ---
+    // --- INITIAL LOAD (The Big Fetch) ---
     useEffect(() => {
         const fetchAllData = async () => {
             if (!family || !user) return;
@@ -267,11 +267,15 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             }
         };
         fetchAllData();
-    }, [family, user, API_URL]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [family, user, API_URL]); 
+    // ^ We purposefully EXCLUDE the functions here so changing 'period' 
+    // doesn't trigger a full dashboard reload.
 
+    // --- REPORT UPDATE (When Period Changes) ---
     useEffect(() => {
         if (!loading && !familyNotFound) { getFamilyReport(); }
-    }, [period, loading, familyNotFound]);
+    }, [period, loading, familyNotFound, getFamilyReport]); // Added getFamilyReport here (Correct)
 
     const handleMembersUpdate = (updatedFamily) => {
         console.log("Family Updated, refreshing members...");

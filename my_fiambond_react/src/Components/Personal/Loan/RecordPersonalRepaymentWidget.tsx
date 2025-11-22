@@ -1,11 +1,11 @@
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
-import { AppContext } from '../../Context/AppContext.jsx';
+import { AppContext } from '../../../Context/AppContext.jsx';
 // Removed Firebase Imports
 // import { Loan } from '../../types';
 
 // --- YOUR CLOUDINARY DETAILS ---
-const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy"; 
-const CLOUDINARY_UPLOAD_PRESET = "ml_default";
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 interface RecordPersonalRepaymentWidgetProps {

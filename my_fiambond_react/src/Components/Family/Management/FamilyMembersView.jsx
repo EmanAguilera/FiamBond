@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, memo } from 'react';
 // --- 1. BRING BACK FIREBASE IMPORTS ---
-import { db } from '../../config/firebase-config.js';
+import { db } from '../../../config/firebase-config.js';
 import { 
     collection, 
     query, 
