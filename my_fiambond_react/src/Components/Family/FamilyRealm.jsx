@@ -232,12 +232,12 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             getFamilyActiveGoalsCount(), 
             getFamilyActiveLoansCount(), 
             getFamilyReport(),
-            getFamilyMembers() // Ensure members are re-fetched
+            getFamilyMembers() 
         ]);
         if (onDataChange) onDataChange();
     }, [getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport, getFamilyMembers, onDataChange, familyNotFound]);
 
-    // --- INITIAL LOAD ---
+    // --- INITIAL LOAD (The Big Fetch) ---
     useEffect(() => {
         const fetchAllData = async () => {
             if (!family || !user) return;
@@ -267,11 +267,15 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             }
         };
         fetchAllData();
-    }, [family, user, API_URL]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [family, user, API_URL]); 
+    // ^ We purposefully EXCLUDE the functions here so changing 'period' 
+    // doesn't trigger a full dashboard reload.
 
+    // --- REPORT UPDATE (When Period Changes) ---
     useEffect(() => {
         if (!loading && !familyNotFound) { getFamilyReport(); }
-    }, [period, loading, familyNotFound]);
+    }, [period, loading, familyNotFound, getFamilyReport]); // Added getFamilyReport here (Correct)
 
     const handleMembersUpdate = (updatedFamily) => {
         console.log("Family Updated, refreshing members...");
