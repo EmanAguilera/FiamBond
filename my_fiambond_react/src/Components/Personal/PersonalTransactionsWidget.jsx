@@ -106,9 +106,7 @@ export default function PersonalTransactionsWidget() {
             const response = await fetch(`${API_URL}/transactions?user_id=${user.uid}`);
             
             if (!response.ok) {
-                const errText = await response.text(); 
-                console.error("Server Error Details:", errText); // Log it to console
-                throw new Error(`API Error: ${response.status} - ${errText}`);
+                throw new Error(`API Error: ${response.statusText}`);
             }
 
             const data = await response.json();
