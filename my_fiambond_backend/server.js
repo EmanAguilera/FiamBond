@@ -10,9 +10,8 @@ const port = process.env.PORT || 3000; // Let Vercel decide the port
 
 // Enable CORS so your Vercel Frontend can talk to this Vercel Backend
 app.use(cors({
-    origin: "*", // For production, you can replace "*" with your frontend domain later
-    methods: ["GET", "POST", "PATCH", "DELETE"],
-    credentials: true
+    origin: "*", 
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
 }));
 
 app.use(express.json());
