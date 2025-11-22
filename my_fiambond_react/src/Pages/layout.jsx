@@ -15,7 +15,6 @@ export default function Layout() {
     const location = useLocation();
 
     const authLayoutPaths = ['/login', '/register', '/verify-email'];
-    // THE FIX IS HERE: We also want the simple layout for our new public landing page.
     const isAuthPage = authLayoutPaths.includes(location.pathname) || location.pathname === '/welcome';
 
     const navItems = user ? [
@@ -23,14 +22,14 @@ export default function Layout() {
         { name: "Settings", href: "/settings", icon: Cog6ToothIcon },
     ] : [];
 
-    // If the current page is an authentication or landing page, render the simple layout.
+    // --- 1. PUBLIC / AUTH LAYOUT (No Sidebar) ---
     if (isAuthPage) {
         return (
             <div className="min-h-screen bg-slate-50">
                 <header className="app-header">
                     <nav className="top-nav">
-                        {/* CHANGE #1: Point the logo to /welcome */}
-                        <Link to="/welcome" className="logo">Fiambond</Link>
+                        {/* FIX #1: If user is logged in, go to Dashboard. If not, go to Welcome. */}
+                        <Link to={user ? "/" : "/welcome"} className="logo">Fiambond</Link>
                         
                         {location.pathname !== '/verify-email' && !user && (
                             <div className="flex items-center space-x-2">
@@ -47,13 +46,13 @@ export default function Layout() {
         );
     }
 
-    // Otherwise, render the full Dashboard layout.
+    // --- 2. DASHBOARD LAYOUT (With Sidebar) ---
     return (
         <>
             <header className="app-header">
                 <nav className="top-nav">
-                    {/* CHANGE #2: Point the logo to /welcome here as well */}
-                    <Link to="/welcome" className="logo">Fiambond</Link>
+                    {/* FIX #2: When inside the dashboard, Logo always points to root "/" */}
+                    <Link to="/" className="logo">Fiambond</Link>
                     
                     {user && (
                         <div className="flex items-center space-x-4">
