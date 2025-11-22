@@ -5,22 +5,22 @@ import { AppContext } from "../../Context/AppContext.jsx";
 const Modal = lazy(() => import("../../Components/Modal"));
 
 // Personal - Goals
-const GoalListsWidget = lazy(() => import("../../Components/Personal/Goals/GoalListsWidget.jsx"));
-const CreateGoalWidget = lazy(() => import("../../Components/Personal/Goals/CreateGoalWidget.tsx"));
+const GoalListsWidget = lazy(() => import("../../Components/Personal/Goal/GoalListsWidget.jsx"));
+const CreateGoalWidget = lazy(() => import("../../Components/Personal/Goal/CreateGoalWidget.tsx"));
 
 // Personal - Transactions
-const PersonalTransactionsWidget = lazy(() => import("../../Components/Personal/Transactions/PersonalTransactionsWidget.jsx"));
-const CreateTransactionWidget = lazy(() => import("../../Components/Personal/Transactions/CreateTransactionWidget.tsx"));
+const PersonalTransactionsWidget = lazy(() => import("../../Components/Personal/Transaction/PersonalTransactionsWidget.jsx"));
+const CreateTransactionWidget = lazy(() => import("../../Components/Personal/Transaction/CreateTransactionWidget.tsx"));
 
 // Personal - Dashboard Tools
 const MyFamiliesListWidget = lazy(() => import("../../Components/Personal/Dashboard/MyFamiliesListWidget.jsx"));
 const PersonalReportChartWidget = lazy(() => import("../../Components/Personal/Dashboard/PersonalReportChartWidget.jsx"));
 
 // Personal - Loans
-const LoanTrackingWidget = lazy(() => import("../../Components/Personal/Loans/LoanTrackingWidget.tsx"));
-const RecordLoanFlowWidget = lazy(() => import("../../Components/Personal/Loans/RecordLoanFlowWidget.tsx"));
-const RecordLoanChoiceWidget = lazy(() => import("../../Components/Personal/Loans/RecordLoanChoiceWidget.tsx"));
-const CreatePersonalLoanWidget = lazy(() => import("../../Components/Personal/Loans/CreatePersonalLoanWidget.tsx"));
+const LoanTrackingWidget = lazy(() => import("../../Components/Personal/Loan/LoanTrackingWidget.tsx"));
+const RecordLoanFlowWidget = lazy(() => import("../../Components/Personal/Loan/RecordLoanFlowWidget.tsx"));
+const RecordLoanChoiceWidget = lazy(() => import("../../Components/Personal/Loan/RecordLoanChoiceWidget.tsx"));
+const CreatePersonalLoanWidget = lazy(() => import("../../Components/Personal/Loan/CreatePersonalLoanWidget.tsx"));
 
 // Family - Dashboard
 const FamilyRealm = lazy(() => import("../../Components/Family/Dashboard/FamilyRealm.jsx"));

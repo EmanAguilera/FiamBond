@@ -10,11 +10,14 @@ const port = process.env.PORT || 3000; // Let Vercel decide the port
 
 // Enable CORS so your Vercel Frontend can talk to this Vercel Backend
 app.use(cors({
-    origin: "*", 
-    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+    origin: true, // Reflects the request origin (allows everyone)
+    credentials: true, // Allows cookies/headers if needed
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
 
-app.use(express.json());
+// Handle Preflight requests explicitly
+app.options('*', cors());
 
 // --- DATABASE CONNECTION ---
 // Vercel will inject MONGO_URI automatically from the dashboard settings.
