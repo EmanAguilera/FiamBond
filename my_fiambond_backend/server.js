@@ -2,16 +2,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
-// Load environment variables if we are working locally (optional, but good practice)
-// require('dotenv').config(); 
-
 const app = express();
-const port = process.env.PORT || 3000; // Let Vercel decide the port
+const port = process.env.PORT || 3000; 
 
-// Enable CORS so your Vercel Frontend can talk to this Vercel Backend
+// --- CORS CONFIGURATION ---
+// Allows Localhost (Frontend) to talk to Vercel (Backend) without blocking
 app.use(cors({
-    origin: true, // Reflects the request origin (allows everyone)
-    credentials: true, // Allows cookies/headers if needed
+    origin: true, 
+    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
@@ -19,17 +17,25 @@ app.use(cors({
 // Handle Preflight requests explicitly
 app.options('*', cors());
 
+app.use(express.json());
+
 // --- DATABASE CONNECTION ---
-// Vercel will inject MONGO_URI automatically from the dashboard settings.
 const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/fiambond_v3'; 
 
 if (!process.env.MONGO_URI) {
     console.log("⚠️  Running on Local Database. If deploying, check Vercel Environment Variables.");
 }
 
-mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+// Added timeout options to prevent Vercel freezing if DB is unreachable
+mongoose.connect(mongoURI, { 
+    useNewUrlParser: true, 
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000 // Fail after 5 seconds instead of hanging
+})
   .then(() => console.log('✅ MongoDB Connected Successfully!'))
-  .catch(err => console.error('❌ MongoDB Connection Error:', err));
+  .catch(err => {
+      console.error('❌ MongoDB Connection Error:', err); // Log to Vercel Console
+  });
 
 // ==========================================
 //               SCHEMAS
@@ -114,19 +120,20 @@ const Family = mongoose.model('Family', FamilySchema);
 //                ROUTES
 // ==========================================
 
-app.get('/', (req, res) => res.send('FiamBond V3 API is Online 🚀'));
+app.get('/', (req, res) => res.status(200).send('FiamBond V3 API is Online 🚀'));
 
 // --- TRANSACTION ROUTES ---
 app.get('/api/transactions', async (req, res) => {
   try {
     const { user_id, family_id, startDate } = req.query;
-    
     let query = {};
 
-    // Robust check: Handle "undefined" string literal which fetch sometimes sends
-    if (family_id && family_id !== 'undefined' && family_id !== 'null') {
+    const hasFamily = family_id && family_id !== 'undefined' && family_id !== 'null';
+    const hasUser = user_id && user_id !== 'undefined' && user_id !== 'null';
+
+    if (hasFamily) {
         query.family_id = family_id;
-    } else if (user_id && user_id !== 'undefined' && user_id !== 'null') {
+    } else if (hasUser) {
         query.user_id = user_id;
     } else {
         return res.status(400).json({ error: "User ID or Family ID required" });
@@ -142,6 +149,7 @@ app.get('/api/transactions', async (req, res) => {
     const transactions = await Transaction.find(query).sort({ created_at: -1 });
     res.json(transactions);
   } catch (err) {
+    console.error("GET /transactions Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -152,6 +160,7 @@ app.post('/api/transactions', async (req, res) => {
     const savedTx = await newTransaction.save();
     res.json(savedTx);
   } catch (err) {
+    console.error("POST /transactions Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -162,9 +171,12 @@ app.get('/api/loans', async (req, res) => {
     const { user_id, family_id } = req.query;
     let query = {};
 
-    if (family_id && family_id !== 'undefined' && family_id !== 'null') {
+    const hasFamily = family_id && family_id !== 'undefined' && family_id !== 'null';
+    const hasUser = user_id && user_id !== 'undefined' && user_id !== 'null';
+
+    if (hasFamily) {
         query.family_id = family_id;
-    } else if (user_id && user_id !== 'undefined' && user_id !== 'null') {
+    } else if (hasUser) {
         query.$or = [{ creditor_id: user_id }, { debtor_id: user_id }];
     } else {
         return res.status(400).json({ error: "User ID or Family ID required" });
@@ -173,6 +185,7 @@ app.get('/api/loans', async (req, res) => {
     const loans = await Loan.find(query).sort({ created_at: -1 });
     res.json(loans);
   } catch (err) {
+    console.error("GET /loans Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -183,6 +196,7 @@ app.post('/api/loans', async (req, res) => {
     const savedLoan = await newLoan.save();
     res.status(201).json(savedLoan);
   } catch (err) {
+    console.error("POST /loans Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -192,6 +206,7 @@ app.patch('/api/loans/:id', async (req, res) => {
     const updatedLoan = await Loan.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updatedLoan);
   } catch (err) {
+    console.error("PATCH /loans Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -213,6 +228,7 @@ app.get('/api/goals', async (req, res) => {
     const goals = await Goal.find(query).sort({ created_at: -1 });
     res.json(goals);
   } catch (err) {
+    console.error("GET /goals Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -223,6 +239,7 @@ app.post('/api/goals', async (req, res) => {
     const savedGoal = await newGoal.save();
     res.status(201).json(savedGoal);
   } catch (err) {
+    console.error("POST /goals Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -232,6 +249,7 @@ app.patch('/api/goals/:id', async (req, res) => {
     const updatedGoal = await Goal.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updatedGoal);
   } catch (err) {
+    console.error("PATCH /goals Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -241,6 +259,7 @@ app.delete('/api/goals/:id', async (req, res) => {
     await Goal.findByIdAndDelete(req.params.id);
     res.json({ message: "Goal deleted" });
   } catch (err) {
+    console.error("DELETE /goals Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -253,6 +272,7 @@ app.get('/api/families', async (req, res) => {
     const families = await Family.find({ member_ids: user_id });
     res.json(families);
   } catch (err) {
+    console.error("GET /families Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -266,6 +286,7 @@ app.get('/api/families/:id', async (req, res) => {
     if (!family) return res.status(404).json({ error: "Family not found" });
     res.json(family);
   } catch (err) {
+    console.error("GET /families/:id Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -285,6 +306,7 @@ app.post('/api/families', async (req, res) => {
     const savedFamily = await newFamily.save();
     res.status(201).json(savedFamily);
   } catch (err) {
+    console.error("POST /families Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -295,6 +317,7 @@ app.patch('/api/families/:id', async (req, res) => {
     const updatedFamily = await Family.findByIdAndUpdate(req.params.id, { family_name }, { new: true });
     res.json(updatedFamily);
   } catch (err) {
+    console.error("PATCH /families Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -304,6 +327,7 @@ app.delete('/api/families/:id', async (req, res) => {
     await Family.findByIdAndDelete(req.params.id);
     res.json({ message: "Family deleted" });
   } catch (err) {
+    console.error("DELETE /families Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -325,6 +349,7 @@ app.post('/api/families/:id/members', async (req, res) => {
     await family.save();
     res.json(family);
   } catch (err) {
+    console.error("POST /families/members Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -338,6 +363,7 @@ app.get('/api/users', async (req, res) => {
     const users = await User.find({ _id: { $in: idList } });
     res.json(users);
   } catch (err) {
+    console.error("GET /users Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
