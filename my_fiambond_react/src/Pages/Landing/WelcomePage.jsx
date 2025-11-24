@@ -1,8 +1,22 @@
 import { Link } from "react-router-dom";
+import { Helmet } from 'react-helmet-async';
 
 export default function WelcomePage() {
     return (
         <div className="hero-section">
+            {/* --- SEO METADATA (The Fix for Google) --- */}
+            <Helmet>
+                <title>FiamBond | Personal & Family Financial Tracking App</title>
+                <meta 
+                    name="description" 
+                    content="FiamBond is a secure MERN stack application for tracking personal assets, loans, and family financial goals. Manage your family finances and lending records securely." 
+                />
+                <meta 
+                    name="keywords" 
+                    content="FiamBond, Financial App, Family Finance, Loan Tracker, MERN Stack Portfolio, React Finance" 
+                />
+            </Helmet>
+
             <div className="hero-content">
                 <div className="hero-text">
                     <h1 className="hero-headline">Take Control of Your Finances</h1>

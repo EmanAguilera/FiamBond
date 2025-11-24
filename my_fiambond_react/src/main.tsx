@@ -3,6 +3,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async'; // <--- 1. IMPORT THIS
 import AppProvider from './Context/AppContext';
 import App from './App';
 import './App.css'; 
@@ -12,13 +13,14 @@ const rootElement = document.getElementById('root');
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-      {/* THIS is the one and only BrowserRouter for your entire application */}
-      <BrowserRouter>
-        {/* The context provider wraps the App so all components can access the user state */}
-        <AppProvider>
-          <App />
-        </AppProvider>
-      </BrowserRouter>
+      {/* 2. WRAP EVERYTHING IN HELMET PROVIDER */}
+      <HelmetProvider>
+        <BrowserRouter>
+          <AppProvider>
+            <App />
+          </AppProvider>
+        </BrowserRouter>
+      </HelmetProvider>
     </React.StrictMode>
   );
 } else {
