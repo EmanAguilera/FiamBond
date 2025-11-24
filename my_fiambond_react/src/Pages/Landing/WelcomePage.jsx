@@ -4,16 +4,16 @@ import { Helmet } from 'react-helmet-async';
 export default function WelcomePage() {
     return (
         <div className="hero-section">
-            {/* --- SEO METADATA (The Fix for Google) --- */}
+            {/* --- SEO UPDATES --- */}
             <Helmet>
-                <title>FiamBond | Personal & Family Financial Tracking App</title>
+                <title>FiamBond | Secure Finance Tracker (MERN Stack)</title>
                 <meta 
                     name="description" 
-                    content="FiamBond is a secure MERN stack application for tracking personal assets, loans, and family financial goals. Manage your family finances and lending records securely." 
+                    content="FiamBond is a hybrid financial application architected with React, TypeScript, Node.js, Express, and MongoDB Atlas. Features secure Firebase Authentication and Cloudinary storage." 
                 />
                 <meta 
                     name="keywords" 
-                    content="FiamBond, Financial App, Family Finance, Loan Tracker, MERN Stack Portfolio, React Finance" 
+                    content="FiamBond, MERN Stack, Finance App, React, TypeScript, MongoDB, Express.js, Node.js, Vercel, Firebase Auth" 
                 />
             </Helmet>
 
