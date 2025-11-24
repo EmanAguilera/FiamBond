@@ -1,5 +1,5 @@
 import { useState, useCallback, useContext, useEffect, memo } from 'react';
-import { AppContext } from '../../Context/AppContext.jsx';
+import { AppContext } from '../../../Context/AppContext.jsx';
 // Removed Firebase Imports
 
 // --- CHART IMPORTS ---
