@@ -59,8 +59,8 @@ export default function VerifyEmail() {
 
     // This is the layout wrapper that makes the page look like your Login/Register pages.
     return (
-        <main className="login-wrapper">
-            <div className="login-card text-center" style={{ maxWidth: '450px' }}>
+        <main className="login-wrapper h-screen w-screen overflow-hidden flex items-center justify-center bg-gray-50">
+            <div className="login-card w-full max-w-md text-center" style={{ maxWidth: '450px' }}>
                 <h1 className="title">Verify Your Email Address</h1>
                 <p className="text-gray-600 mb-6">
                     A verification link has been sent to your email address:

@@ -108,8 +108,8 @@ export default function Login() {
 
   return (
     <>
-      <main className="login-wrapper">
-        <div className="login-card">
+       <main className="login-wrapper h-screen w-screen overflow-hidden flex items-center justify-center bg-gray-50">
+        <div className="login-card w-full max-w-md">
           <h1 className="title">Sign in to your account</h1>
           
           <div className="space-y-4">
