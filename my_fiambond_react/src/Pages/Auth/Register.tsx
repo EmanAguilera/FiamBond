@@ -100,8 +100,8 @@ export default function Register() {
   };
 
   return (
-    <main className="login-wrapper">
-      <div className="login-card">
+    <main className="login-wrapper h-screen w-screen overflow-hidden flex items-center justify-center bg-gray-50">
+        <div className="login-card w-full max-w-md">
         <h1 className="title">Create an account</h1>
 
         {/* --- GOOGLE SIGN-UP --- */}
