@@ -355,6 +355,34 @@ app.post('/api/families/:id/members', async (req, res) => {
     }
 });
 
+
+// 3. Get User (For Member Lists)
+app.get('/api/users', async (req, res) => {
+    try {
+        const { ids } = req.query;
+        if (!ids) return res.status(400).json({ error: "IDs required" });
+        const idList = ids.split(',');
+        const users = await User.find({ _id: { $in: idList } });
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- USERS ---
+app.get('/api/users', async (req, res) => {
+    try {
+        const { ids } = req.query;
+        if (!ids) return res.status(400).json({ error: "IDs required" });
+        const idList = ids.split(',');
+        const users = await User.find({ _id: { $in: idList } });
+        res.json(users);
+    } catch (err) {
+        console.error("GET /users Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- NEW COMPANY ROUTES ---
 
 // 1. Get Company by ID (The one fixing your error)
@@ -397,29 +425,29 @@ app.post('/api/companies', async (req, res) => {
     }
 });
 
-// 3. Get User (For Member Lists)
-app.get('/api/users', async (req, res) => {
+app.post('/api/companies/:id/members', async (req, res) => {
     try {
-        const { ids } = req.query;
-        if (!ids) return res.status(400).json({ error: "IDs required" });
-        const idList = ids.split(',');
-        const users = await User.find({ _id: { $in: idList } });
-        res.json(users);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+        const { newMemberId } = req.body; // The Firebase UID of the employee
+        const companyId = req.params.id;
 
-// --- USERS ---
-app.get('/api/users', async (req, res) => {
-    try {
-        const { ids } = req.query;
-        if (!ids) return res.status(400).json({ error: "IDs required" });
-        const idList = ids.split(',');
-        const users = await User.find({ _id: { $in: idList } });
-        res.json(users);
+        if (!newMemberId) return res.status(400).json({ error: "Member ID required" });
+
+        const company = await Company.findOne({ 
+            $or: [{ _id: companyId }, { owner_id: companyId }] 
+        });
+
+        if (!company) return res.status(404).json({ error: "Company not found" });
+
+        if (company.member_ids.includes(newMemberId)) {
+            return res.status(409).json({ error: "User is already an employee" });
+        }
+
+        company.member_ids.push(newMemberId);
+        await company.save();
+        
+        res.json(company);
     } catch (err) {
-        console.error("GET /users Error:", err);
+        console.error("POST /companies/members Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
