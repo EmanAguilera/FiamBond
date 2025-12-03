@@ -87,6 +87,7 @@ const User = mongoose.models.User || mongoose.model('User', UserSchema);
 const TransactionSchema = new mongoose.Schema({
     user_id: String,
     family_id: { type: String, default: null },
+    company_id: { type: String, default: null }, 
     description: String,
     amount: Number,
     type: String,
