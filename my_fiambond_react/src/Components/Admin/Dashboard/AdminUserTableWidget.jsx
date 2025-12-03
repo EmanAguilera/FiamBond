@@ -9,10 +9,15 @@ const UserItem = ({ user, type, onTogglePremium }) => {
     const isAdmin = user.role === 'admin';
     const isRevenueView = type === 'revenue';
     
-    // Format Date
-    const joinDate = user.created_at?.seconds 
-        ? new Date(user.created_at.seconds * 1000).toLocaleDateString() 
-        : 'Unknown';
+    // --- DATE LOGIC FIX ---
+    // If viewing Revenue, try to show when they PAID (granted_at). 
+    // If that doesn't exist (old data), fall back to creation date.
+    let displayDate = 'Unknown';
+    if (user.premium_granted_at?.seconds) {
+        displayDate = new Date(user.premium_granted_at.seconds * 1000).toLocaleDateString();
+    } else if (user.created_at?.seconds) {
+        displayDate = new Date(user.created_at.seconds * 1000).toLocaleDateString();
+    }
 
     return (
         <div className="flex items-center p-4 border-b last:border-b-0 border-gray-100 hover:bg-gray-50 transition-colors duration-150">
@@ -38,7 +43,11 @@ const UserItem = ({ user, type, onTogglePremium }) => {
                 {isRevenueView ? (
                     <div className="flex flex-col items-end">
                         <span className="font-bold text-emerald-600">+ ₱{SUBSCRIPTION_PRICE.toLocaleString()}</span>
-                        <span className="text-xs text-slate-400">Join: {joinDate}</span>
+                        <span className="text-xs text-slate-400">
+                            {/* Display correct label */}
+                            {user.premium_granted_at ? 'Paid: ' : 'Join: '} 
+                            {displayDate}
+                        </span>
                     </div>
                 ) : (
                     <button 
@@ -63,7 +72,7 @@ function AdminUserTableWidget({ users, type, onTogglePremium, headerText }) {
     return (
         <div className="max-h-[60vh] overflow-y-auto">
             {headerText && (
-                <div className={`px-4 py-3 border-b text-sm font-medium flex justify-between
+                <div className={`px-4 py-3 border-b text-sm font-medium flex justify-between sticky top-0 z-10
                     ${type === 'revenue' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 
                       type === 'admin' ? 'bg-purple-50 border-purple-100 text-purple-800' : 
                       'bg-indigo-50 border-indigo-100 text-indigo-800'}`}>

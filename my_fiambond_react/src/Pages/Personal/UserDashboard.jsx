@@ -21,7 +21,7 @@ const CreatePersonalLoanWidget = lazy(() => import("../../Components/Personal/Lo
 
 // Realm Imports
 const FamilyRealm = lazy(() => import("../Family/FamilyDashboard.jsx"));
-const CompanyRealm = lazy(() => import("../Company/CompanyDashboard.jsx")); // <--- IMPORT COMPANY REALM
+const CompanyRealm = lazy(() => import("../Company/CompanyDashboard.jsx"));
 
 // New Widget
 const ApplyCompanyWidget = lazy(() => import("../../Components/Company/ApplyCompanyWidget.jsx"));
@@ -88,7 +88,7 @@ export default function UserDashboard() {
 
     // --- UI STATE ---
     const [isAdmin, setIsAdmin] = useState(false);
-    const [isCompanyUser, setIsCompanyUser] = useState(false); // <--- State for Company Role
+    const [isCompanyUser, setIsCompanyUser] = useState(false);
 
     const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
     const [isTransactionsModalOpen, setIsTransactionsModalOpen] = useState(false);
@@ -97,13 +97,13 @@ export default function UserDashboard() {
     const [isCreateTransactionModalOpen, setIsCreateTransactionModalOpen] = useState(false);
     const [isCreateGoalModalOpen, setIsCreateGoalModalOpen] = useState(false);
     const [isRecordLoanModalOpen, setIsRecordLoanModalOpen] = useState(false);
-    const [isApplyCompanyModalOpen, setIsApplyCompanyModalOpen] = useState(false); // <--- Modal for "Locked" state
+    const [isApplyCompanyModalOpen, setIsApplyCompanyModalOpen] = useState(false);
 
     const [loanFlowStep, setLoanFlowStep] = useState('choice');
     
     // Realms State
     const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
-    const [showCompanyRealm, setShowCompanyRealm] = useState(false); // <--- Toggle for Company Realm
+    const [showCompanyRealm, setShowCompanyRealm] = useState(false);
 
     // --- DATA STATE ---
     const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -126,7 +126,6 @@ export default function UserDashboard() {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         if (data.role === 'admin') setIsAdmin(true);
-                        // Check for Company Access (using is_premium as the flag)
                         if (data.is_premium) setIsCompanyUser(true); 
                     }
                 } catch (err) {
@@ -257,10 +256,8 @@ export default function UserDashboard() {
     // --- COMPANY BUTTON HANDLER ---
     const handleManageCompanyClick = () => {
         if (isCompanyUser) {
-            // UNLOCKED: Go to Company Realm
             setShowCompanyRealm(true);
         } else {
-            // LOCKED: Show Application Modal
             setIsApplyCompanyModalOpen(true);
         }
     };
@@ -275,7 +272,7 @@ export default function UserDashboard() {
 
     if (isInitialLoading) return <DashboardSkeleton />;
 
-    // 1. FAMILY REALM VIEW (If Active)
+    // 1. FAMILY REALM VIEW
     if (activeFamilyRealm) {
         return (
             <Suspense fallback={<DashboardSkeleton />}>
@@ -288,13 +285,11 @@ export default function UserDashboard() {
         );
     }
 
-    // 2. COMPANY REALM VIEW (If Active)
+    // 2. COMPANY REALM VIEW
     if (showCompanyRealm) {
         return (
             <Suspense fallback={<DashboardSkeleton />}>
                 <CompanyRealm 
-                    // Pass a dummy company object or fetch real one in the component using user ID
-                    // For now, assuming user ID maps to one company
                     company={{ id: user.uid, name: "My Company" }} 
                     onBack={() => setShowCompanyRealm(false)} 
                     onDataChange={handleDashboardRefresh} 
@@ -313,7 +308,7 @@ export default function UserDashboard() {
                     <button onClick={() => setIsCreateGoalModalOpen(true)} className="secondary-btn">+ Add Goal</button>
                     <button onClick={() => setIsFamilyModalOpen(true)} className="secondary-btn">Manage Families</button>
 
-                    {/* --- MANAGE COMPANY BUTTON (Visible to All) --- */}
+                    {/* MANAGE COMPANY (Consistent Style) */}
                     <button 
                         onClick={handleManageCompanyClick}
                         className={`px-5 py-2.5 rounded-lg font-medium transition flex items-center gap-2 shadow-sm
@@ -323,20 +318,19 @@ export default function UserDashboard() {
                             }`}
                     >
                         {!isCompanyUser && (
-                            // Lock Icon for non-company users
                             <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                         )}
                         Manage Company
                     </button>
 
-                    {/* ADMIN BUTTON (Only Visible to Admin) */}
+                    {/* ADMIN BUTTON (Clean White/Gray Style) */}
                     {isAdmin && (
                         <button 
                             onClick={() => navigate('/admin')}
-                            className="bg-slate-800 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-slate-900 transition-all flex items-center gap-2 ml-auto"
+                            className="bg-white text-slate-600 border border-slate-300 px-5 py-2.5 rounded-lg font-medium hover:bg-slate-50 hover:text-slate-800 transition flex items-center gap-2 shadow-sm"
                         >
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                            Manage Admin
+                            Admin Panel
                         </button>
                     )}
                 </div>
@@ -369,7 +363,6 @@ export default function UserDashboard() {
                 {isCreateGoalModalOpen && <Modal isOpen={isCreateGoalModalOpen} onClose={() => setIsCreateGoalModalOpen(false)} title="New Goal"><CreateGoalWidget onSuccess={handleGoalSuccess} /></Modal>}
                 {isRecordLoanModalOpen && <Modal isOpen={isRecordLoanModalOpen} onClose={() => { setIsRecordLoanModalOpen(false); setLoanFlowStep('choice'); }} title="Record Loan">{renderLoanModalContent()}</Modal>}
                 
-                {/* --- APPLY COMPANY MODAL --- */}
                 {isApplyCompanyModalOpen && (
                     <Modal isOpen={isApplyCompanyModalOpen} onClose={() => setIsApplyCompanyModalOpen(false)} title="Unlock Company Features">
                         <ApplyCompanyWidget onClose={() => setIsApplyCompanyModalOpen(false)} />

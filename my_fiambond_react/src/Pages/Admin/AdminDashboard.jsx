@@ -1,16 +1,13 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+// ADDED: serverTimestamp, query, where
+import { collection, getDocs, updateDoc, doc, serverTimestamp, query, where } from "firebase/firestore";
 import { db } from "../../config/firebase-config";
 
 // --- WIDGET IMPORTS ---
 const Modal = lazy(() => import("../../Components/Modal"));
 const AdminReportChartWidget = lazy(() => import("../../Components/Admin/Dashboard/AdminReportChartWidget"));
-
-// --- NEW SPLIT WIDGETS ---
-const RevenueLedgerWidget = lazy(() => import("../../Components/Admin/Dashboard/RevenueLedgerWidget"));
-const EntityManagementWidget = lazy(() => import("../../Components/Admin/Dashboard/EntityManagementWidget"));
-const AdminTeamWidget = lazy(() => import("../../Components/Admin/Dashboard/AdminTeamWidget"));
+const AdminUserTableWidget = lazy(() => import("../../Components/Admin/Dashboard/AdminUserTableWidget")); // Using the generic one
 
 // --- ICONS ---
 const MoneyIcon = () => <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
@@ -19,6 +16,7 @@ const ShieldIcon = () => <svg className="w-8 h-8" fill="none" stroke="currentCol
 
 const SUBSCRIPTION_PRICE = 499.00;
 
+// --- CARD COMPONENT ---
 const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorClass }) => (
     <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
         <div className="flex justify-between items-start">
@@ -33,20 +31,65 @@ const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorCl
     </div>
 );
 
+// --- ADD ADMIN FORM COMPONENT ---
+const AddAdminForm = ({ onAdd, onCancel }) => {
+    const [email, setEmail] = useState("");
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        await onAdd(email);
+        setLoading(false);
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="p-4">
+            <p className="text-sm text-gray-600 mb-4">
+                Enter the email address of an existing user to promote them to an Administrator.
+            </p>
+            <div className="mb-4">
+                <label className="block text-sm font-bold text-gray-700 mb-2">User Email</label>
+                <input 
+                    type="email" 
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="user@example.com"
+                />
+            </div>
+            <div className="flex justify-end gap-3">
+                <button type="button" onClick={onCancel} className="px-4 py-2 text-slate-600 hover:text-slate-800">Cancel</button>
+                <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                >
+                    {loading ? 'Promoting...' : 'Promote to Admin'}
+                </button>
+            </div>
+        </form>
+    );
+};
+
 export default function AdminDashboard() {
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(true);
-    
-    // Data State
+
+    // --- STATE ---
     const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    // Added 'addAdmin' modal state
+    const [modals, setModals] = useState({ revenue: false, entities: false, admin: false, addAdmin: false });
+    
+    // Metrics
     const [premiumUsers, setPremiumUsers] = useState([]);
     const [adminUsers, setAdminUsers] = useState([]);
     const [currentMrr, setCurrentMrr] = useState(0);
+
+    // Chart
     const [report, setReport] = useState(null);
     const [period, setPeriod] = useState('monthly');
-
-    // UI State
-    const [modals, setModals] = useState({ revenue: false, entities: false, admin: false });
 
     // --- REPORT GENERATOR ---
     const generateReport = useCallback((userList, currentPeriod) => {
@@ -63,14 +106,19 @@ export default function AdminDashboard() {
         let activeCount = 0;
 
         userList.forEach(u => {
-            if (u.is_premium && u.created_at?.seconds) {
-                const txDate = new Date(u.created_at.seconds * 1000);
-                if (txDate >= startDate && txDate <= now) {
-                    const dateKey = txDate.toLocaleDateString();
-                    if (!revenueData[dateKey]) revenueData[dateKey] = 0;
-                    revenueData[dateKey] += SUBSCRIPTION_PRICE;
-                    periodRevenue += SUBSCRIPTION_PRICE;
-                    activeCount++;
+            if (u.is_premium) {
+                // DATE LOGIC: Prefer 'premium_granted_at', fallback to 'created_at'
+                const timestamp = u.premium_granted_at || u.created_at;
+                
+                if (timestamp?.seconds) {
+                    const txDate = new Date(timestamp.seconds * 1000);
+                    if (txDate >= startDate && txDate <= now) {
+                        const dateKey = txDate.toLocaleDateString();
+                        if (!revenueData[dateKey]) revenueData[dateKey] = 0;
+                        revenueData[dateKey] += SUBSCRIPTION_PRICE;
+                        periodRevenue += SUBSCRIPTION_PRICE;
+                        activeCount++;
+                    }
                 }
             }
         });
@@ -81,7 +129,7 @@ export default function AdminDashboard() {
             chartData: {
                 labels,
                 datasets: [{ 
-                    label: 'Subscription Income (₱)', 
+                    label: 'Admin Funds (₱)', 
                     data: labels.map(l => revenueData[l]), 
                     backgroundColor: 'rgba(16, 185, 129, 0.5)', 
                     borderColor: 'rgba(16, 185, 129, 1)', 
@@ -91,7 +139,7 @@ export default function AdminDashboard() {
             totalInflow: periodRevenue,
             totalOutflow: 0,
             netPosition: periodRevenue, 
-            reportTitle: `Revenue Report: ${startDate.toLocaleDateString()} - ${now.toLocaleDateString()}`,
+            reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${now.toLocaleDateString()}`,
             transactionCount: activeCount
         });
     }, []);
@@ -102,7 +150,12 @@ export default function AdminDashboard() {
         try {
             const usersSnapshot = await getDocs(collection(db, "users"));
             const usersList = usersSnapshot.docs.map(u => ({ id: u.id, ...u.data() }));
-            usersList.sort((a, b) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
+            // Sort by Premium Granted descending, then Created At descending
+            usersList.sort((a, b) => {
+                const timeA = a.premium_granted_at?.seconds || a.created_at?.seconds || 0;
+                const timeB = b.premium_granted_at?.seconds || b.created_at?.seconds || 0;
+                return timeB - timeA;
+            });
             
             setUsers(usersList);
             const premiums = usersList.filter(u => u.is_premium);
@@ -120,34 +173,42 @@ export default function AdminDashboard() {
 
     useEffect(() => { fetchData(); }, []);
 
-    // --- ACTIONS ---
+    // --- HANDLER: TOGGLE PREMIUM (With Timestamp Fix) ---
     const togglePremium = async (userId, currentStatus) => {
-        // 1. Check if ID exists
-        if (!userId) {
-            alert("Error: User ID is missing.");
-            return;
-        }
-
-        // 2. Confirmation
-        const action = currentStatus ? 'revoke' : 'grant';
-        if(!confirm(`Are you sure you want to ${action} Company Dashboard access?`)) return;
-        
+        if(!confirm(`Confirm ${currentStatus ? 'revoke' : 'grant'} company access?`)) return;
         try {
-            console.log(`Attempting to update User: ${userId} to is_premium: ${!currentStatus}`);
+            await updateDoc(doc(db, "users", userId), { 
+                is_premium: !currentStatus,
+                // If granting access, save the current time. If revoking, clear it (or keep history if desired)
+                premium_granted_at: !currentStatus ? serverTimestamp() : null 
+            });
+            fetchData(); 
+        } catch (error) { alert("Error updating status: " + error.message); }
+    };
+
+    // --- HANDLER: ADD ADMIN ---
+    const handleAddAdmin = async (email) => {
+        try {
+            // 1. Find user by email
+            const q = query(collection(db, "users"), where("email", "==", email));
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                alert("User not found with this email.");
+                return;
+            }
+
+            // 2. Update role
+            const userDoc = querySnapshot.docs[0];
+            await updateDoc(userDoc.ref, { role: 'admin' });
             
-            // 3. Perform Update
-            const userRef = doc(db, "users", userId);
-            await updateDoc(userRef, { is_premium: !currentStatus });
-            
-            console.log("Update Success!");
-            
-            // 4. Refresh Data
-            await fetchData(); 
-            
+            alert(`${email} is now an Admin.`);
+            setModals({ ...modals, addAdmin: false });
+            fetchData();
+
         } catch (error) {
-            console.error("Update Failed:", error);
-            // 5. Show the ACTUAL error code
-            alert(`Update Failed: ${error.code || error.message}`);
+            console.error(error);
+            alert("Failed to promote user.");
         }
     };
 
@@ -155,17 +216,29 @@ export default function AdminDashboard() {
 
     return (
         <div className="p-4 md:p-10">
-            <header className="dashboard-header mb-8 flex justify-between">
-                <div className="flex items-center gap-4">
+            <header className="dashboard-header mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4 w-full md:w-auto">
                     <button onClick={() => navigate('/')} className="secondary-btn-sm">&larr; Back</button>
                     <div><h1 className="text-2xl font-bold text-slate-800">System Administration</h1></div>
                 </div>
-                <button onClick={fetchData} className="secondary-btn">Refresh</button>
+                
+                <div className="flex gap-3">
+                    {/* ADD ADMIN BUTTON */}
+                    <button 
+                        onClick={() => setModals({ ...modals, addAdmin: true })}
+                        className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition flex items-center gap-2 shadow-sm"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                        Add Admin
+                    </button>
+                    <button onClick={fetchData} className="secondary-btn">Refresh</button>
+                </div>
             </header>
 
             {/* CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <DashboardCard title="Monthly Revenue" value={`₱${currentMrr.toLocaleString()}`} subtext="Projected MRR" linkText="View Ledger" onClick={() => setModals({ ...modals, revenue: true })} icon={<MoneyIcon />} colorClass="text-emerald-600" />
+                {/* RENAMED CARD */}
+                <DashboardCard title="Admin Funds (Net)" value={`₱${currentMrr.toLocaleString()}`} subtext="Total Accumulated Value" linkText="View Ledger" onClick={() => setModals({ ...modals, revenue: true })} icon={<MoneyIcon />} colorClass="text-emerald-600" />
                 <DashboardCard title="Total Entities" value={users.length} subtext={`${premiumUsers.length} Companies`} linkText="Manage Access" onClick={() => setModals({ ...modals, entities: true })} icon={<EntitiesIcon />} colorClass="text-indigo-600" />
                 <DashboardCard title="Admin Team" value={adminUsers.length} subtext="System Overseers" linkText="View Admins" onClick={() => setModals({ ...modals, admin: true })} icon={<ShieldIcon />} colorClass="text-purple-600" />
             </div>
@@ -175,21 +248,39 @@ export default function AdminDashboard() {
                 <AdminReportChartWidget report={report} period={period} setPeriod={setPeriod} />
             </Suspense>
 
-            {/* CLEAN MODAL IMPLEMENTATION */}
+            {/* MODALS */}
             <Suspense fallback={null}>
                 {modals.revenue && (
                     <Modal isOpen={modals.revenue} onClose={() => setModals({ ...modals, revenue: false })} title="Revenue Ledger">
-                        <RevenueLedgerWidget users={premiumUsers} totalRevenue={currentMrr} />
+                        <AdminUserTableWidget 
+                            users={premiumUsers} 
+                            type="revenue" 
+                            headerText={<span className="flex justify-between w-full"><span>Total Funds:</span><span>₱{currentMrr.toLocaleString()}</span></span>} 
+                        />
                     </Modal>
                 )}
                 {modals.entities && (
                     <Modal isOpen={modals.entities} onClose={() => setModals({ ...modals, entities: false })} title="Entity Management">
-                        <EntityManagementWidget users={users} onTogglePremium={togglePremium} />
+                        <AdminUserTableWidget 
+                            users={users} 
+                            type="entity" 
+                            onTogglePremium={togglePremium} 
+                            headerText="Toggle Company Status for Users"
+                        />
                     </Modal>
                 )}
                 {modals.admin && (
                     <Modal isOpen={modals.admin} onClose={() => setModals({ ...modals, admin: false })} title="Admin Team">
-                        <AdminTeamWidget users={adminUsers} />
+                        <AdminUserTableWidget 
+                            users={adminUsers} 
+                            type="admin" 
+                            headerText="Current System Administrators"
+                        />
+                    </Modal>
+                )}
+                {modals.addAdmin && (
+                    <Modal isOpen={modals.addAdmin} onClose={() => setModals({ ...modals, addAdmin: false })} title="Promote to Admin">
+                        <AddAdminForm onAdd={handleAddAdmin} onCancel={() => setModals({ ...modals, addAdmin: false })} />
                     </Modal>
                 )}
             </Suspense>
