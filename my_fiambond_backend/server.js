@@ -149,15 +149,25 @@ app.get('/', (req, res) => {
 // --- TRANSACTIONS ---
 app.get('/api/transactions', async (req, res) => {
     try {
-        const { user_id, family_id, startDate } = req.query;
+        const { user_id, family_id, company_id, startDate } = req.query;
         let query = {};
 
-        const hasFamily = family_id && family_id !== 'undefined' && family_id !== 'null';
-        const hasUser = user_id && user_id !== 'undefined' && user_id !== 'null';
-
-        if (hasFamily) query.family_id = family_id;
-        else if (hasUser) query.user_id = user_id;
-        else return res.status(400).json({ error: "User ID or Family ID required" });
+        // STRICT FILTERING LOGIC
+        if (company_id && company_id !== 'undefined') {
+            query.company_id = company_id;
+        } 
+        else if (family_id && family_id !== 'undefined') {
+            query.family_id = family_id;
+        } 
+        else if (user_id) {
+            // PERSONAL REALM: Must NOT have family_id OR company_id
+            query.user_id = user_id;
+            query.family_id = null;
+            query.company_id = null; 
+        } 
+        else {
+            return res.status(400).json({ error: "ID required" });
+        }
 
         if (startDate && startDate !== 'undefined') {
             const dateObj = new Date(startDate);
@@ -167,7 +177,6 @@ app.get('/api/transactions', async (req, res) => {
         const transactions = await Transaction.find(query).sort({ created_at: -1 });
         res.json(transactions);
     } catch (err) {
-        console.error("GET /transactions Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -227,19 +236,26 @@ app.patch('/api/loans/:id', async (req, res) => {
 // --- GOALS ---
 app.get('/api/goals', async (req, res) => {
     try {
-        const { user_id, family_id } = req.query;
+        const { user_id, family_id, company_id } = req.query;
         let query = {};
-        if (family_id && family_id !== 'undefined' && family_id !== 'null') {
+        
+        if (company_id && company_id !== 'undefined') {
+            query = { company_id: company_id };
+        } 
+        else if (family_id && family_id !== 'undefined') {
             query = { family_id: family_id };
-        } else if (user_id && user_id !== 'undefined') {
-            query = { user_id: user_id, family_id: null };
-        } else {
-            return res.status(400).json({ error: "user_id or family_id required" });
+        } 
+        else if (user_id) {
+            // PERSONAL REALM: Strict Check
+            query = { user_id: user_id, family_id: null, company_id: null };
+        } 
+        else {
+            return res.status(400).json({ error: "ID required" });
         }
+
         const goals = await Goal.find(query).sort({ created_at: -1 });
         res.json(goals);
     } catch (err) {
-        console.error("GET /goals Error:", err);
         res.status(500).json({ error: err.message });
     }
 });

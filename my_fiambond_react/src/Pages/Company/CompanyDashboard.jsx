@@ -15,6 +15,8 @@ const ManageEmployeesWidget = lazy(() => import('../../Components/Company/Manage
 const CompanyLedgerListWidget = lazy(() => import('../../Components/Company/Dashboard/CompanyLedgerListWidget.jsx'));
 const CompanyEmployeeListWidget = lazy(() => import('../../Components/Company/Dashboard/CompanyEmployeeListWidget.jsx'));
 const CompanyGoalListWidget = lazy(() => import('../../Components/Company/Dashboard/CompanyGoalListWidget.jsx'));
+const CreateCompanyGoalWidget = lazy(() => import('../../Components/Company/Goal/CreateCompanyGoalWidget.jsx'));
+
 
 // --- ICONS ---
 const WalletIcon = () => (<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>);
@@ -162,6 +164,36 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
     useEffect(() => { fetchData(); }, [fetchData]);
     useEffect(() => { generateReport(); }, [generateReport]);
 
+    // --- AUTO-REGISTER COMPANY IF MISSING ---
+    useEffect(() => {
+        const ensureCompanyExists = async () => {
+            if (!user) return;
+            try {
+                // Check if exists
+                const check = await fetch(`${API_URL}/companies/${user.uid}`);
+                if (check.status === 404) {
+                    console.log("Company missing in Mongo. Creating...");
+                    // Create it using the user's name
+                    const createRes = await fetch(`${API_URL}/companies`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: `${user.first_name}'s Company`,
+                            owner_id: user.uid
+                        })
+                    });
+                    if (createRes.ok) {
+                        console.log("Company Auto-Created!");
+                        fetchData(); // Reload data
+                    }
+                }
+            } catch (e) {
+                console.error("Auto-create failed", e);
+            }
+        };
+        ensureCompanyExists();
+    }, [user, API_URL]);
+
     const handleRefresh = () => {
         fetchData();
         if (onDataChange) onDataChange();
@@ -209,7 +241,7 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                 
                 {/* FORMS */}
                 {modals.addTx && <Modal isOpen={modals.addTx} onClose={() => setModals({...modals, addTx: false})} title="Record Business Finance"><CreateCompanyTransactionWidget company={company} onSuccess={() => { setModals({...modals, addTx: false}); handleRefresh(); }} /></Modal>}
-                {modals.addGoal && <Modal isOpen={modals.addGoal} onClose={() => setModals({...modals, addGoal: false})} title="Set Strategy"><div className="p-10 text-center text-gray-500">Goal Widget Coming Soon</div></Modal>}
+                {modals.addGoal && ( <Modal isOpen={modals.addGoal} onClose={() => setModals({...modals, addGoal: false})} title="Set Strategic Target"> <CreateCompanyGoalWidget  company={company}  onSuccess={() => { setModals({...modals, addGoal: false}); handleRefresh(); }} /> </Modal> )}
                 {modals.manageEmp && <Modal isOpen={modals.manageEmp} onClose={() => setModals({...modals, manageEmp: false})} title="Onboard Employee"><ManageEmployeesWidget company={company} members={members} onUpdate={handleRefresh} /></Modal>}
 
                 {/* LISTS (The New Lightweight Widgets) */}
