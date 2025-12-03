@@ -355,6 +355,61 @@ app.post('/api/families/:id/members', async (req, res) => {
     }
 });
 
+// --- NEW COMPANY ROUTES ---
+
+// 1. Get Company by ID (The one fixing your error)
+app.get('/api/companies/:id', async (req, res) => {
+    try {
+        // Allow searching by _id OR by owner_id (user uid)
+        // This handles the case where frontend passes user.uid as company.id
+        const company = await Company.findOne({ 
+            $or: [
+                { _id: (mongoose.Types.ObjectId.isValid(req.params.id) ? req.params.id : null) },
+                { owner_id: req.params.id }
+            ]
+        });
+
+        if (!company) return res.status(404).json({ error: "Company not found" });
+        res.json(company);
+    } catch (err) {
+        console.error("GET /companies/:id Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Create Company
+app.post('/api/companies', async (req, res) => {
+    try {
+        const { name, owner_id } = req.body;
+        // Check if user already has a company
+        const existing = await Company.findOne({ owner_id });
+        if(existing) return res.status(400).json({ error: "User already owns a company" });
+
+        const newCompany = new Company({ 
+            name, 
+            owner_id, 
+            member_ids: [owner_id] // Owner is first member
+        });
+        const savedCompany = await newCompany.save();
+        res.status(201).json(savedCompany);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Get User (For Member Lists)
+app.get('/api/users', async (req, res) => {
+    try {
+        const { ids } = req.query;
+        if (!ids) return res.status(400).json({ error: "IDs required" });
+        const idList = ids.split(',');
+        const users = await User.find({ _id: { $in: idList } });
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- USERS ---
 app.get('/api/users', async (req, res) => {
     try {
