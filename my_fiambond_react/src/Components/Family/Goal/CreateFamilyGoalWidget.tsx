@@ -1,144 +1,97 @@
-// Components/CreateFamilyGoalWidget.tsx
+import { useContext, useState, FormEvent } from "react";
+import { AppContext } from "../../../Context/AppContext";
+import { toast } from "react-hot-toast";
 
-import { useContext, useState, ChangeEvent, FormEvent } from "react";
-import { AppContext } from "../../../Context/AppContext.jsx";
-// Removed Firebase Imports
-
-// Define TypeScript interfaces
-interface Family {
-  id: string;
-  family_name?: string;
-}
-
-interface CreateFamilyGoalWidgetProps {
-  family: Family;
+interface Props {
+  family: { id: string; family_name?: string };
   onSuccess?: () => void;
 }
 
-interface IGoalForm {
-  name: string;
-  target_amount: string;
-  target_date: string;
-}
-
-export default function CreateFamilyGoalWidget({ family, onSuccess }: CreateFamilyGoalWidgetProps) {
+export default function CreateFamilyGoalWidget({ family, onSuccess }: Props) {
   const { user } = useContext(AppContext);
-  
-  // Use Vite env variable or fallback to localhost
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-  const [formData, setFormData] = useState<IGoalForm>({
-    name: "",
-    target_amount: "",
-    target_date: "",
-  });
+  const [formData, setFormData] = useState({ name: "", target_amount: "", target_date: "" });
+  const [loading, setLoading] = useState(false);
 
-  const [formError, setFormError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleCreateGoal = async (e: FormEvent<HTMLFormElement>) => {
+  const handleCreateGoal = async (e: FormEvent) => {
     e.preventDefault();
+    if (!user) return toast.error("Login required");
     
-    if (!user) {
-      setFormError("You must be logged in to create a goal.");
-      return;
-    }
-    
-    setFormError(null);
     setLoading(true);
-    
     try {
-      // Prepare the payload for the Node.js Backend
-      // Matches the Mongoose GoalSchema
-      const payload = {
-        user_id: user.uid,
-        family_id: family.id, // IMPORTANT: Links this goal to the family
-        name: formData.name,
-        target_amount: Number(formData.target_amount),
-        target_date: new Date(formData.target_date), // Send standard JS Date
-        status: "active",
-        // created_at is handled automatically by Mongoose default: Date.now
-      };
-
-      // Send POST request
-      const response = await fetch(`${API_URL}/goals`, {
+      const res = await fetch(`${API_URL}/goals`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.uid,
+          family_id: family.id,
+          name: formData.name,
+          target_amount: parseFloat(formData.target_amount),
+          target_date: new Date(formData.target_date).toISOString(),
+          status: "active",
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create goal on server');
-      }
+      if (!res.ok) throw new Error('Failed');
       
-      // Reset form
+      toast.success("Family Goal Set!");
       setFormData({ name: "", target_amount: "", target_date: "" });
-
-      if (onSuccess) {
-        onSuccess();
-      }
-
+      onSuccess?.();
     } catch (err) {
-      console.error('Failed to create family goal:', err);
-      setFormError("A network error occurred. Please try again.");
+      toast.error("Error creating goal");
     } finally {
       setLoading(false);
     }
   };
 
+  const inputClass = "w-full p-3 border border-slate-200 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400";
+
+
   return (
-    <div className="w-full">
-      <form onSubmit={handleCreateGoal} className="space-y-4">
-        <div>
-          <input
-            type="text"
-            name="name"
-            placeholder="Goal Name (e.g. Family Vacation)"
-            value={formData.name}
-            onChange={handleInputChange}
-            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            disabled={loading}
-            required
-          />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <input
-              type="number"
-              name="target_amount"
-              placeholder="Target Amount"
-              value={formData.target_amount}
-              onChange={handleInputChange}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              disabled={loading}
-              required
-              step="0.01"
-            />
-          </div>
-          <div>
-            <input
-              type="date"
-              name="target_date"
-              value={formData.target_date}
-              onChange={handleInputChange}
-              className="w-full p-2 border border-gray-300 rounded-md text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              disabled={loading}
-              required
-            />
-          </div>
-        </div>
-        {formError && <p className="error text-center">{formError}</p>}
-        <button type="submit" className="primary-btn w-full" disabled={loading}>
-          {loading ? 'Setting Goal...' : 'Set Family Goal'}
-        </button>
-      </form>
-    </div>
+    <form onSubmit={handleCreateGoal} className="space-y-4">
+      {/* Name */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-1">Goal Name</label>
+        <input
+          type="text"
+          required
+          placeholder="e.g. Family Vacation"
+          value={formData.name}
+          onChange={e => setFormData({...formData, name: e.target.value})}
+          className={inputClass}
+        />
+      </div>
+
+      {/* Amount */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-1">Target Amount (₱)</label>
+        <input
+          type="number"
+          step="0.01"
+          required
+          placeholder="0.00"
+          value={formData.target_amount}
+          onChange={e => setFormData({...formData, target_amount: e.target.value})}
+          className={inputClass}
+        />
+      </div>
+
+      {/* Date */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-1">Target Date</label>
+        <input
+          type="date"
+          required
+          value={formData.target_date}
+          onChange={e => setFormData({...formData, target_date: e.target.value})}
+          className={inputClass}
+        />
+      </div>
+
+      <button disabled={loading} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-lg shadow-indigo-200 mt-2">
+        {loading ? 'Setting Goal...' : 'Set Family Goal'}
+      </button>
+    </form>
   );
 }

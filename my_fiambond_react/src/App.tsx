@@ -18,9 +18,9 @@ import Register from "./Pages/Auth/Register";
 import VerifyEmail from './Pages/Auth/VerifyEmail.jsx';
 
 // --- DASHBOARD PAGES ---
-import UserDashboard from "./Pages/Personal/UserDashboard.jsx"; // Personal Realm
+import UserDashboard from "./Pages/Personal/UserRealm.jsx"; // Personal Realm
 import Settings from "./Pages/Settings.jsx";
-import AdminDashboard from "./Pages/Admin/AdminDashboard.jsx";   // Admin Realm
+import AdminDashboard from "./Pages/Admin/AdminRealm.jsx";   // Admin Realm
 
 export default function App() {
   return (

@@ -41,8 +41,6 @@ async function connectToDatabase() {
 
     if (!cached.promise) {
         const opts = {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
             bufferCommands: false, // Important: Fail fast if DB is down
             serverSelectionTimeoutMS: 5000, // Don't hang forever
         };
@@ -99,6 +97,7 @@ const Transaction = mongoose.models.Transaction || mongoose.model('Transaction',
 const GoalSchema = new mongoose.Schema({
     user_id: { type: String, required: true },
     family_id: { type: String, default: null },
+    company_id: { type: String, default: null },
     name: { type: String, required: true },
     target_amount: { type: Number, required: true },
     target_date: { type: Date, required: true },
@@ -137,6 +136,15 @@ const FamilySchema = new mongoose.Schema({
     created_at: { type: Date, default: Date.now }
 });
 const Family = mongoose.models.Family || mongoose.model('Family', FamilySchema);
+
+const CompanySchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    owner_id: { type: String, required: true },
+    member_ids: [String],
+    created_at: { type: Date, default: Date.now }
+});
+// This line defines the "Company" variable that was missing
+const Company = mongoose.models.Company || mongoose.model('Company', CompanySchema);
 
 
 // ==========================================
@@ -423,35 +431,48 @@ app.get('/api/companies/:id', async (req, res) => {
 });
 
 // 2. Create Company
-app.post('/api/companies', async (req, res) => {
+app.get('/api/companies/:id', async (req, res) => {
     try {
-        const { name, owner_id } = req.body;
-        // Check if user already has a company
-        const existing = await Company.findOne({ owner_id });
-        if(existing) return res.status(400).json({ error: "User already owns a company" });
+        const companyIdentifier = req.params.id;
+        
+        // --- THE FIX: Smart ID Logic ---
+        let query;
+        if (mongoose.Types.ObjectId.isValid(companyIdentifier)) {
+            query = { $or: [{ _id: companyIdentifier }, { owner_id: companyIdentifier }] };
+        } else {
+            query = { owner_id: companyIdentifier };
+        }
+        // -------------------------------
 
-        const newCompany = new Company({ 
-            name, 
-            owner_id, 
-            member_ids: [owner_id] // Owner is first member
-        });
-        const savedCompany = await newCompany.save();
-        res.status(201).json(savedCompany);
+        const company = await Company.findOne(query);
+
+        if (!company) return res.status(404).json({ error: "Company not found" });
+        res.json(company);
     } catch (err) {
+        console.error("GET /companies/:id Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
 app.post('/api/companies/:id/members', async (req, res) => {
     try {
-        const { newMemberId } = req.body; // The Firebase UID of the employee
-        const companyId = req.params.id;
+        const { newMemberId } = req.body;
+        const companyIdentifier = req.params.id; // This could be MongoID OR Firebase UID
 
         if (!newMemberId) return res.status(400).json({ error: "Member ID required" });
 
-        const company = await Company.findOne({ 
-            $or: [{ _id: companyId }, { owner_id: companyId }] 
-        });
+        // --- THE FIX: Smart ID Logic ---
+        let query;
+        if (mongoose.Types.ObjectId.isValid(companyIdentifier)) {
+            // It looks like a Mongo ID, so check both fields
+            query = { $or: [{ _id: companyIdentifier }, { owner_id: companyIdentifier }] };
+        } else {
+            // It is definitely NOT a Mongo ID (it's a Firebase UID), so only check owner_id
+            query = { owner_id: companyIdentifier };
+        }
+        // -------------------------------
+
+        const company = await Company.findOne(query);
 
         if (!company) return res.status(404).json({ error: "Company not found" });
 

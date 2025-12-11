@@ -1,6 +1,5 @@
-import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
+import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react"; // Removed 'useMemo'
 import { AppContext } from "../../../Context/AppContext.jsx";
-// We keep DB/Firebase ONLY for User Profile lookup (Hybrid approach)
 import { db } from '../../../config/firebase-config.js';
 import {
     collection,
@@ -14,16 +13,18 @@ const Modal = lazy(() => import('../../Modal.jsx'));
 const CompleteGoalWidget = lazy(() => import('./CompleteGoalWidget.tsx'));
 
 const GoalListsSkeleton = () => (
-    <div className="animate-pulse">
-        <div className="h-8 w-1/3 bg-slate-200 rounded mb-4"></div>
-        <div className="h-10 w-full bg-slate-200 rounded mb-6"></div>
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden p-4">
+        <div className="flex border-b border-slate-200 mb-4">
+            <div className="h-10 w-1/2 bg-slate-100 rounded-t"></div>
+            <div className="h-10 w-1/2 bg-white rounded-t"></div>
+        </div>
         <div className="space-y-4">
             {[...Array(2)].map((_, i) => (
                 <div key={i} className="p-4 bg-white border border-slate-200 rounded-lg">
                     <div className="flex justify-between items-start">
-                        <div>
+                        <div className="space-y-2">
                             <div className="h-6 w-48 bg-slate-200 rounded"></div>
-                            <div className="h-4 w-32 bg-slate-200 rounded mt-3"></div>
+                            <div className="h-4 w-32 bg-slate-100 rounded"></div>
                         </div>
                         <div className="h-7 w-28 bg-slate-200 rounded"></div>
                     </div>
@@ -44,16 +45,13 @@ export default function GoalListsWidget({ family, onDataChange }) {
     const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
     const [goalToComplete, setGoalToComplete] = useState(null);
     
-    // Use standard env variable pattern
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-    // --- Data Fetching Logic ---
     const getGoals = useCallback(async () => {
         if (!user) return;
         setLoading(true);
         setListError(null);
         try {
-            // 1. FETCH FROM NODE.JS / MONGODB
             let url = `${API_URL}/goals?`;
             if (family) {
                 url += `family_id=${family.id}`;
@@ -66,18 +64,14 @@ export default function GoalListsWidget({ family, onDataChange }) {
             
             const rawGoals = await response.json();
 
-            // 2. TRANSFORM DATA (The Shim)
-            // MongoDB dates are strings. UI expects objects with .toDate().
             const allGoals = rawGoals.map(g => ({
                 ...g,
-                id: g._id, // Map Mongo _id to id
-                // Create fake Firebase Timestamp objects for compatibility
+                id: g._id, 
                 target_date: g.target_date ? { toDate: () => new Date(g.target_date) } : null,
                 created_at: g.created_at ? { toDate: () => new Date(g.created_at) } : { toDate: () => new Date() },
                 completed_at: g.completed_at ? { toDate: () => new Date(g.completed_at) } : null
             }));
 
-            // 3. FETCH USER PROFILES (Firebase Hybrid Lookup)
             const userIds = new Set();
             allGoals.forEach(goal => {
                 if (goal.user_id) userIds.add(goal.user_id);
@@ -127,13 +121,10 @@ export default function GoalListsWidget({ family, onDataChange }) {
         if (!window.confirm("Are you sure you want to abandon this goal?")) return;
         setListError(null);
         try {
-            // Call Node.js Delete Endpoint
             const response = await fetch(`${API_URL}/goals/${goalId}`, {
                 method: 'DELETE'
             });
-
             if (!response.ok) throw new Error('Failed to delete');
-
             getGoals(); 
             if (onDataChange) onDataChange();
         } catch {
@@ -142,97 +133,114 @@ export default function GoalListsWidget({ family, onDataChange }) {
     }
 
     if (loading) return <GoalListsSkeleton />;
-    if (listError) return <p className="error text-center py-10">{listError}</p>;
+    if (listError) return <p className="text-center text-rose-500 py-10 bg-rose-50 rounded-lg border border-rose-100">{listError}</p>;
 
     return (
-        <div>
-            {/* Tab Navigation */}
-            <div className="border-b border-gray-200 mb-6">
-                <nav className="-mb-px flex space-x-6">
-                    <button onClick={() => setActiveTab('active')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'active' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                        Active Goals
-                    </button>
-                    <button onClick={() => setActiveTab('history')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'history' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                        Goal History
-                    </button>
-                </nav>
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <div className="flex border-b border-slate-200">
+                <button 
+                    onClick={() => setActiveTab('active')} 
+                    className={`flex-1 py-3 text-sm font-bold text-center transition-colors ${activeTab === 'active' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Active Goals
+                </button>
+                <button 
+                    onClick={() => setActiveTab('history')} 
+                    className={`flex-1 py-3 text-sm font-bold text-center transition-colors ${activeTab === 'history' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Goal History
+                </button>
             </div>
 
-            {/* Active Goals Tab */}
-            {activeTab === 'active' && (
-                <div>
-                    {activeGoals.length > 0 ? (
-                        <div className="space-y-4">
-                            {activeGoals.map((goal) => {
-                                // .toDate() works now because of the shim
-                                const deadlineDate = goal.target_date?.toDate();
-                                const isOverdue = deadlineDate && new Date() > deadlineDate;
-                                return (
-                                    <div key={goal.id} className={`bg-white border rounded-lg shadow-sm transition-all hover:shadow-md ${isOverdue ? 'border-yellow-400' : 'border-gray-200'}`}>
-                                        <div className="p-4">
-                                            <div className="flex justify-between items-start gap-4">
-                                                <div className="min-w-0">
-                                                    <h3 className="font-bold text-lg text-gray-800 break-words">{goal.name}</h3>
-                                                    <p className="text-sm font-semibold text-indigo-600">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                                                    <div className="text-xs text-gray-500 mt-2 space-y-1">
-                                                        <p>Created by: <span className="font-medium text-gray-700">{goal.user.full_name}</span></p>
-                                                        {deadlineDate && <p>Deadline: <span className={`font-medium ${isOverdue ? 'text-red-600' : 'text-gray-700'}`}>{deadlineDate.toLocaleDateString()}</span></p>}
-                                                    </div>
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+                {activeTab === 'active' && (
+                    <div className="space-y-4">
+                        {activeGoals.length > 0 ? activeGoals.map((goal) => {
+                            const deadlineDate = goal.target_date?.toDate();
+                            const isOverdue = deadlineDate && new Date() > deadlineDate;
+
+                            return (
+                                <div key={goal.id} className={`bg-white border rounded-lg p-4 shadow-sm transition-all hover:shadow-md ${isOverdue ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 className="font-bold text-gray-800 text-lg">{goal.name}</h3>
+                                            <div className="text-xs text-slate-500 mt-1 flex flex-col gap-1">
+                                                <span>Created by: {goal.user.full_name}</span>
+                                                <div className="flex gap-2">
+                                                    {deadlineDate && (
+                                                        <span>Deadline: <strong>{deadlineDate.toLocaleDateString()}</strong></span>
+                                                    )}
+                                                    {isOverdue && <span className="text-amber-600 font-bold">(Overdue)</span>}
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="bg-gray-50 px-4 py-2 rounded-b-lg flex justify-end items-center space-x-3">
-                                            <button onClick={() => handleDeleteGoal(goal.id)} className="danger-btn-sm text-xs">Abandon</button>
-                                            <button onClick={() => handleMarkAsComplete(goal)} className="success-btn-sm text-xs">Mark as Complete</button>
+                                        <div className="text-right">
+                                            <span className="block font-bold text-indigo-600 text-lg">
+                                                ₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            </span>
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    ) : <p className="text-gray-600 italic px-4">You have no active goals yet.</p>}
-                </div>
-            )}
-
-            {/* Goal History Tab */}
-            {activeTab === 'history' && (
-                <div>
-                    {completedGoals.length > 0 ? (
-                        <div className="space-y-3">
-                            {completedGoals.map((goal) => (
-                                <div key={goal.id} className="bg-white border border-gray-200 rounded-lg p-4 opacity-80 hover:opacity-100 transition-opacity">
-                                    <div className="flex items-start justify-between">
-                                        <div className="min-w-0">
-                                            <h3 className="font-semibold text-md text-gray-500 line-through break-words">{goal.name}</h3>
-                                            <div className="text-xs text-gray-500 mt-1">
-                                                Completed by {goal.completed_by?.full_name || 'Unknown'} on {goal.completed_at?.toDate().toLocaleDateString()}
-                                            </div>
-                                            
-                                            {goal.achievement_url && (
-                                                <div className="mt-3">
-                                                    <a
-                                                        href={goal.achievement_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-green-600 bg-green-50 rounded-lg hover:bg-green-100"
-                                                    >
-                                                        View Achievement
-                                                    </a>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="ml-4 text-right flex-shrink-0">
-                                            <p className="font-bold text-md text-green-600">₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                                            <p className="text-xs font-semibold text-green-600">Achieved</p>
-                                        </div>
+                                    
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                                        <button 
+                                            onClick={() => handleDeleteGoal(goal.id)} 
+                                            className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded transition-colors"
+                                        >
+                                            Abandon
+                                        </button>
+                                        <button 
+                                            onClick={() => handleMarkAsComplete(goal)} 
+                                            className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors shadow-sm"
+                                        >
+                                            Mark Complete
+                                        </button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    ) : <p className="text-gray-600 italic px-4">You have not completed any goals yet.</p>}
-                </div>
-            )}
+                            );
+                        }) : (
+                            <p className="text-center text-slate-400 italic py-6">You have no active goals yet.</p>
+                        )}
+                    </div>
+                )}
 
-            <Suspense fallback={<div>Loading...</div>}>
+                {activeTab === 'history' && (
+                    <div className="space-y-3">
+                        {completedGoals.length > 0 ? completedGoals.map((goal) => (
+                            <div key={goal.id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 opacity-75 hover:opacity-100 transition-opacity">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h3 className="font-semibold text-slate-600 line-through text-lg">{goal.name}</h3>
+                                        <div className="text-xs text-slate-400 mt-0.5">
+                                            Completed by {goal.completed_by?.full_name || 'Unknown'} <br/>
+                                            on {goal.completed_at?.toDate().toLocaleDateString()}
+                                        </div>
+                                        {goal.achievement_url && (
+                                            <a 
+                                                href={goal.achievement_url} 
+                                                target="_blank" 
+                                                rel="noreferrer" 
+                                                className="mt-2 inline-flex items-center text-xs font-bold text-emerald-600 hover:underline"
+                                            >
+                                                View Achievement
+                                            </a>
+                                        )}
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="block font-bold text-emerald-600">
+                                            ₱{parseFloat(goal.target_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </span>
+                                        <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-100 px-1.5 rounded">Achieved</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )) : (
+                            <p className="text-center text-slate-400 italic py-6">You have not completed any goals yet.</p>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            <Suspense fallback={null}>
                 {isCompleteModalOpen && goalToComplete && (
                     <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} title="Complete Your Goal">
                         <CompleteGoalWidget goal={goalToComplete} onSuccess={handleCompletionSuccess} />
