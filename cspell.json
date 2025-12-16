@@ -1,0 +1,22 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    // From your React app
+    "Aguilera",
+    "chartjs",
+    "dzcnbrgjy",
+    "cooldown",
+    "barangays",
+    "Guimaras",
+    "Eman",
+    "firestore",
+    "Fiam",
+    "pendings",
+    "vITE",
+    "Millis"
+   
+  ],
+  "flagWords": [],
+  "ignorePaths": ["node_modules", "dist", "build"]
+}

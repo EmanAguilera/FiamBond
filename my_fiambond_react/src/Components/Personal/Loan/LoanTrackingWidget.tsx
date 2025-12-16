@@ -1,33 +1,73 @@
-import { useContext, useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { AppContext } from "../../../Context/AppContext.jsx";
-import { db } from '../../../config/firebase-config.js';
+import { useContext, useState, useEffect, useCallback, lazy, Suspense, ReactNode } from "react";
+import { AppContext } from "../../../Context/AppContext"; // Removed .jsx extension for TS
+import { db } from '../../../config/firebase-config'; // Removed .js extension for TS
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
 // --- LAZY LOADED COMPONENTS ---
-const Modal = lazy(() => import('../../Modal.jsx'));
-const MakeRepaymentWidget = lazy(() => import('./MakeRepaymentWidget.js'));
-const RecordPersonalRepaymentWidget = lazy(() => import('./RecordPersonalRepaymentWidget.js'));
-const LoanConfirmationWidget = lazy(() => import('./LoanConfirmationWidget.js'));
-const RepaymentConfirmationWidget = lazy(() => import('./RepaymentConfirmationWidget.js'));
+const Modal = lazy(() => import('../../Modal'));
+const MakeRepaymentWidget = lazy(() => import('./Actions/MakeRepaymentWidget'));
+const RecordPersonalRepaymentWidget = lazy(() => import('./Actions/RecordPersonalRepaymentWidget'));
+const LoanConfirmationWidget = lazy(() => import('./Actions/LoanConfirmationWidget'));
+const RepaymentConfirmationWidget = lazy(() => import('./Actions/RepaymentConfirmationWidget'));
 
-// --- TYPE DEFINITIONS ---
+// --- INTERFACES ---
+interface UserProfile {
+    id: string;
+    full_name: string;
+    [key: string]: any;
+}
+
+interface Loan {
+    id: string;
+    _id?: string;
+    family_id: string | null;
+    creditor_id: string;
+    debtor_id: string | null;
+    debtor_name?: string;
+    amount: number;
+    total_owed?: number;
+    repaid_amount?: number;
+    status: string;
+    description: string;
+    attachment_url?: string;
+    created_at: { toDate: () => Date; toMillis: () => number };
+    deadline?: { toDate: () => Date } | null;
+    pending_repayment?: {
+        receipt_url?: string;
+    };
+    repayment_receipts?: any[];
+    creditor?: UserProfile;
+    debtor?: UserProfile;
+}
+
 interface LoanTrackingWidgetProps {
     family?: { id: string; family_name: string; } | null;
     onDataChange?: () => void;
 }
 
-// --- SKELETON LOADER ---
+interface CollapsibleSectionProps {
+    title: string;
+    colorClass: string;
+    count: number;
+    isOpen: boolean;
+    onClick: () => void;
+    children: ReactNode;
+}
+
+// --- SKELETON ---
 const LoanListSkeleton = () => (
-    <div className="animate-pulse">
-        <div className="h-8 w-1/2 bg-slate-200 rounded mb-4"></div>
-        <div className="h-10 w-full bg-slate-200 rounded mb-6"></div>
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden p-4">
+        <div className="flex border-b border-slate-200 mb-4">
+            <div className="h-10 w-1/2 bg-slate-100 rounded-t"></div>
+            <div className="h-10 w-1/2 bg-white rounded-t"></div>
+        </div>
         <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
                 <div key={i} className="p-4 bg-white border border-slate-200 rounded-lg">
                     <div className="flex justify-between items-start">
-                        <div>
+                        <div className="space-y-2">
                             <div className="h-6 w-48 bg-slate-200 rounded"></div>
-                            <div className="h-4 w-32 bg-slate-200 rounded mt-3"></div>
+                            <div className="h-4 w-32 bg-slate-100 rounded"></div>
                         </div>
                         <div className="h-7 w-28 bg-slate-200 rounded"></div>
                     </div>
@@ -37,23 +77,46 @@ const LoanListSkeleton = () => (
     </div>
 );
 
-const DeadlineNotification = ({ deadline, outstanding }: { deadline: Date; outstanding: number; }) => {
+// --- HELPER COMPONENTS ---
+const DeadlineNotification = ({ deadline, outstanding }: { deadline: Date | undefined; outstanding: number }) => {
     if (!deadline || outstanding <= 0) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const timeDiff = deadline.getTime() - today.getTime();
     const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-    if (dayDiff < 0) return <span className="text-xs font-semibold text-red-600">Overdue</span>;
-    if (dayDiff <= 7) return <span className="text-xs font-semibold text-yellow-600">Due Soon</span>;
+    
+    if (dayDiff < 0) return <span className="text-rose-600 font-bold ml-2">(Overdue)</span>;
+    if (dayDiff <= 7) return <span className="text-amber-600 font-bold ml-2">(Due Soon)</span>;
     return null;
 };
 
-// --- UPDATED LOAN ITEM COMPONENT ---
-const LoanItem = ({ loan, onRepaymentSuccess }: { loan: any; onRepaymentSuccess: () => void; }) => {
+const ChevronDownIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+);
+
+const CollapsibleSection = ({ title, colorClass, count, isOpen, onClick, children }: CollapsibleSectionProps) => (
+    <div className="border border-slate-200 rounded-lg overflow-hidden mb-3">
+        <button 
+            onClick={onClick} 
+            className="w-full flex justify-between items-center p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+        >
+            <div className="flex items-center gap-3">
+                <h4 className={`font-bold text-lg ${colorClass}`}>{title}</h4>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 shadow-sm`}>{count}</span>
+            </div>
+            <ChevronDownIcon className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {isOpen && <div className="p-4 bg-white border-t border-slate-200 space-y-3">{children}</div>}
+    </div>
+);
+
+// --- LOAN ITEM ---
+const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess: () => void }) => {
     const { user } = useContext(AppContext);
-    const [isRepaymentModalOpen, setIsRepaymentModalOpen] = useState<boolean>(false);
-    const [isRecordRepaymentModalOpen, setIsRecordRepaymentModalOpen] = useState<boolean>(false);
-    const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState<boolean>(false);
-    const [isRepayConfirmModalOpen, setIsRepayConfirmModalOpen] = useState<boolean>(false);
+    
+    const [isRepaymentModalOpen, setIsRepaymentModalOpen] = useState(false);
+    const [isRecordRepaymentModalOpen, setIsRecordRepaymentModalOpen] = useState(false);
+    const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
+    const [isRepayConfirmModalOpen, setIsRepayConfirmModalOpen] = useState(false);
     
     if (!user) return null;
 
@@ -63,12 +126,9 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: any; onRepaymentSuccess:
     const totalOwed = loan.total_owed || loan.amount; 
     const outstanding = totalOwed - (loan.repaid_amount || 0);
     
-    // Status Checks
     const isPendingInitialConfirmation = isBorrower && loan.status === 'pending_confirmation';
     const isPendingRepaymentConfirmation = isCreditor && !!loan.pending_repayment;
     const isRepaid = loan.status === 'paid' || loan.status === 'repaid';
-    
-    // --- FIX: Detect if Debtor is waiting for approval ---
     const isDebtorWaitingForApproval = isBorrower && !!loan.pending_repayment;
     
     const creationDate = loan.created_at?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -83,111 +143,103 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: any; onRepaymentSuccess:
     };
     
     const debtorDisplayName = loan.debtor?.full_name || loan.debtor_name || 'Borrower';
-    const BellIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" /></svg>);
-    const ReceiptIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>);
-    const UserIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>);
-    const UsersIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>);
-    const ClockIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
+    const creditorDisplayName = loan.creditor?.full_name || 'Creditor';
+
+    const isActionRequired = isPendingInitialConfirmation || isPendingRepaymentConfirmation;
+    const borderClass = isActionRequired ? 'border-amber-400 bg-amber-50' : 'border-slate-200';
+    const opacityClass = isRepaid ? 'opacity-75 bg-slate-50' : 'bg-white';
 
     return (
-        <div className={`bg-white border rounded-lg shadow-sm transition-all hover:shadow-md ${isPendingInitialConfirmation || isPendingRepaymentConfirmation || isDebtorWaitingForApproval ? 'border-amber-400' : 'border-gray-200'} ${isRepaid ? 'opacity-70' : ''}`}>
-            <div className="p-4">
-                <div className="flex justify-between items-start">
-                    <div className="min-w-0 pr-4">
-                        <div className="flex items-center gap-2 mb-1">
-                            {isPersonalLoan ? (
-                                <span className="flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full"><UserIcon /> Personal</span>
-                            ) : (
-                                <span className="flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full"><UsersIcon /> Family</span>
-                            )}
-                        </div>
-                        <p className="font-bold text-gray-800 break-words">{loan.description}</p>
-                        <div className="mt-1 text-xs text-gray-500 space-y-1">
-                            <p>From: <span className="font-medium text-gray-700">{loan.creditor.full_name}</span></p>
-                            <p>To: <span className="font-medium text-gray-700">{debtorDisplayName}</span></p>
-                        </div>
+        <div className={`rounded-lg border shadow-sm transition-all hover:shadow-md p-4 ${borderClass} ${opacityClass}`}>
+            <div className="flex justify-between items-start mb-2">
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        {isActionRequired && <span className="text-[10px] uppercase font-bold text-amber-800 bg-amber-200 px-1.5 py-0.5 rounded">Action Required</span>}
+                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${isPersonalLoan ? 'bg-slate-100 text-slate-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                            {isPersonalLoan ? 'Personal' : 'Family'}
+                        </span>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                        {isRepaid ? (
-                            <span className="px-3 py-1 text-xs font-bold text-green-800 bg-green-100 rounded-full">REPAID</span>
-                        ) : loan.status === 'pending_confirmation' ? (
-                            <span className="px-3 py-1 text-xs font-bold text-gray-600 bg-gray-100 rounded-full">PENDING</span>
-                        ) : isDebtorWaitingForApproval ? (
-                            // --- FIX: Show this status for Debtor when repayment is pending ---
-                            <div className="flex flex-col items-end">
-                                <span className="flex items-center gap-1 px-3 py-1 text-xs font-bold text-amber-800 bg-amber-100 rounded-full">
-                                    <ClockIcon /> APPROVAL
-                                </span>
-                                <small className="text-xs text-gray-500 mt-1">Payment Sent</small>
-                            </div>
-                        ) : (
-                            <>
-                                <p className={`font-bold text-lg ${outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>₱{outstanding.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
-                                <small className="text-xs text-gray-500">Outstanding</small>
-                            </>
-                        )}
-                    </div>
+                    <h3 className="font-bold text-gray-800 text-lg leading-tight">{loan.description}</h3>
                 </div>
-                
-                <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
-                    <div><span>Created: </span><span className="font-semibold text-gray-600">{creationDate}</span></div>
-                    {deadlineDate && !isRepaid && ( <div className="flex items-center gap-2"><span>Deadline: </span><span className="font-semibold text-gray-600">{deadlineDate.toLocaleDateString()}</span><DeadlineNotification deadline={deadlineDate} outstanding={outstanding} /></div> )}
+                <div className="text-right">
+                    {isRepaid ? (
+                        <span className="block font-bold text-emerald-600 text-lg">REPAID</span>
+                    ) : (
+                        <div className="flex flex-col items-end">
+                            <span className={`block font-bold text-lg ${isCreditor ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                ₱{outstanding.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">{isCreditor ? 'You lent' : 'You owe'}</span>
+                        </div>
+                    )}
                 </div>
-
-                {/* Attachments Section */}
-                {(loan.attachment_url || loan.pending_repayment?.receipt_url || (loan.repayment_receipts && loan.repayment_receipts.length > 0)) && (
-                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
-                        {(isBorrower || (isCreditor && isPersonalLoan)) && loan.attachment_url && (
-                            <div>
-                                <a href={loan.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800 hover:underline">
-                                    <ReceiptIcon /> View Loan Proof
-                                </a>
-                            </div>
-                        )}
-                        {/* Allow both Debtor and Creditor to see the pending receipt */}
-                        {loan.pending_repayment?.receipt_url && (
-                             <div>
-                                <a href={loan.pending_repayment.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800 hover:underline">
-                                    <ReceiptIcon /> View Repayment Proof (Pending)
-                                </a>
-                            </div>
-                        )}
-                    </div>
-                )}
             </div>
- 
-            {!isRepaid && (
-                <div className={`px-4 py-2.5 rounded-b-lg border-t flex justify-end items-center space-x-3 ${isPendingInitialConfirmation || isPendingRepaymentConfirmation || isDebtorWaitingForApproval ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+
+            <div className="text-xs text-slate-500 space-y-1 mb-3">
+                <p>
+                    {isCreditor ? `Lending to: ${debtorDisplayName}` : `Borrowed from: ${creditorDisplayName}`}
+                    <span className="mx-2">•</span>
+                    Created: {creationDate}
+                </p>
+                
+                <div className="flex items-center gap-2">
+                    {deadlineDate && !isRepaid && (
+                        <span>
+                            Deadline: <strong className="text-slate-700">{deadlineDate.toLocaleDateString()}</strong>
+                            <DeadlineNotification deadline={deadlineDate} outstanding={outstanding} />
+                        </span>
+                    )}
                     
-                    {/* 1. Initial Loan Acceptance (Borrower) */}
+                    {(loan.attachment_url || loan.pending_repayment?.receipt_url) && (
+                        <>
+                            <span className="text-slate-300">|</span>
+                            {loan.attachment_url && (
+                                <a href={loan.attachment_url} target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-600 hover:underline">
+                                    View Loan Receipt
+                                </a>
+                            )}
+                            {loan.pending_repayment?.receipt_url && (
+                                <a href={loan.pending_repayment.receipt_url} target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-600 hover:underline ml-2">
+                                    View Payment Proof
+                                </a>
+                            )}
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {!isRepaid && (
+                <div className={`pt-3 border-t ${isActionRequired ? 'border-amber-200' : 'border-slate-100'} flex justify-end gap-2`}>
+                    
                     {isPendingInitialConfirmation && (
-                        <button onClick={() => setIsConfirmationModalOpen(true)} className="flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-amber-500 rounded-lg shadow-sm hover:bg-amber-600 transition-colors">
-                            <BellIcon /> Confirm Funds Receipt
+                        <button onClick={() => setIsConfirmationModalOpen(true)} className="px-3 py-1.5 text-xs font-bold text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors shadow-sm">
+                            Confirm Funds Received
                         </button>
                     )}
 
-                    {/* 2. Repayment Confirmation (Creditor) */}
                     {isPendingRepaymentConfirmation && (
-                        <button onClick={() => setIsRepayConfirmModalOpen(true)} className="flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-amber-500 rounded-lg shadow-sm hover:bg-amber-600 transition-colors">
-                            <BellIcon /> Confirm Repayment
+                        <button onClick={() => setIsRepayConfirmModalOpen(true)} className="px-3 py-1.5 text-xs font-bold text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors shadow-sm">
+                            Confirm Repayment
                         </button>
                     )}
 
-                    {/* 3. Waiting State (Borrower) */}
                     {isDebtorWaitingForApproval && (
-                        <span className="text-xs font-medium text-amber-700 flex items-center gap-1">
-                            <ClockIcon /> Waiting for lender to accept...
+                        <span className="px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-100 rounded">
+                            Waiting for lender approval...
                         </span>
                     )}
 
-                    {/* 4. Normal Actions */}
                     {!isPendingInitialConfirmation && !isPendingRepaymentConfirmation && !isDebtorWaitingForApproval && (
                         <>
                             {isBorrower && outstanding > 0 && (
-                                <button onClick={() => setIsRepaymentModalOpen(true)} className="secondary-btn-sm text-xs">Make Repayment</button>
+                                <button onClick={() => setIsRepaymentModalOpen(true)} className="px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors">
+                                    Make Repayment
+                                </button>
                             )}
                             {isCreditor && outstanding > 0 && loan.status === 'outstanding' && (
-                                <button onClick={() => setIsRecordRepaymentModalOpen(true)} className="primary-btn-sm text-xs">Record Repayment</button>
+                                <button onClick={() => setIsRecordRepaymentModalOpen(true)} className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors shadow-sm">
+                                    Record Repayment
+                                </button>
                             )}
                         </>
                     )}
@@ -204,44 +256,28 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: any; onRepaymentSuccess:
     );
 };
 
-const ChevronDownIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-);
-
-interface CollapsibleSectionProps {
-    title: string;
-    color: string;
-    count: number;
-    isOpen: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-}
-
-const CollapsibleSection = ({ title, color, count, isOpen, onClick, children }: CollapsibleSectionProps) => (
-    <div className="border border-slate-200 rounded-lg overflow-hidden transition-shadow hover:shadow-sm">
-        <button onClick={onClick} className="w-full flex justify-between items-center p-4 bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" aria-expanded={isOpen}>
-            <div className="flex items-center gap-3">
-                <h4 className={`font-bold text-lg ${color}`}>{title}</h4>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${color.replace('text', 'bg').replace('-700', '-100')} ${color.replace('text', 'text').replace('-700', '-800')}`}>{count}</span>
-            </div>
-            <ChevronDownIcon className={`text-gray-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-        </button>
-        {isOpen && <div className="p-4 border-t border-slate-200 bg-white"><div className="space-y-3">{children}</div></div>}
-    </div>
-);
-
+// --- MAIN WIDGET ---
 export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackingWidgetProps) {
     const { user } = useContext(AppContext);
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
     const [activeTab, setActiveTab] = useState<'outstanding' | 'history'>('outstanding');
-    const [categorizedLoans, setCategorizedLoans] = useState<{ actionRequired: any[]; lent: any[]; borrowed: any[]; repaid: any[]; }>({ actionRequired: [], lent: [], borrowed: [], repaid: [] });
+    const [openSection, setOpenSection] = useState<string | null>('actionRequired');
+
+    // Typed State for Categories
+    const [categorizedLoans, setCategorizedLoans] = useState<{
+        actionRequired: Loan[];
+        lent: Loan[];
+        borrowed: Loan[];
+        repaid: Loan[];
+    }>({ actionRequired: [], lent: [], borrowed: [], repaid: [] });
+    
+    // Typed State for Error (String or Null)
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [openSection, setOpenSection] = useState<'actionRequired' | 'lent' | 'borrowed' | null>('actionRequired');
 
-    const handleToggleSection = (section: 'actionRequired' | 'lent' | 'borrowed') => {
-        setOpenSection(prevOpenSection => (prevOpenSection === section ? null : section));
+    const handleToggleSection = (section: string) => {
+        setOpenSection(prev => (prev === section ? null : section));
     };
 
     const getLoans = useCallback(async () => {
@@ -252,52 +288,48 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
             const response = await fetch(`${API_URL}/loans?user_id=${user.uid}`);
             if (!response.ok) throw new Error("Failed to fetch loans");
             
-            const rawLoans = await response.json();
+            const rawLoans: any[] = await response.json();
             let filteredLoans = rawLoans;
             if (family && family.id) {
-                filteredLoans = rawLoans.filter((l: any) => l.family_id === family.id);
+                filteredLoans = rawLoans.filter((l) => l.family_id === family.id);
             }
 
-            const allLoans = filteredLoans.map((l: any) => ({
+            // Hydrate Objects and Map to Loan Interface
+            const allLoans: Loan[] = filteredLoans.map((l) => ({
                 ...l,
                 id: l._id, 
                 created_at: l.created_at ? { toDate: () => new Date(l.created_at), toMillis: () => new Date(l.created_at).getTime() } : { toDate: () => new Date(), toMillis: () => Date.now() },
                 deadline: l.deadline ? { toDate: () => new Date(l.deadline) } : null,
-                repayment_receipts: l.repayment_receipts?.map((r: any) => ({
-                    ...r,
-                    recorded_at: { toDate: () => new Date(r.recorded_at) }
-                }))
+                repayment_receipts: l.repayment_receipts?.map((r: any) => ({ ...r, recorded_at: { toDate: () => new Date(r.recorded_at) } }))
             }));
 
-            if (allLoans.length === 0) { 
-                setCategorizedLoans({ actionRequired: [], lent: [], borrowed: [], repaid: [] }); 
-                setLoading(false); 
-                return; 
-            }
-
+            // Fetch Users
             const userIds = new Set<string>();
-            allLoans.forEach((loan: any) => { 
+            allLoans.forEach((loan) => { 
                 if (loan.creditor_id) userIds.add(loan.creditor_id); 
                 if (loan.debtor_id) userIds.add(loan.debtor_id); 
             });
             
-            const usersMap: { [key: string]: any } = {};
+            const usersMap: Record<string, UserProfile> = {};
             if (userIds.size > 0) { 
                 const usersQuery = query(collection(db, "users"), where(documentId(), "in", [...userIds])); 
                 const usersSnapshot = await getDocs(usersQuery); 
-                usersSnapshot.forEach(doc => { usersMap[doc.id] = { id: doc.id, ...doc.data() }; }); 
+                usersSnapshot.forEach(doc => { usersMap[doc.id] = { id: doc.id, full_name: "Unknown", ...doc.data() } as UserProfile; }); 
             }
             
             const enrichedLoans = allLoans
-                .map((loan: any) => ({ 
+                .map((loan) => ({ 
                     ...loan, 
                     creditor: usersMap[loan.creditor_id] || { id: 'unknown', full_name: "Unknown" }, 
-                    debtor: loan.debtor_id ? usersMap[loan.debtor_id] : null 
+                    debtor: loan.debtor_id ? usersMap[loan.debtor_id] : undefined 
                 }))
-                .sort((a: any, b: any) => b.created_at.toMillis() - a.created_at.toMillis());
+                .sort((a, b) => b.created_at.toMillis() - a.created_at.toMillis());
 
-            // --- CATEGORIZATION LOGIC ---
-            const actionRequired: any[] = [], lent: any[] = [], borrowed: any[] = [], repaid: any[] = [];
+            // Categorization
+            const actionRequired: Loan[] = [];
+            const lent: Loan[] = [];
+            const borrowed: Loan[] = [];
+            const repaid: Loan[] = [];
             
             for (const loan of enrichedLoans) {
                 if (loan.status === 'paid' || loan.status === 'repaid') { 
@@ -307,18 +339,11 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
                 const isCreditor = user.uid === loan.creditor_id;
                 const isBorrower = user.uid === loan.debtor_id;
                 
-                // 1. Initial Loan needs confirmation (Debtor must confirm)
-                const isPendingInitialConfirmation = isBorrower && loan.status === 'pending_confirmation';
-                
-                // 2. Repayment needs confirmation (Creditor must confirm)
-                const isPendingRepaymentConfirmation = isCreditor && !!loan.pending_repayment;
-                
-                if (isPendingInitialConfirmation || isPendingRepaymentConfirmation) { 
+                if ((isBorrower && loan.status === 'pending_confirmation') || (isCreditor && !!loan.pending_repayment)) { 
                     actionRequired.push(loan); 
                 } else if (isCreditor) { 
                     lent.push(loan); 
                 } else if (isBorrower) { 
-                    // Note: Debtor's pending repayment stays here, but UI changes to "Waiting"
                     borrowed.push(loan); 
                 }
             }
@@ -340,58 +365,67 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
     };
 
     if (loading) return <LoanListSkeleton />;
-    if (error) return <p className="error text-center py-4">{error}</p>;
+    if (error) return <p className="text-center text-rose-500 py-6 bg-rose-50 rounded-lg border border-rose-100">{error}</p>;
     
     const { actionRequired, lent, borrowed, repaid } = categorizedLoans;
     const hasNoOutstandingLoans = actionRequired.length === 0 && lent.length === 0 && borrowed.length === 0;
 
     return (
-        <div>
-            <div className="border-b border-gray-200 mb-6">
-                <nav className="-mb-px flex space-x-6">
-                    <button onClick={() => setActiveTab('outstanding')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'outstanding' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>Outstanding</button>
-                    <button onClick={() => setActiveTab('history')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'history' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>History</button>
-                </nav>
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <div className="flex border-b border-slate-200">
+                <button 
+                    onClick={() => setActiveTab('outstanding')} 
+                    className={`flex-1 py-3 text-sm font-bold text-center transition-colors ${activeTab === 'outstanding' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Outstanding Loans
+                </button>
+                <button 
+                    onClick={() => setActiveTab('history')} 
+                    className={`flex-1 py-3 text-sm font-bold text-center transition-colors ${activeTab === 'history' ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                    Loan History
+                </button>
             </div>
 
-            {activeTab === 'outstanding' && (
-                <div>
-                    {hasNoOutstandingLoans ? <p className="text-center italic text-gray-500 py-4 px-3">You have no outstanding loans.</p> : (
-                        <div className="space-y-3">
-                            {actionRequired.length > 0 && (
-                                <CollapsibleSection title="Action Required" color="text-amber-700" count={actionRequired.length} isOpen={openSection === 'actionRequired'} onClick={() => handleToggleSection('actionRequired')}>
-                                    {actionRequired.map(loan => <LoanItem key={loan.id} loan={loan} onRepaymentSuccess={handleRepaymentSuccess} />)}
-                                </CollapsibleSection>
-                            )}
-                            {lent.length > 0 && (
-                                <CollapsibleSection title="Money You've Lent" color="text-blue-700" count={lent.length} isOpen={openSection === 'lent'} onClick={() => handleToggleSection('lent')}>
-                                    {lent.map(loan => <LoanItem key={loan.id} loan={loan} onRepaymentSuccess={handleRepaymentSuccess} />)}
-                                </CollapsibleSection>
-                            )}
-                            {borrowed.length > 0 && (
-                                <CollapsibleSection title="Money You've Borrowed" color="text-red-700" count={borrowed.length} isOpen={openSection === 'borrowed'} onClick={() => handleToggleSection('borrowed')}>
-                                    {borrowed.map(loan => <LoanItem key={loan.id} loan={loan} onRepaymentSuccess={handleRepaymentSuccess} />)}
-                                </CollapsibleSection>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-            {activeTab === 'history' && (
-                <div>
-                    {repaid.length === 0 ? <p className="text-center italic text-gray-500 py-4 px-3">You have no repaid loans in your history.</p> : (
-                        <section>
-                            <div className="flex items-center gap-3 mb-2">
-                                <h4 className="font-bold text-lg text-gray-700">Completed Loans</h4>
-                                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-800">{repaid.length}</span>
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+                {activeTab === 'outstanding' && (
+                    <div>
+                        {hasNoOutstandingLoans ? (
+                            <p className="text-center text-slate-400 italic py-6">You have no outstanding loans.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {actionRequired.length > 0 && (
+                                    <CollapsibleSection title="Action Required" colorClass="text-amber-700" count={actionRequired.length} isOpen={openSection === 'actionRequired'} onClick={() => handleToggleSection('actionRequired')}>
+                                        {actionRequired.map(loan => <LoanItem key={loan.id} loan={loan} onRepaymentSuccess={handleRepaymentSuccess} />)}
+                                    </CollapsibleSection>
+                                )}
+                                {lent.length > 0 && (
+                                    <CollapsibleSection title="Money You've Lent" colorClass="text-indigo-700" count={lent.length} isOpen={openSection === 'lent'} onClick={() => handleToggleSection('lent')}>
+                                        {lent.map(loan => <LoanItem key={loan.id} loan={loan} onRepaymentSuccess={handleRepaymentSuccess} />)}
+                                    </CollapsibleSection>
+                                )}
+                                {borrowed.length > 0 && (
+                                    <CollapsibleSection title="Money You've Borrowed" colorClass="text-rose-700" count={borrowed.length} isOpen={openSection === 'borrowed'} onClick={() => handleToggleSection('borrowed')}>
+                                        {borrowed.map(loan => <LoanItem key={loan.id} loan={loan} onRepaymentSuccess={handleRepaymentSuccess} />)}
+                                    </CollapsibleSection>
+                                )}
                             </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'history' && (
+                    <div>
+                        {repaid.length === 0 ? (
+                            <p className="text-center text-slate-400 italic py-6">You have no repaid loans in your history.</p>
+                        ) : (
                             <div className="space-y-3">
                                 {repaid.map(loan => <LoanItem key={loan.id} loan={loan} onRepaymentSuccess={handleRepaymentSuccess} />)}
                             </div>
-                        </section>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

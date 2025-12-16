@@ -41,8 +41,6 @@ async function connectToDatabase() {
 
     if (!cached.promise) {
         const opts = {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
             bufferCommands: false, // Important: Fail fast if DB is down
             serverSelectionTimeoutMS: 5000, // Don't hang forever
         };
@@ -87,6 +85,7 @@ const User = mongoose.models.User || mongoose.model('User', UserSchema);
 const TransactionSchema = new mongoose.Schema({
     user_id: String,
     family_id: { type: String, default: null },
+    company_id: { type: String, default: null }, 
     description: String,
     amount: Number,
     type: String,
@@ -98,6 +97,7 @@ const Transaction = mongoose.models.Transaction || mongoose.model('Transaction',
 const GoalSchema = new mongoose.Schema({
     user_id: { type: String, required: true },
     family_id: { type: String, default: null },
+    company_id: { type: String, default: null },
     name: { type: String, required: true },
     target_amount: { type: Number, required: true },
     target_date: { type: Date, required: true },
@@ -137,6 +137,15 @@ const FamilySchema = new mongoose.Schema({
 });
 const Family = mongoose.models.Family || mongoose.model('Family', FamilySchema);
 
+const CompanySchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    owner_id: { type: String, required: true },
+    member_ids: [String],
+    created_at: { type: Date, default: Date.now }
+});
+// This line defines the "Company" variable that was missing
+const Company = mongoose.models.Company || mongoose.model('Company', CompanySchema);
+
 
 // ==========================================
 // 6. ROUTES (The Logic)
@@ -149,15 +158,25 @@ app.get('/', (req, res) => {
 // --- TRANSACTIONS ---
 app.get('/api/transactions', async (req, res) => {
     try {
-        const { user_id, family_id, startDate } = req.query;
+        const { user_id, family_id, company_id, startDate } = req.query;
         let query = {};
 
-        const hasFamily = family_id && family_id !== 'undefined' && family_id !== 'null';
-        const hasUser = user_id && user_id !== 'undefined' && user_id !== 'null';
-
-        if (hasFamily) query.family_id = family_id;
-        else if (hasUser) query.user_id = user_id;
-        else return res.status(400).json({ error: "User ID or Family ID required" });
+        // STRICT FILTERING LOGIC
+        if (company_id && company_id !== 'undefined') {
+            query.company_id = company_id;
+        } 
+        else if (family_id && family_id !== 'undefined') {
+            query.family_id = family_id;
+        } 
+        else if (user_id) {
+            // PERSONAL REALM: Must NOT have family_id OR company_id
+            query.user_id = user_id;
+            query.family_id = null;
+            query.company_id = null; 
+        } 
+        else {
+            return res.status(400).json({ error: "ID required" });
+        }
 
         if (startDate && startDate !== 'undefined') {
             const dateObj = new Date(startDate);
@@ -167,7 +186,6 @@ app.get('/api/transactions', async (req, res) => {
         const transactions = await Transaction.find(query).sort({ created_at: -1 });
         res.json(transactions);
     } catch (err) {
-        console.error("GET /transactions Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -227,19 +245,26 @@ app.patch('/api/loans/:id', async (req, res) => {
 // --- GOALS ---
 app.get('/api/goals', async (req, res) => {
     try {
-        const { user_id, family_id } = req.query;
+        const { user_id, family_id, company_id } = req.query;
         let query = {};
-        if (family_id && family_id !== 'undefined' && family_id !== 'null') {
+        
+        if (company_id && company_id !== 'undefined') {
+            query = { company_id: company_id };
+        } 
+        else if (family_id && family_id !== 'undefined') {
             query = { family_id: family_id };
-        } else if (user_id && user_id !== 'undefined') {
-            query = { user_id: user_id, family_id: null };
-        } else {
-            return res.status(400).json({ error: "user_id or family_id required" });
+        } 
+        else if (user_id) {
+            // PERSONAL REALM: Strict Check
+            query = { user_id: user_id, family_id: null, company_id: null };
+        } 
+        else {
+            return res.status(400).json({ error: "ID required" });
         }
+
         const goals = await Goal.find(query).sort({ created_at: -1 });
         res.json(goals);
     } catch (err) {
-        console.error("GET /goals Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -355,6 +380,20 @@ app.post('/api/families/:id/members', async (req, res) => {
     }
 });
 
+
+// 3. Get User (For Member Lists)
+app.get('/api/users', async (req, res) => {
+    try {
+        const { ids } = req.query;
+        if (!ids) return res.status(400).json({ error: "IDs required" });
+        const idList = ids.split(',');
+        const users = await User.find({ _id: { $in: idList } });
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- USERS ---
 app.get('/api/users', async (req, res) => {
     try {
@@ -365,6 +404,88 @@ app.get('/api/users', async (req, res) => {
         res.json(users);
     } catch (err) {
         console.error("GET /users Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- NEW COMPANY ROUTES ---
+
+// 1. Get Company by ID (The one fixing your error)
+app.get('/api/companies/:id', async (req, res) => {
+    try {
+        // Allow searching by _id OR by owner_id (user uid)
+        // This handles the case where frontend passes user.uid as company.id
+        const company = await Company.findOne({ 
+            $or: [
+                { _id: (mongoose.Types.ObjectId.isValid(req.params.id) ? req.params.id : null) },
+                { owner_id: req.params.id }
+            ]
+        });
+
+        if (!company) return res.status(404).json({ error: "Company not found" });
+        res.json(company);
+    } catch (err) {
+        console.error("GET /companies/:id Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Create Company
+app.get('/api/companies/:id', async (req, res) => {
+    try {
+        const companyIdentifier = req.params.id;
+        
+        // --- THE FIX: Smart ID Logic ---
+        let query;
+        if (mongoose.Types.ObjectId.isValid(companyIdentifier)) {
+            query = { $or: [{ _id: companyIdentifier }, { owner_id: companyIdentifier }] };
+        } else {
+            query = { owner_id: companyIdentifier };
+        }
+        // -------------------------------
+
+        const company = await Company.findOne(query);
+
+        if (!company) return res.status(404).json({ error: "Company not found" });
+        res.json(company);
+    } catch (err) {
+        console.error("GET /companies/:id Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/companies/:id/members', async (req, res) => {
+    try {
+        const { newMemberId } = req.body;
+        const companyIdentifier = req.params.id; // This could be MongoID OR Firebase UID
+
+        if (!newMemberId) return res.status(400).json({ error: "Member ID required" });
+
+        // --- THE FIX: Smart ID Logic ---
+        let query;
+        if (mongoose.Types.ObjectId.isValid(companyIdentifier)) {
+            // It looks like a Mongo ID, so check both fields
+            query = { $or: [{ _id: companyIdentifier }, { owner_id: companyIdentifier }] };
+        } else {
+            // It is definitely NOT a Mongo ID (it's a Firebase UID), so only check owner_id
+            query = { owner_id: companyIdentifier };
+        }
+        // -------------------------------
+
+        const company = await Company.findOne(query);
+
+        if (!company) return res.status(404).json({ error: "Company not found" });
+
+        if (company.member_ids.includes(newMemberId)) {
+            return res.status(409).json({ error: "User is already an employee" });
+        }
+
+        company.member_ids.push(newMemberId);
+        await company.save();
+        
+        res.json(company);
+    } catch (err) {
+        console.error("POST /companies/members Error:", err);
         res.status(500).json({ error: err.message });
     }
 });

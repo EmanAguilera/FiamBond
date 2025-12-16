@@ -1,19 +1,21 @@
 version: '3.8'
 
 services:
-  # This is your Node.js API service
   api:
     build: .
     ports:
       - "3000:3000"
-    environment:
-      - MONGO_URI=mongodb://db:27017/fiambondv3
+    # CHANGE THIS SECTION:
+    env_file:
+      - .env 
+    # This automatically loads MONGO_URI and PORT from your file
+    
     volumes:
       - .:/usr/src/app
+      - /usr/src/app/node_modules
     depends_on:
       - db
 
-  # This is your MongoDB database service
   db:
     image: mongo:latest
     ports:
