@@ -2,15 +2,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
-// 1. LOAD ENVIRONMENT VARIABLES (For Localhost)
-// This allows your laptop to read .env. Vercel ignores this if file is missing.
+// 1. LOAD ENVIRONMENT VARIABLES
 require('dotenv').config(); 
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 2. CORS CONFIGURATION (The "Open Door" Policy)
-// This allows your Frontend to talk to this Backend
+// 2. CORS CONFIGURATION
 app.use(cors({
     origin: true, 
     credentials: true,
@@ -18,12 +16,10 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
 
-app.options(/.*/, cors()); // Enable pre-flight across-the-board
+app.options(/.*/, cors()); 
 app.use(express.json());
 
-// 3. DATABASE CONNECTION (The "Serverless Brain")
-// This section is special. It keeps the database connection open 
-// so Vercel doesn't crash/timeout on every request.
+// 3. DATABASE CONNECTION (Vercel Optimized)
 const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/fiambond_v3';
 
 if (!process.env.MONGO_URI) {
@@ -41,8 +37,8 @@ async function connectToDatabase() {
 
     if (!cached.promise) {
         const opts = {
-            bufferCommands: false, // Important: Fail fast if DB is down
-            serverSelectionTimeoutMS: 5000, // Don't hang forever
+            bufferCommands: false, 
+            serverSelectionTimeoutMS: 5000,
         };
 
         cached.promise = mongoose.connect(mongoURI, opts).then((mongoose) => {
@@ -62,25 +58,53 @@ async function connectToDatabase() {
     return cached.conn;
 }
 
-// 4. MIDDLEWARE (The Guard)
-// This stops any request from processing until the Database is 100% ready.
+// 4. MIDDLEWARE
 app.use(async (req, res, next) => {
     try {
         await connectToDatabase();
         next();
     } catch (error) {
         console.error("Database Middleware Error:", error);
-        res.status(500).json({ error: "Database connection failed. Check server logs." });
+        res.status(500).json({ error: "Database connection failed." });
     }
 });
 
 // ==========================================
-// 5. SCHEMAS (The Blueprints)
-// We use "mongoose.models.X || ..." to prevent "OverwriteModelError" in Vercel
+// 5. SCHEMAS (Updated for Revenue Ledger)
 // ==========================================
 
-const UserSchema = new mongoose.Schema({ _id: String, full_name: String, email: String, family_id: String }, { _id: false });
+const UserSchema = new mongoose.Schema({ 
+    _id: String, 
+    full_name: String, 
+    first_name: String,
+    last_name: String,
+    email: String, 
+    role: { type: String, default: 'user' },
+    // Subscription States
+    is_premium: { type: Boolean, default: false },
+    subscription_status: { type: String, default: 'inactive' },
+    active_company_premium_id: { type: String, default: "" },
+    is_family_premium: { type: Boolean, default: false },
+    family_subscription_status: { type: String, default: 'inactive' },
+    active_family_premium_id: { type: String, default: "" },
+    family_id: String,
+    created_at: { type: Date, default: Date.now }
+}, { _id: false });
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
+
+// NEW: Premiums Schema (The Ledger)
+const PremiumSchema = new mongoose.Schema({
+    user_id: { type: String, required: true },
+    access_type: { type: String, enum: ['company', 'family'], required: true },
+    amount: { type: Number, required: true },
+    plan_cycle: { type: String, default: 'monthly' },
+    status: { type: String, default: 'active' },
+    granted_at: { type: Date, default: Date.now },
+    expires_at: { type: Date },
+    payment_method: { type: String, default: 'Admin Manual' },
+    payment_ref: { type: String, default: 'N/A' }
+});
+const Premium = mongoose.models.Premium || mongoose.model('Premium', PremiumSchema);
 
 const TransactionSchema = new mongoose.Schema({
     user_id: String,
@@ -143,16 +167,60 @@ const CompanySchema = new mongoose.Schema({
     member_ids: [String],
     created_at: { type: Date, default: Date.now }
 });
-// This line defines the "Company" variable that was missing
 const Company = mongoose.models.Company || mongoose.model('Company', CompanySchema);
 
 
 // ==========================================
-// 6. ROUTES (The Logic)
+// 6. ROUTES
 // ==========================================
 
 app.get('/', (req, res) => {
-    res.status(200).send(`FiamBond V3 API is Online 🚀 (${new Date().toISOString()})`);
+    res.status(200).send(`FiamBond V3 API Online 🚀`);
+});
+
+// --- PREMIUMS (The fix for the Ledger) ---
+app.get('/api/premiums', async (req, res) => {
+    try {
+        const premiums = await Premium.find().sort({ granted_at: -1 });
+        res.json(premiums);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Admin Toggle logic for MongoDB (Similar to Firestore Batch)
+app.post('/api/admin/toggle-premium', async (req, res) => {
+    try {
+        const { userId, action, type, amount, plan, paymentRef } = req.body;
+        
+        if (action === 'approve' || action === 'grant') {
+            const newPremium = new Premium({
+                user_id: userId,
+                access_type: type,
+                amount: amount,
+                plan_cycle: plan || 'monthly',
+                payment_ref: paymentRef || 'ADMIN_GRANTED',
+                granted_at: new Date(),
+                expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            });
+            await newPremium.save();
+
+            const userUpdate = type === 'company' ? 
+                { is_premium: true, subscription_status: 'active', active_company_premium_id: newPremium._id } :
+                { is_family_premium: true, family_subscription_status: 'active', active_family_premium_id: newPremium._id };
+            
+            await User.findByIdAndUpdate(userId, userUpdate);
+        } else {
+            const revokeUpdate = type === 'company' ? 
+                { is_premium: false, subscription_status: 'inactive', active_company_premium_id: "" } :
+                { is_family_premium: false, family_subscription_status: 'inactive', active_family_premium_id: "" };
+            
+            await User.findByIdAndUpdate(userId, revokeUpdate);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- TRANSACTIONS ---
@@ -160,29 +228,15 @@ app.get('/api/transactions', async (req, res) => {
     try {
         const { user_id, family_id, company_id, startDate } = req.query;
         let query = {};
-
-        // STRICT FILTERING LOGIC
-        if (company_id && company_id !== 'undefined') {
-            query.company_id = company_id;
-        } 
-        else if (family_id && family_id !== 'undefined') {
-            query.family_id = family_id;
-        } 
-        else if (user_id) {
-            // PERSONAL REALM: Must NOT have family_id OR company_id
-            query.user_id = user_id;
-            query.family_id = null;
-            query.company_id = null; 
-        } 
-        else {
-            return res.status(400).json({ error: "ID required" });
-        }
+        if (company_id && company_id !== 'undefined') query.company_id = company_id;
+        else if (family_id && family_id !== 'undefined') query.family_id = family_id;
+        else if (user_id) query = { user_id, family_id: null, company_id: null }; 
+        else return res.status(400).json({ error: "ID required" });
 
         if (startDate && startDate !== 'undefined') {
             const dateObj = new Date(startDate);
             if (!isNaN(dateObj.getTime())) query.created_at = { $gte: dateObj };
         }
-
         const transactions = await Transaction.find(query).sort({ created_at: -1 });
         res.json(transactions);
     } catch (err) {
@@ -196,7 +250,6 @@ app.post('/api/transactions', async (req, res) => {
         const savedTx = await newTransaction.save();
         res.json(savedTx);
     } catch (err) {
-        console.error("POST /transactions Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -216,7 +269,6 @@ app.get('/api/loans', async (req, res) => {
         const loans = await Loan.find(query).sort({ created_at: -1 });
         res.json(loans);
     } catch (err) {
-        console.error("GET /loans Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -227,7 +279,6 @@ app.post('/api/loans', async (req, res) => {
         const savedLoan = await newLoan.save();
         res.status(201).json(savedLoan);
     } catch (err) {
-        console.error("POST /loans Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -237,7 +288,6 @@ app.patch('/api/loans/:id', async (req, res) => {
         const updatedLoan = await Loan.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json(updatedLoan);
     } catch (err) {
-        console.error("PATCH /loans Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -247,20 +297,10 @@ app.get('/api/goals', async (req, res) => {
     try {
         const { user_id, family_id, company_id } = req.query;
         let query = {};
-        
-        if (company_id && company_id !== 'undefined') {
-            query = { company_id: company_id };
-        } 
-        else if (family_id && family_id !== 'undefined') {
-            query = { family_id: family_id };
-        } 
-        else if (user_id) {
-            // PERSONAL REALM: Strict Check
-            query = { user_id: user_id, family_id: null, company_id: null };
-        } 
-        else {
-            return res.status(400).json({ error: "ID required" });
-        }
+        if (company_id && company_id !== 'undefined') query = { company_id };
+        else if (family_id && family_id !== 'undefined') query = { family_id };
+        else if (user_id) query = { user_id, family_id: null, company_id: null };
+        else return res.status(400).json({ error: "ID required" });
 
         const goals = await Goal.find(query).sort({ created_at: -1 });
         res.json(goals);
@@ -275,7 +315,6 @@ app.post('/api/goals', async (req, res) => {
         const savedGoal = await newGoal.save();
         res.status(201).json(savedGoal);
     } catch (err) {
-        console.error("POST /goals Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -285,7 +324,6 @@ app.patch('/api/goals/:id', async (req, res) => {
         const updatedGoal = await Goal.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json(updatedGoal);
     } catch (err) {
-        console.error("PATCH /goals Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -295,7 +333,6 @@ app.delete('/api/goals/:id', async (req, res) => {
         await Goal.findByIdAndDelete(req.params.id);
         res.json({ message: "Goal deleted" });
     } catch (err) {
-        console.error("DELETE /goals Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -308,19 +345,17 @@ app.get('/api/families', async (req, res) => {
         const families = await Family.find({ member_ids: user_id });
         res.json(families);
     } catch (err) {
-        console.error("GET /families Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
 app.get('/api/families/:id', async (req, res) => {
     try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ error: "Invalid Family ID format" });
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ error: "Invalid Family ID" });
         const family = await Family.findById(req.params.id);
         if (!family) return res.status(404).json({ error: "Family not found" });
         res.json(family);
     } catch (err) {
-        console.error("GET /families/:id Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -330,12 +365,10 @@ app.post('/api/families', async (req, res) => {
         const { family_name, owner_id, member_ids } = req.body;
         let finalMembers = member_ids || [];
         if (owner_id && !finalMembers.includes(owner_id)) finalMembers.push(owner_id);
-        
         const newFamily = new Family({ family_name, owner_id, member_ids: finalMembers });
         const savedFamily = await newFamily.save();
         res.status(201).json(savedFamily);
     } catch (err) {
-        console.error("POST /families Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -345,7 +378,6 @@ app.patch('/api/families/:id', async (req, res) => {
         const updatedFamily = await Family.findByIdAndUpdate(req.params.id, { family_name: req.body.family_name }, { new: true });
         res.json(updatedFamily);
     } catch (err) {
-        console.error("PATCH /families Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -355,7 +387,6 @@ app.delete('/api/families/:id', async (req, res) => {
         await Family.findByIdAndDelete(req.params.id);
         res.json({ message: "Family deleted" });
     } catch (err) {
-        console.error("DELETE /families Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -363,25 +394,33 @@ app.delete('/api/families/:id', async (req, res) => {
 app.post('/api/families/:id/members', async (req, res) => {
     try {
         const { newMemberId } = req.body;
-        const familyId = req.params.id;
-        if (!newMemberId) return res.status(400).json({ error: "Member ID required" });
-
-        const family = await Family.findById(familyId);
+        const family = await Family.findById(req.params.id);
         if (!family) return res.status(404).json({ error: "Family not found" });
-
-        if (family.member_ids.includes(newMemberId)) return res.status(409).json({ error: "User is already a member" });
-
+        if (family.member_ids.includes(newMemberId)) return res.status(409).json({ error: "Member already exists" });
         family.member_ids.push(newMemberId);
         await family.save();
         res.json(family);
     } catch (err) {
-        console.error("POST /families/members Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
 
-// 3. Get User (For Member Lists)
+// --- USERS (DUPLICATE PRESERVED) ---
+
+// Version 1
+app.get('/api/users', async (req, res) => {
+    try {
+        const { ids } = req.query;
+        if (!ids) return res.status(400).json({ error: "IDs required" });
+        const users = await User.find({ _id: { $in: ids.split(',') } });
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Version 2 (Matches your request)
 app.get('/api/users', async (req, res) => {
     try {
         const { ids } = req.query;
@@ -394,62 +433,47 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// --- USERS ---
-app.get('/api/users', async (req, res) => {
+// User Update route
+app.patch('/api/users/:id', async (req, res) => {
     try {
-        const { ids } = req.query;
-        if (!ids) return res.status(400).json({ error: "IDs required" });
-        const idList = ids.split(',');
-        const users = await User.find({ _id: { $in: idList } });
-        res.json(users);
+        const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json(user);
     } catch (err) {
-        console.error("GET /users Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- NEW COMPANY ROUTES ---
 
-// 1. Get Company by ID (The one fixing your error)
+// --- COMPANIES (DUPLICATES PRESERVED) ---
+
+// Logic 1
 app.get('/api/companies/:id', async (req, res) => {
     try {
-        // Allow searching by _id OR by owner_id (user uid)
-        // This handles the case where frontend passes user.uid as company.id
         const company = await Company.findOne({ 
             $or: [
                 { _id: (mongoose.Types.ObjectId.isValid(req.params.id) ? req.params.id : null) },
                 { owner_id: req.params.id }
             ]
         });
-
         if (!company) return res.status(404).json({ error: "Company not found" });
         res.json(company);
     } catch (err) {
-        console.error("GET /companies/:id Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// 2. Create Company
+// Logic 2 (Matches your provided logic)
 app.get('/api/companies/:id', async (req, res) => {
     try {
         const companyIdentifier = req.params.id;
-        
-        // --- THE FIX: Smart ID Logic ---
-        let query;
-        if (mongoose.Types.ObjectId.isValid(companyIdentifier)) {
-            query = { $or: [{ _id: companyIdentifier }, { owner_id: companyIdentifier }] };
-        } else {
-            query = { owner_id: companyIdentifier };
-        }
-        // -------------------------------
+        let query = mongoose.Types.ObjectId.isValid(companyIdentifier) 
+            ? { $or: [{ _id: companyIdentifier }, { owner_id: companyIdentifier }] }
+            : { owner_id: companyIdentifier };
 
         const company = await Company.findOne(query);
-
         if (!company) return res.status(404).json({ error: "Company not found" });
         res.json(company);
     } catch (err) {
-        console.error("GET /companies/:id Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -457,46 +481,30 @@ app.get('/api/companies/:id', async (req, res) => {
 app.post('/api/companies/:id/members', async (req, res) => {
     try {
         const { newMemberId } = req.body;
-        const companyIdentifier = req.params.id; // This could be MongoID OR Firebase UID
-
-        if (!newMemberId) return res.status(400).json({ error: "Member ID required" });
-
-        // --- THE FIX: Smart ID Logic ---
-        let query;
-        if (mongoose.Types.ObjectId.isValid(companyIdentifier)) {
-            // It looks like a Mongo ID, so check both fields
-            query = { $or: [{ _id: companyIdentifier }, { owner_id: companyIdentifier }] };
-        } else {
-            // It is definitely NOT a Mongo ID (it's a Firebase UID), so only check owner_id
-            query = { owner_id: companyIdentifier };
-        }
-        // -------------------------------
+        const companyIdentifier = req.params.id;
+        let query = mongoose.Types.ObjectId.isValid(companyIdentifier) 
+            ? { $or: [{ _id: companyIdentifier }, { owner_id: companyIdentifier }] }
+            : { owner_id: companyIdentifier };
 
         const company = await Company.findOne(query);
-
         if (!company) return res.status(404).json({ error: "Company not found" });
-
-        if (company.member_ids.includes(newMemberId)) {
-            return res.status(409).json({ error: "User is already an employee" });
-        }
+        if (company.member_ids.includes(newMemberId)) return res.status(409).json({ error: "Already an employee" });
 
         company.member_ids.push(newMemberId);
         await company.save();
-        
         res.json(company);
     } catch (err) {
-        console.error("POST /companies/members Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
 // ==========================================
-// 7. EXPORT (for Vercel) & LISTEN (for Local)
+// 7. EXPORT & LISTEN
 // ==========================================
 
 if (process.env.NODE_ENV !== 'production') {
     app.listen(port, () => {
-        console.log(`🚀 Server running locally on port ${port}`);
+        console.log(`🚀 Server running on port ${port}`);
     });
 }
 

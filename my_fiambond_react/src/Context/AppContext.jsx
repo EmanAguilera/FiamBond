@@ -2,73 +2,78 @@ import { createContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../config/firebase-config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore"; // Import onSnapshot
+import { doc, onSnapshot, getDoc } from "firebase/firestore";
 
-// Export the context itself for components that need to consume it.
 export const AppContext = createContext();
 
-// Export the provider component as the default export.
 export default function AppProvider({ children }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Store detailed premium info (start/end dates)
+  const [premiumDetails, setPremiumDetails] = useState({
+    company: null,
+    family: null
+  });
 
   useEffect(() => {
     let unsubscribeFromFirestore = null;
 
     const unsubscribeFromAuth = onAuthStateChanged(auth, (currentUser) => {
-      // If a user is logged in
       if (currentUser) {
         const userDocRef = doc(db, "users", currentUser.uid);
 
-        // Start listening for real-time updates to the user's document
-        unsubscribeFromFirestore = onSnapshot(userDocRef, (docSnap) => {
+        unsubscribeFromFirestore = onSnapshot(userDocRef, async (docSnap) => {
           if (docSnap.exists()) {
-            // If the document exists, combine auth data with Firestore data
+            const userData = docSnap.data();
+            
+            // --- SYNC PREMIUM DETAILS ---
+            let companyInfo = null;
+            let familyInfo = null;
+
+            // Fetch Company Premium Dates if ID exists
+            if (userData.active_company_premium_id) {
+                const compSnap = await getDoc(doc(db, "premiums", userData.active_company_premium_id));
+                if (compSnap.exists()) companyInfo = compSnap.data();
+            }
+
+            // Fetch Family Premium Dates if ID exists
+            if (userData.active_family_premium_id) {
+                const famSnap = await getDoc(doc(db, "premiums", userData.active_family_premium_id));
+                if (famSnap.exists()) familyInfo = famSnap.data();
+            }
+
+            setPremiumDetails({ company: companyInfo, family: familyInfo });
+
             setUser({
               uid: currentUser.uid,
               email: currentUser.email,
               emailVerified: currentUser.emailVerified,
-              ...docSnap.data() // This includes full_name, etc.
+              ...userData
             });
           } else {
-            // If the document doesn't exist yet (e.g., right after signup),
-            // set the user with only the basic auth info.
-            // The listener will automatically update this when the doc is created.
-            setUser({
-              uid: currentUser.uid,
-              email: currentUser.email,
-              emailVerified: currentUser.emailVerified
-            });
+            setUser({ uid: currentUser.uid, email: currentUser.email, emailVerified: currentUser.emailVerified });
           }
           setLoading(false);
         });
       } else {
-        // User is logged out
         setUser(null);
+        setPremiumDetails({ company: null, family: null });
         setLoading(false);
-        // If there was a Firestore listener, clean it up
-        if (unsubscribeFromFirestore) {
-          unsubscribeFromFirestore();
-        }
+        if (unsubscribeFromFirestore) unsubscribeFromFirestore();
       }
     });
 
-    // Main cleanup function: Unsubscribe from both auth and Firestore listeners
-    // when the AppProvider component unmounts.
     return () => {
       unsubscribeFromAuth();
-      if (unsubscribeFromFirestore) {
-        unsubscribeFromFirestore();
-      }
+      if (unsubscribeFromFirestore) unsubscribeFromFirestore();
     };
-  }, []); // Empty dependency array ensures this effect runs only once on mount
+  }, []);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // The onAuthStateChanged listener above will automatically handle setting
-      // the user to null. The navigation below ensures they are redirected.
       navigate("/login");
     } catch (error) {
       console.error("Failed to log out", error);
@@ -80,6 +85,7 @@ export default function AppProvider({ children }) {
     setUser,
     loading,
     handleLogout,
+    premiumDetails // Global access to dates
   };
 
   return (

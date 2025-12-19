@@ -1,11 +1,11 @@
 import { useState, lazy, Suspense, useContext, useCallback, useEffect } from 'react';
 import { AppContext } from '../../Context/AppContext.jsx';
-
-// --- FIREBASE IMPORTS ---
 import { db } from '../../config/firebase-config.js';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
+import { Link } from 'react-router-dom'; // Ensure Link is imported
 
 // --- WIDGET IMPORTS ---
+// NOTE: These are lazy-loaded, their actual code is in separate files.
 const Modal = lazy(() => import('../../Components/Modal.jsx'));
 const FamilyReportChartWidget = lazy(() => import('../../Components/Family/Analytics/FamilyReportChartWidget.jsx'));
 const LoanTrackingWidget = lazy(() => import('../../Components/Personal/Loan/LoanTrackingWidget'));
@@ -14,7 +14,7 @@ const CreateLoanWidget = lazy(() => import('../../Components/Personal/Loan/Setup
 const CreateFamilyTransactionWidget = lazy(() => import('../../Components/Family/Finance/CreateFamilyTransactionWidget'));
 const CreateFamilyGoalWidget = lazy(() => import('../../Components/Family/Goal/CreateFamilyGoalWidget'));
 const FamilyTransactionsWidget = lazy(() => import('../../Components/Family/Finance/FamilyTransactionsWidget'));
-const FamilyMembersView = lazy(() => import('../../Components/Family/Members/FamilyMembersView.jsx'));
+const ManageMembersWidget = lazy(() => import('../../Components/Family/Members/ManageMembersWidget.jsx')); 
 
 // --- ICONS ---
 const Icons = {

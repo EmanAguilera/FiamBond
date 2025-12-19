@@ -14,7 +14,14 @@
     "Fiam",
     "pendings",
     "vITE",
-    "Millis"
+    "Millis",
+    "exceljs",
+    "argb",
+    "openxmlformats",
+    "officedocument",
+    "spreadsheetml",
+    "fiambond",
+    "tesseract"
    
   ],
   "flagWords": [],

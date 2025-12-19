@@ -3,48 +3,53 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver'; 
 
 export default function SubscriptionReportWidget({ transactions }) {
-    // transactions here will be the list of user payments
-    const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
-    const [filterMonth, setFilterMonth] = useState(new Date().getMonth().toString());
+    // --- STATE: DATE RANGE DEFAULTS ---
+    // Default Start: First day of current month
+    const defaultStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    // Default End: Today
+    const defaultEnd = new Date().toISOString().split('T')[0];
 
-    const months = [
-        { val: 'all', label: 'All Months' },
-        { val: '0', label: 'January' }, { val: '1', label: 'February' }, { val: '2', label: 'March' },
-        { val: '3', label: 'April' }, { val: '4', label: 'May' }, { val: '5', label: 'June' },
-        { val: '6', label: 'July' }, { val: '7', label: 'August' }, { val: '8', label: 'September' },
-        { val: '9', label: 'October' }, { val: '10', label: 'November' }, { val: '11', label: 'December' }
-    ];
+    const [startDate, setStartDate] = useState(defaultStart);
+    const [endDate, setEndDate] = useState(defaultEnd);
 
     // --- FILTER LOGIC ---
     const reportData = useMemo(() => {
+        // Convert input strings to Date objects for comparison
+        // Set Start to 00:00:00
+        const startObj = new Date(startDate);
+        startObj.setHours(0, 0, 0, 0);
+
+        // Set End to 23:59:59 (to include the full last day)
+        const endObj = new Date(endDate);
+        endObj.setHours(23, 59, 59, 999);
+
         return transactions
             .filter(tx => {
                 if (!tx.created_at) return false;
-                // Handle Firebase Timestamp or JS Date
+                // Handle Firebase Timestamp vs JS Date
                 const txDate = tx.created_at.toDate ? tx.created_at.toDate() : new Date(tx.created_at);
                 
-                const yearMatch = txDate.getFullYear().toString() === filterYear;
-                const monthMatch = filterMonth === 'all' || txDate.getMonth().toString() === filterMonth;
-                return yearMatch && monthMatch;
+                // Check Range
+                return txDate >= startObj && txDate <= endObj;
             })
             .sort((a, b) => {
                 const dateA = a.created_at.toDate ? a.created_at.toDate() : new Date(a.created_at);
                 const dateB = b.created_at.toDate ? b.created_at.toDate() : new Date(b.created_at);
-                return dateB - dateA;
+                return dateB - dateA; // Newest first
             });
-    }, [transactions, filterYear, filterMonth]);
+    }, [transactions, startDate, endDate]);
 
     const totalRevenue = reportData.reduce((acc, curr) => acc + curr.amount, 0);
     
+    // Helper label for Exports
     const getPeriodLabel = () => {
-        if (filterMonth === 'all') return `Annual Revenue ${filterYear}`;
-        const m = months.find(m => m.val === filterMonth);
-        return `${m.label} ${filterYear}`;
+        return `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`;
     };
 
     // --- 1. PDF GENERATION ---
     const handleGeneratePDF = (e) => {
         e.preventDefault();
+        const logoUrl = `${window.location.origin}/FiamBond_Logo.png`; 
         const printWindow = window.open('', '_blank', 'width=900,height=900');
 
         const htmlContent = `
@@ -54,41 +59,56 @@ export default function SubscriptionReportWidget({ transactions }) {
                 <title>Subscription Report - FiamBond Admin</title>
                 <style>
                     @page { margin: 0; size: A4; }
-                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #1F2937; }
-                    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 3px solid #059669; padding-bottom: 20px; }
-                    .company-name { font-size: 24px; font-weight: 700; color: #059669; text-transform: uppercase; }
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #1F2937; -webkit-print-color-adjust: exact; }
+                    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 3px solid #4F46E5; padding-bottom: 20px; }
+                    .logo-container img { height: 60px; width: auto; display: block; }
+                    .company-details { text-align: right; }
+                    .company-name { font-size: 20px; font-weight: 700; color: #4F46E5; text-transform: uppercase; letter-spacing: 1px; }
                     .report-label { font-size: 12px; color: #6B7280; margin-top: 4px; }
-                    .summary-box { background-color: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-                    .summary-title { font-size: 14px; font-weight: 600; color: #047857; text-transform: uppercase; }
-                    .summary-amount { font-size: 32px; font-weight: 800; color: #059669; }
+                    .summary-box { background-color: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+                    .summary-title { font-size: 14px; font-weight: 600; color: #4338CA; text-transform: uppercase; }
+                    .summary-amount { font-size: 32px; font-weight: 800; color: #4F46E5; }
                     .summary-meta { font-size: 12px; color: #6B7280; text-align: right; }
                     table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-                    thead th { background-color: #059669; color: white; text-align: left; padding: 12px 15px; text-transform: uppercase; font-size: 11px; }
+                    thead th { background-color: #4F46E5; color: white; text-align: left; padding: 12px 15px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
                     tbody tr { border-bottom: 1px solid #E5E7EB; }
                     tbody tr:nth-child(even) { background-color: #F9FAFB; }
                     td { padding: 12px 15px; vertical-align: middle; }
-                    .amount-col { text-align: right; font-weight: 600; }
-                    .plan-badge { background: #D1FAE5; color: #065F46; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+                    .amount-col { text-align: right; font-weight: 600; font-family: 'Courier New', monospace; }
+                    .plan-badge { background: #E0E7FF; color: #3730A3; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+                    footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 10px; color: #9CA3AF; border-top: 1px solid #E5E7EB; padding: 20px; background: white; }
                 </style>
             </head>
             <body>
                 <header>
-                    <div class="company-name">FiamBond Admin</div>
-                    <div class="report-label">Official Subscription Revenue Report</div>
+                    <div class="logo-container"><img src="${logoUrl}" alt="FiamBond Admin" /></div>
+                    <div class="company-details">
+                        <div class="company-name">FiamBond Admin</div>
+                        <div class="report-label">Official Subscription Revenue Report</div>
+                    </div>
                 </header>
                 <div class="summary-box">
                     <div><div class="summary-title">Total Revenue</div><div class="summary-amount">₱${totalRevenue.toLocaleString('en-US', {minimumFractionDigits: 2})}</div></div>
-                    <div class="summary-meta">Period: ${getPeriodLabel()}<br/>Generated: ${new Date().toLocaleDateString()}</div>
+                    <div class="summary-meta">Range: ${getPeriodLabel()}<br/>Generated: ${new Date().toLocaleDateString()}</div>
                 </div>
                 <table>
                     <thead><tr><th width="20%">Date</th><th width="40%">Subscriber</th><th width="20%">Plan</th><th width="20%" style="text-align:right">Amount (PHP)</th></tr></thead>
                     <tbody>
                         ${reportData.map(tx => {
                             const dateObj = tx.created_at.toDate ? tx.created_at.toDate() : new Date(tx.created_at);
-                            return `<tr><td>${dateObj.toLocaleDateString()}</td><td><div style="font-weight:600;">${tx.subscriber}</div><div style="font-size:10px; color:#666">${tx.method} - Ref: ${tx.ref}</div></td><td><span class="plan-badge">${tx.plan}</span></td><td class="amount-col">${tx.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</td></tr>`;
+                            return `<tr>
+                                <td>${dateObj.toLocaleDateString()}</td>
+                                <td>
+                                    <div style="font-weight:600; color:#111;">${tx.subscriber}</div>
+                                    <div style="font-size:10px; color:#666">${tx.method} - Ref: ${tx.ref}</div>
+                                </td>
+                                <td><span class="plan-badge">${tx.plan}</span></td>
+                                <td class="amount-col">${tx.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                            </tr>`;
                         }).join('')}
                     </tbody>
                 </table>
+                <footer>Generated by <strong>FiamBond Admin Suite</strong>. This is a system-generated document.</footer>
             </body>
             </html>
         `;
@@ -110,10 +130,9 @@ export default function SubscriptionReportWidget({ transactions }) {
             { header: 'Amount', key: 'amount', width: 15 },
         ];
 
-        // Header Style (Green for Revenue)
         worksheet.getRow(1).values = ['Date', 'Subscriber', 'Reference', 'Plan', 'Amount (PHP)'];
         worksheet.getRow(1).eachCell((cell) => {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }; 
             cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
             cell.alignment = { horizontal: 'center' };
         });
@@ -132,29 +151,55 @@ export default function SubscriptionReportWidget({ transactions }) {
 
         const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        saveAs(blob, `Subscription_Report_${getPeriodLabel().replace(/ /g, '_')}.xlsx`);
+        saveAs(blob, `Subscription_Report_${getPeriodLabel().replace(/ /g, '').replace(/\//g, '-')}.xlsx`);
+    };
+
+    // --- 3. CSV GENERATION ---
+    const handleExportCSV = () => {
+        const headers = ["Date", "Subscriber", "Plan", "Method", "Reference", "Amount"];
+        const rows = reportData.map(tx => {
+            const dateObj = tx.created_at.toDate ? tx.created_at.toDate() : new Date(tx.created_at);
+            return [
+                `"${dateObj.toLocaleDateString()}"`,
+                `"${tx.subscriber.replace(/"/g, '""')}"`,
+                `"${tx.plan}"`,
+                `"${tx.method}"`,
+                `"${tx.ref}"`,
+                tx.amount.toFixed(2)
+            ];
+        });
+        
+        const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        saveAs(blob, `Subscription_Report_${getPeriodLabel().replace(/\//g, '-')}.csv`);
     };
 
     return (
         <div className="space-y-4">
-            {/* FILTER BAR */}
+            {/* DATE RANGE PICKER */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between md:items-center gap-4">
-                <div className="flex gap-4">
+                <div className="flex gap-4 items-end">
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">Fiscal Year</label>
-                        <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="bg-white border border-slate-300 text-gray-700 text-sm rounded-lg block w-24 p-2 outline-none">
-                            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">Start Date</label>
+                        <input 
+                            type="date" 
+                            value={startDate} 
+                            onChange={(e) => setStartDate(e.target.value)} 
+                            className="bg-white border border-slate-300 text-gray-700 text-sm rounded-lg block p-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">Month</label>
-                        <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="bg-white border border-slate-300 text-gray-700 text-sm rounded-lg block w-32 p-2 outline-none">
-                            {months.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
-                        </select>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">End Date</label>
+                        <input 
+                            type="date" 
+                            value={endDate} 
+                            onChange={(e) => setEndDate(e.target.value)} 
+                            className="bg-white border border-slate-300 text-gray-700 text-sm rounded-lg block p-2 outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
                     </div>
                 </div>
                 <div className="text-right">
-                    <p className="text-xs text-slate-500">Total {filterMonth === 'all' ? 'Annual' : 'Monthly'} Revenue</p>
+                    <p className="text-xs text-slate-500">Total Revenue in Range</p>
                     <p className="text-2xl font-bold text-emerald-600">₱{totalRevenue.toLocaleString()}</p>
                 </div>
             </div>
@@ -171,7 +216,7 @@ export default function SubscriptionReportWidget({ transactions }) {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {reportData.length === 0 ? (
-                            <tr><td colSpan="3" className="px-6 py-8 text-center text-sm text-gray-500">No subscriptions found for {getPeriodLabel()}.</td></tr>
+                            <tr><td colSpan="3" className="px-6 py-8 text-center text-sm text-gray-500">No subscriptions found in this date range.</td></tr>
                         ) : (
                             reportData.map((tx, idx) => {
                                 const dateObj = tx.created_at.toDate ? tx.created_at.toDate() : new Date(tx.created_at);
@@ -196,14 +241,18 @@ export default function SubscriptionReportWidget({ transactions }) {
             {/* EXPORT BUTTONS */}
             <div className="pt-2">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">Export Revenue Report</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
+                    <button onClick={handleExportCSV} disabled={reportData.length === 0} className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-slate-700 bg-white border border-slate-300 font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50">
+                        <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        CSV
+                    </button>
                     <button onClick={handleExportExcel} disabled={reportData.length === 0} className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-emerald-700 bg-emerald-50 border border-emerald-200 font-bold shadow-sm hover:bg-emerald-100 disabled:opacity-50">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        Export Excel
+                        Excel
                     </button>
                     <button onClick={handleGeneratePDF} disabled={reportData.length === 0} className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-white bg-indigo-600 font-bold shadow-md hover:bg-indigo-700 disabled:opacity-50">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        Export PDF
+                        PDF
                     </button>
                 </div>
             </div>

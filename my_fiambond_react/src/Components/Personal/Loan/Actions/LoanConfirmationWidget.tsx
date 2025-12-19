@@ -46,7 +46,7 @@ export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirma
                 user_id: user.uid, 
                 family_id: null, // Personal income
                 type: 'income',
-                amount: Number(loan.total_owed || loan.amount),
+                amount: Number(loan.amount),
                 description: `Loan received from ${creditorName}: ${loan.description}`,
                 // created_at handled by backend
             };
@@ -77,7 +77,7 @@ export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirma
                     <p className="font-semibold text-gray-800">{loan.description}</p>
                     <p className="text-sm text-gray-500 mt-1">From: <span className="font-medium">{loan.creditor?.full_name || 'Lender'}</span></p>
                     <p className="text-lg font-bold text-green-600 mt-2">
-                        Amount: ₱{Number(loan.total_owed || loan.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        Amount: ₱{Number(loan.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
             </div>
