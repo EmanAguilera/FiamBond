@@ -3,6 +3,7 @@ import Tesseract from 'tesseract.js';
 import { AppContext } from "../../../Context/AppContext"; 
 
 const PAYMENT_PROVIDERS = {
+    // ... (same as before)
     gcash: {
         id: 'gcash',
         label: 'GCash',
@@ -35,7 +36,20 @@ const PAYMENT_PROVIDERS = {
     }
 };
 
-export default function ApplyCompanyWidget({ onClose, onUpgradeSuccess }) {
+// --- UPDATED: New Price Tiers ---
+const prices = {
+    monthly: { 
+        family: { amount: 500, label: "₱500" },      // Basic premium for family access
+        company: { amount: 1500, label: "₱1,500" }   // Full premium for company access
+    },
+    yearly:  { 
+        family: { amount: 5000, label: "₱5,000" },   // Basic yearly
+        company: { amount: 15000, label: "₱15,000" } // Full yearly
+    }
+};
+
+// --- RENAMED COMPONENT AND ADDED targetAccess PROP ---
+export default function ApplyPremiumWidget({ onClose, onUpgradeSuccess, targetAccess = 'company' }) {
     const { user } = useContext(AppContext);
     
     const [step, setStep] = useState(1);
@@ -46,12 +60,13 @@ export default function ApplyCompanyWidget({ onClose, onUpgradeSuccess }) {
     const [refNumber, setRefNumber] = useState('');
     const fileInputRef = useRef(null);
 
-    const prices = {
-        monthly: { amount: 1500, label: "₱1,500" },
-        yearly:  { amount: 15000, label: "₱15,000" }
-    };
-    const selectedPlan = prices[billingCycle];
+    // Access tier-specific price
+    const selectedPlan = prices[billingCycle][targetAccess]; 
     const activeProvider = PAYMENT_PROVIDERS[selectedProviderKey];
+    
+    // UI Labels
+    const accessLabel = targetAccess === 'family' ? 'Family Access' : 'Company Access';
+    const accessHeader = targetAccess === 'family' ? 'Premium Family Access' : 'Full Company Access';
 
     // --- AI SCANNING ---
     const handleFileUpload = (event) => {
@@ -89,8 +104,6 @@ export default function ApplyCompanyWidget({ onClose, onUpgradeSuccess }) {
     const handleSubmit = () => {
         if(!refNumber) return alert("Please enter the Reference Number.");
         
-        // --- THE FIX IS HERE ---
-        // We use user.uid because that is what Firebase Auth provides.
         const userIdToUse = user.uid || user.id; 
 
         if (!userIdToUse) {
@@ -102,8 +115,9 @@ export default function ApplyCompanyWidget({ onClose, onUpgradeSuccess }) {
             amountPaid: selectedPlan.amount,
             plan: billingCycle,
             paymentRef: refNumber,
-            userId: userIdToUse, // <--- UPDATED
-            method: activeProvider.label 
+            userId: userIdToUse, 
+            method: activeProvider.label,
+            targetAccess: targetAccess // <--- NEW: Pass the requested tier
         });
     };
 
@@ -114,7 +128,8 @@ export default function ApplyCompanyWidget({ onClose, onUpgradeSuccess }) {
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             
-            <h3 className="text-xl font-bold text-gray-800">Company Access</h3>
+            {/* UPDATED HEADER */}
+            <h3 className="text-xl font-bold text-gray-800">{accessHeader}</h3>
             <div className="flex items-center justify-center gap-2 mb-6">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                 <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">AI Receipt Scanner Active</p>
@@ -125,7 +140,7 @@ export default function ApplyCompanyWidget({ onClose, onUpgradeSuccess }) {
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="bg-gray-100 p-1 rounded-lg flex text-sm font-semibold mb-6">
                         <button onClick={() => setBillingCycle('monthly')} className={`flex-1 py-2 rounded-md transition-all ${billingCycle === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Monthly</button>
-                        <button onClick={() => setBillingCycle('yearly')} className={`flex-1 py-2 rounded-md transition-all ${billingCycle === 'yearly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Yearly (-20%)</button>
+                        <button onClick={() => setBillingCycle('yearly')} className={`flex-1 py-2 rounded-md transition-all ${billingCycle === 'yearly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Yearly ({targetAccess === 'company' ? '-20%' : '-16.6%'})</button>
                     </div>
 
                     <p className="text-xs text-left font-bold text-gray-400 uppercase mb-2">Select Payment Method</p>
@@ -144,7 +159,8 @@ export default function ApplyCompanyWidget({ onClose, onUpgradeSuccess }) {
                         <p className="text-xs text-gray-500 mt-1 uppercase font-semibold">{activeProvider.accountName}</p>
                     </div>
 
-                    <button onClick={() => setStep(2)} className={`w-full py-3 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-all ${activeProvider.color}`}>I have paid, Scan Receipt</button>
+                    {/* UPDATED BUTTON TEXT */}
+                    <button onClick={() => setStep(2)} className={`w-full py-3 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-all ${activeProvider.color}`}>I have paid for {accessLabel}, Scan Receipt</button>
                     <button onClick={onClose} className="mt-3 text-xs text-gray-400 hover:text-gray-600">Cancel</button>
                 </div>
             )}
@@ -174,7 +190,8 @@ export default function ApplyCompanyWidget({ onClose, onUpgradeSuccess }) {
                         </div>
                     </div>
 
-                    <button onClick={handleSubmit} disabled={isScanning || !refNumber} className={`w-full py-3 text-white rounded-lg font-bold shadow-lg transition-all ${isScanning || !refNumber ? 'bg-gray-300 cursor-not-allowed' : `${activeProvider.color} hover:opacity-90`}`}>Verify & Upgrade</button>
+                    {/* UPDATED BUTTON TEXT */}
+                    <button onClick={handleSubmit} disabled={isScanning || !refNumber} className={`w-full py-3 text-white rounded-lg font-bold shadow-lg transition-all ${isScanning || !refNumber ? 'bg-gray-300 cursor-not-allowed' : `${activeProvider.color} hover:opacity-90`}`}>Verify & Unlock {accessLabel}</button>
                     <button onClick={() => { setStep(1); setRefNumber(''); }} className="w-full mt-3 py-2 text-gray-400 text-xs font-medium hover:text-gray-600">Change Payment Method</button>
                 </div>
             )}

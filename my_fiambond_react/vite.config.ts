@@ -16,6 +16,8 @@ export default defineConfig({
         headers:{
           Accept: 'application/json',
           "Content-Type": 'application/json',
+          "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+          "Cross-Origin-Embedder-Policy": "require-corp",
         }
       }
     }

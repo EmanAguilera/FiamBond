@@ -7,8 +7,18 @@ import { AppContext } from '../Context/AppContext';
 
 // THE FIX IS HERE: Remove the 'children' prop from the function signature
 export default function PrivateRoutes() {
-    const { user, loading } = useContext(AppContext);
+    const { user, loading, getRealmAccess } = useContext(AppContext);
     const location = useLocation();
+
+    // Determine the required realm for the current path
+    const getRequiredRealm = (pathname) => {
+        if (pathname.startsWith('/company')) return 'company';
+        if (pathname.startsWith('/family')) return 'family';
+        // Admin and Personal pages are covered by AdminRoute and default access
+        return null;
+    };
+
+    const requiredRealm = getRequiredRealm(location.pathname);
 
     // While the context is loading the user's auth state, show a loading message.
     if (loading) {
@@ -32,5 +42,16 @@ export default function PrivateRoutes() {
     // THE FIX IS HERE: If the user is authenticated and verified,
     // render the <Outlet />. This tells React Router to render the
     // nested child route (e.g., <Home /> or <Settings />).
+
+    // Check subscription access for restricted realms
+    if (user && user.subscription_tier) {
+        const hasAccess = getRealmAccess(user.subscription_tier).includes(requiredRealm);
+
+        // Redirect to upgrade page if access is denied to a paid realm
+        if (requiredRealm && !hasAccess) {
+            return <Navigate to="/upgrade" state={{ from: location }} replace />;
+        }
+    }
+    
     return <Outlet />;
 }

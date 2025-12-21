@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
+import { useContext, useEffect, useState, useCallback, lazy, Suspense, useMemo } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
 import { useNavigate } from "react-router-dom"; 
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"; 
@@ -10,7 +10,7 @@ const GoalListsWidget = lazy(() => import("../../Components/Personal/Goal/GoalLi
 const CreateGoalWidget = lazy(() => import("../../Components/Personal/Goal/CreateGoalWidget.tsx"));
 const PersonalTransactionsWidget = lazy(() => import("../../Components/Personal/Finance/PersonalTransactionsWidget.jsx"));
 const CreateTransactionWidget = lazy(() => import("../../Components/Personal/Finance/CreateTransactionWidget.tsx"));
-const MyFamiliesListWidget = lazy(() => import("../../Components/Personal/Families/MyFamiliesListWidget.jsx"));
+const ManageFamiliesWidget = lazy(() => import("../../Components/Personal/Families/ManageFamiliesWidget.jsx")); 
 const PersonalReportChartWidget = lazy(() => import("../../Components/Personal/Analytics/PersonalReportChartWidget.jsx"));
 const LoanTrackingWidget = lazy(() => import("../../Components/Personal/Loan/LoanTrackingWidget.tsx"));
 const RecordLoanFlowWidget = lazy(() => import("../../Components/Personal/Loan/Setup/RecordLoanFlowWidget.tsx"));
@@ -18,7 +18,7 @@ const RecordLoanChoiceWidget = lazy(() => import("../../Components/Personal/Loan
 const CreatePersonalLoanWidget = lazy(() => import("../../Components/Personal/Loan/Setup/CreatePersonalLoanWidget.tsx"));
 const FamilyRealm = lazy(() => import("../Family/FamilyRealm.jsx"));
 const CompanyRealm = lazy(() => import("../Company/CompanyRealm.jsx"));
-const ApplyCompanyWidget = lazy(() => import("../../Components/Company/Onboarding/ApplyCompanyWidget.jsx"));
+const ApplyPremiumWidget = lazy(() => import("../../Components/Company/Onboarding/ApplyPremiumWidget.jsx"));
 
 // --- ICONS ---
 const Icons = {
@@ -29,6 +29,36 @@ const Icons = {
     Wallet: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>,
     Flag: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H8.5l-1-1H5a2 2 0 00-2 2z"></path></svg>,
     Gift: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>
+};
+
+// --- SUBSCRIPTION REMINDER SUB-COMPONENT ---
+const SubscriptionReminder = ({ details, type }) => {
+    if (!details) return null;
+    const expiryDate = details.expires_at?.toDate();
+    if (!expiryDate) return null;
+    
+    const diffTime = expiryDate - new Date();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 7) return null; // Only show reminder if 7 days left
+
+    return (
+        <div className={`mb-6 p-4 rounded-2xl border flex items-center justify-between animate-in fade-in slide-in-from-top-4 duration-500
+            ${diffDays <= 0 ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+            <div className="flex items-center gap-3">
+                <span className="text-xl">{diffDays <= 0 ? '🚫' : '⏳'}</span>
+                <div>
+                    <p className="font-bold text-sm">
+                        {diffDays <= 0 ? `${type.toUpperCase()} Access Expired` : `${type.toUpperCase()} expiring in ${diffDays} days`}
+                    </p>
+                    <p className="text-xs opacity-75">Ends on {expiryDate.toLocaleDateString()}</p>
+                </div>
+            </div>
+            <button className="text-xs font-bold px-4 py-2 bg-white rounded-lg shadow-sm border border-current hover:bg-opacity-50 transition-all">
+                {diffDays <= 0 ? 'Renew Now' : 'Extend'}
+            </button>
+        </div>
+    );
 };
 
 // --- REUSABLE BUTTON ---
@@ -64,7 +94,7 @@ const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorCl
     </div>
 );
 
-// --- HELPER ---
+// --- CHART DATA HELPER ---
 const formatDataForChart = (transactions) => {
     if (!transactions || transactions.length === 0) return { labels: [], datasets: [] };
     const data = {};
@@ -87,22 +117,41 @@ const formatDataForChart = (transactions) => {
 };
 
 export default function UserDashboard() {
-    const { user } = useContext(AppContext);
+    const { user, premiumDetails } = useContext(AppContext);
     const navigate = useNavigate();
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
     // UI & Data State
     const [isAdmin, setIsAdmin] = useState(false);
-    const [isCompanyUser, setIsCompanyUser] = useState(false);
-    const [isPending, setIsPending] = useState(false); 
     
-    const [modals, setModals] = useState({ transactions: false, goals: false, family: false, lending: false, createTx: false, createGoal: false, recordLoan: false, applyCompany: false });
+    // NEW SUBSCRIPTION LOGIC (Using AppContext detailed dates)
+    const isCompanyActive = useMemo(() => {
+        if (user?.role === 'admin') return true;
+        if (!premiumDetails.company) return false;
+        return premiumDetails.company.expires_at?.toDate() > new Date();
+    }, [user, premiumDetails.company]);
+
+    const isFamilyActive = useMemo(() => {
+        if (user?.role === 'admin') return true;
+        if (!premiumDetails.family) return false;
+        return premiumDetails.family.expires_at?.toDate() > new Date();
+    }, [user, premiumDetails.family]);
+
+    const isCompanyPending = user?.subscription_status === 'pending_approval';
+    const isFamilyPending = user?.family_subscription_status === 'pending_approval';
+
+    // Modals
+    const [modals, setModals] = useState({ 
+        transactions: false, goals: false, families: false, lending: false, 
+        createTx: false, createGoal: false, recordLoan: false, applyCompany: false, applyFamily: false
+    });
+
     const [loanFlowStep, setLoanFlowStep] = useState('choice');
     const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
     const [showCompanyRealm, setShowCompanyRealm] = useState(false);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
-    const [summaryData, setSummaryData] = useState(null);
+    const [summaryData, setSummaryData] = useState({ netPosition: 0 });
     const [summaryError, setSummaryError] = useState(null);
     const [activeGoalsCount, setActiveGoalsCount] = useState(0);
     const [lendingSummary, setLendingSummary] = useState({ outstanding: 0 });
@@ -112,30 +161,6 @@ export default function UserDashboard() {
     const [period, setPeriod] = useState('monthly');
 
     const toggleModal = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
-
-    useEffect(() => {
-        const checkRoles = async () => {
-            if (user?.uid) {
-                const docSnap = await getDoc(doc(db, "users", user.uid));
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data.role === 'admin') setIsAdmin(true);
-                    
-                    if (data.is_premium === true) {
-                        setIsCompanyUser(true);
-                        setIsPending(false); 
-                    } else if (data.subscription_status === 'pending_approval') {
-                        setIsCompanyUser(false);
-                        setIsPending(true); 
-                    } else {
-                        setIsCompanyUser(false);
-                        setIsPending(false);
-                    }
-                }
-            }
-        };
-        checkRoles();
-    }, [user, modals.applyCompany]); 
 
     const fetchData = useCallback(async () => {
         if (!user) return;
@@ -163,18 +188,11 @@ export default function UserDashboard() {
         if (!user) return;
         setReportLoading(true); setReportError(null);
         try {
-            // FIX: Independent Date Objects to avoid mutation issues
             const endDate = new Date();
             const startDate = new Date();
-            
-            if (period === 'weekly') {
-                startDate.setDate(endDate.getDate() - 7);
-            } else if (period === 'yearly') {
-                startDate.setFullYear(endDate.getFullYear() - 1);
-            } else {
-                // Monthly default
-                startDate.setMonth(endDate.getMonth() - 1);
-            }
+            if (period === 'weekly') startDate.setDate(endDate.getDate() - 7);
+            else if (period === 'yearly') startDate.setFullYear(endDate.getFullYear() - 1);
+            else startDate.setMonth(endDate.getMonth() - 1);
 
             const res = await fetch(`${API_URL}/transactions?user_id=${user.uid}&startDate=${startDate.toISOString()}`);
             if (!res.ok) throw new Error('API Error');
@@ -185,13 +203,8 @@ export default function UserDashboard() {
             txs.forEach(tx => tx.type === 'income' ? inflow += tx.amount : outflow += tx.amount);
             
             setReport({ 
-                chartData: formatDataForChart(txs), 
-                totalInflow: inflow, 
-                totalOutflow: outflow, 
-                netPosition: inflow - outflow, 
-                // FIX: Dynamic Date Range Title
-                reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`, 
-                transactionCount: txs.length 
+                chartData: formatDataForChart(txs), totalInflow: inflow, totalOutflow: outflow, netPosition: inflow - outflow, 
+                reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`, transactionCount: txs.length 
             });
         } catch { setReportError("No Data"); } finally { setReportLoading(false); }
     }, [user, period, API_URL]);
@@ -203,33 +216,23 @@ export default function UserDashboard() {
 
     const handleUpgradeSubmit = async (paymentData) => {
         try {
-            const targetUserId = paymentData.userId || user.uid;
-            const userRef = doc(db, "users", targetUserId);
-            
-            await updateDoc(userRef, {
+            const userRef = doc(db, "users", user.uid);
+            const isFamily = paymentData.targetAccess === 'family';
+            const updates = isFamily ? {
+                family_subscription_status: 'pending_approval',
+                family_payment_ref: paymentData.paymentRef,
+                family_premium_plan: paymentData.plan,
+                family_request_date: serverTimestamp()
+            } : {
                 subscription_status: 'pending_approval',
                 payment_ref: paymentData.paymentRef,
-                payment_method: paymentData.method || 'Manual',
                 premium_plan: paymentData.plan,
-                request_date: serverTimestamp(),
-                is_premium: false 
-            });
-
-            setIsPending(true);
-            setIsCompanyUser(false);
-
-            toggleModal('applyCompany', false);
-            alert(`Success! Ref No. ${paymentData.paymentRef} submitted. Please wait for Admin approval.`);
-        } catch (error) {
-            console.error("Payment Submission Error:", error);
-            alert("Failed to submit request. Please try again.");
-        }
-    };
-
-    const renderLoanModal = () => {
-        if (loanFlowStep === 'family') return <RecordLoanFlowWidget onSuccess={() => { toggleModal('recordLoan', false); refresh(); }} onRequestCreateFamily={() => { toggleModal('recordLoan', false); toggleModal('family', true); }} />;
-        if (loanFlowStep === 'personal') return <CreatePersonalLoanWidget onSuccess={() => { toggleModal('recordLoan', false); refresh(); }} />;
-        return <RecordLoanChoiceWidget onSelectFamilyLoan={() => setLoanFlowStep('family')} onSelectPersonalLoan={() => setLoanFlowStep('personal')} />;
+                request_date: serverTimestamp()
+            };
+            await updateDoc(userRef, updates);
+            toggleModal(isFamily ? 'applyFamily' : 'applyCompany', false);
+            alert("Success! Request submitted for review.");
+        } catch (error) { alert("Failed to submit request."); }
     };
 
     if (activeFamilyRealm) return <Suspense fallback={<div/>}><FamilyRealm family={activeFamilyRealm} onBack={() => setActiveFamilyRealm(null)} onDataChange={refresh} /></Suspense>;
@@ -237,68 +240,60 @@ export default function UserDashboard() {
 
     return (
         <div className="w-full">
+            {/* --- SMART REMINDERS (Updated Logic) --- */}
+            <SubscriptionReminder details={premiumDetails.company} type="company" />
+            <SubscriptionReminder details={premiumDetails.family} type="family" />
+
             {/* --- HEADER --- */}
             <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="flex items-center gap-4">
                     <div className="w-1 h-12 bg-indigo-600 rounded-full opacity-80"></div>
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-800 tracking-tight leading-none">
-                            {userLastName}
-                        </h1>
-                        <p className="text-slate-500 font-medium text-sm mt-1 tracking-wide">
-                            Personal Realm
-                        </p>
+                        <h1 className="text-3xl font-bold text-slate-800 tracking-tight leading-none">{userLastName}</h1>
+                        <p className="text-slate-500 font-medium text-sm mt-1 tracking-wide">Personal Realm</p>
                     </div>
                 </div>
 
-                {/* --- RESPONSIVE BUTTON GRID --- */}
                 <div className="w-full md:w-auto">
                     <div className="grid grid-cols-2 gap-3 md:flex md:items-center">
-                        
-                        <div className="col-span-2 md:col-span-1 md:w-auto">
-                            <Btn onClick={() => toggleModal('createTx', true)} type="pri" icon={Icons.Plus} className="w-full">
-                                Transaction
-                            </Btn>
-                        </div>
-
+                        <Btn onClick={() => toggleModal('createTx', true)} type="pri" icon={Icons.Plus} className="col-span-2 md:col-span-1">Transaction</Btn>
                         <Btn onClick={() => toggleModal('createGoal', true)} icon={Icons.Plus}>Goal</Btn>
                         <Btn onClick={() => { setLoanFlowStep('choice'); toggleModal('recordLoan', true); }} icon={Icons.Plus}>Loan</Btn>
-                        
                         <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
                         
-                        <Btn onClick={() => toggleModal('family', true)} icon={Icons.Users}>Families</Btn>
-                        
-                        {isCompanyUser ? (
-                            <Btn onClick={() => setShowCompanyRealm(true)} type="comp" icon={Icons.Build}>
-                                Company
-                            </Btn>
-                        ) : isPending ? (
-                            <Btn onClick={() => alert("Your payment is being verified by Admin.")} type="pending" icon={Icons.Lock} disabled={true}>
-                                Pending Review
-                            </Btn>
+                        {/* FAMILY BTN */}
+                        {isFamilyActive ? (
+                            <Btn onClick={() => toggleModal('families', true)} icon={Icons.Users}>Families</Btn>
+                        ) : isFamilyPending ? (
+                            <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
                         ) : (
-                            <Btn onClick={() => toggleModal('applyCompany', true)} type="sec" icon={Icons.Lock}>
-                                Unlock Company
-                            </Btn>
+                            <Btn onClick={() => toggleModal('applyFamily', true)} type="sec" icon={Icons.Lock}>Families</Btn>
                         )}
                         
-                        {isAdmin && (
-                            <div className="col-span-2 md:col-span-1 md:w-auto">
-                                <Btn onClick={() => navigate('/admin')} icon={Icons.Lock} className="w-full">
-                                    Admin
-                                </Btn>
-                            </div>
+                        {/* COMPANY BTN */}
+                        {isCompanyActive ? (
+                            <Btn onClick={() => setShowCompanyRealm(true)} type="comp" icon={Icons.Build}>Company</Btn>
+                        ) : isCompanyPending ? (
+                            <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
+                        ) : (
+                            <Btn onClick={() => toggleModal('applyCompany', true)} type="sec" icon={Icons.Lock}>Company</Btn>
+                        )}
+                        
+                        {user?.role === 'admin' && (
+                            <Btn onClick={() => navigate('/admin')} icon={Icons.Lock} className="col-span-2 md:col-span-1">Admin</Btn>
                         )}
                     </div>
                 </div>
             </header>
 
+            {/* --- CARDS --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <DashboardCard title="Personal Funds" value={summaryError ? 'Error' : `₱${parseFloat(summaryData?.netPosition || 0).toLocaleString()}`} subtext="Available Balance" linkText="View Transactions" onClick={() => toggleModal('transactions', true)} icon={Icons.Wallet} colorClass="text-emerald-600" />
                 <DashboardCard title="Active Goals" value={activeGoalsCount} subtext="Targets in Progress" linkText="View Goals" onClick={() => toggleModal('goals', true)} icon={Icons.Flag} colorClass="text-rose-600" />
                 <DashboardCard title="Outstanding Loans" value={`₱${lendingSummary.outstanding.toLocaleString()}`} subtext="Total Receivables" linkText="Manage Lending" onClick={() => toggleModal('lending', true)} icon={Icons.Gift} colorClass="text-amber-600" />
             </div>
 
+            {/* --- CHART SECTION (FUNCTIONALITY PRESERVED) --- */}
             <div className="dashboard-section">
                 <div className="flex justify-center gap-2 mb-6 bg-slate-100 p-1 rounded-xl w-fit mx-auto">
                     {['weekly', 'monthly', 'yearly'].map(p => (
@@ -310,23 +305,21 @@ export default function UserDashboard() {
                  <Suspense fallback={<div className="h-96"/>}><PersonalReportChartWidget report={report} /></Suspense>}
             </div>
 
+            {/* --- MODALS --- */}
             <Suspense fallback={null}>
-                {modals.transactions && <Modal isOpen={modals.transactions} onClose={() => toggleModal('transactions', false)} title="Shared Personal Transactions"><PersonalTransactionsWidget /></Modal>}
-                {modals.goals && <Modal isOpen={modals.goals} onClose={() => toggleModal('goals', false)} title="Shared Personal Goals"><GoalListsWidget onDataChange={refresh} /></Modal>}
-                {modals.family && <Modal isOpen={modals.family} onClose={() => toggleModal('family', false)} title="Manage Family Access"><MyFamiliesListWidget onEnterRealm={setActiveFamilyRealm} /></Modal>}
-                {modals.lending && <Modal isOpen={modals.lending} onClose={() => toggleModal('lending', false)} title="Shared Loan Tracker"><LoanTrackingWidget onDataChange={refresh} /></Modal>}
-                {modals.createTx && <Modal isOpen={modals.createTx} onClose={() => toggleModal('createTx', false)} title="Record New Transaction"><CreateTransactionWidget onSuccess={() => { toggleModal('createTx', false); refresh(); }} /></Modal>}
-                {modals.createGoal && <Modal isOpen={modals.createGoal} onClose={() => toggleModal('createGoal', false)} title="Record New Goal"><CreateGoalWidget onSuccess={() => { toggleModal('createGoal', false); fetchData(); }} /></Modal>}
-                {modals.recordLoan && <Modal isOpen={modals.recordLoan} onClose={() => { toggleModal('recordLoan', false); setLoanFlowStep('choice'); }} title="Record New Loan">{renderLoanModal()}</Modal>}
-                
-                {modals.applyCompany && (
-                    <Modal isOpen={modals.applyCompany} onClose={() => toggleModal('applyCompany', false)} title="Unlock Company">
-                        <ApplyCompanyWidget 
-                            onClose={() => toggleModal('applyCompany', false)} 
-                            onUpgradeSuccess={handleUpgradeSubmit} 
-                        />
-                    </Modal>
-                )}
+                {modals.transactions && <Modal isOpen={modals.transactions} onClose={() => toggleModal('transactions', false)} title="Personal Transactions"><PersonalTransactionsWidget /></Modal>}
+                {modals.goals && <Modal isOpen={modals.goals} onClose={() => toggleModal('goals', false)} title="Goals"><GoalListsWidget onDataChange={refresh} /></Modal>}
+                {modals.families && <Modal isOpen={modals.families} onClose={() => toggleModal('families', false)} title="Families"><ManageFamiliesWidget onEnterRealm={setActiveFamilyRealm} /></Modal>}
+                {modals.lending && <Modal isOpen={modals.lending} onClose={() => toggleModal('lending', false)} title="Loans"><LoanTrackingWidget onDataChange={refresh} /></Modal>}
+                {modals.createTx && <Modal isOpen={modals.createTx} onClose={() => toggleModal('createTx', false)} title="New Transaction"><CreateTransactionWidget onSuccess={() => { toggleModal('createTx', false); refresh(); }} /></Modal>}
+                {modals.createGoal && <Modal isOpen={modals.createGoal} onClose={() => toggleModal('createGoal', false)} title="New Goal"><CreateGoalWidget onSuccess={() => { toggleModal('createGoal', false); fetchData(); }} /></Modal>}
+                {modals.recordLoan && <Modal isOpen={modals.recordLoan} onClose={() => toggleModal('recordLoan', false)} title="Record Loan">
+                    {loanFlowStep === 'choice' && <RecordLoanChoiceWidget onSelectFamilyLoan={() => setLoanFlowStep('family')} onSelectPersonalLoan={() => setLoanFlowStep('personal')} />}
+                    {loanFlowStep === 'family' && <RecordLoanFlowWidget onSuccess={() => { toggleModal('recordLoan', false); refresh(); }} />}
+                    {loanFlowStep === 'personal' && <CreatePersonalLoanWidget onSuccess={() => { toggleModal('recordLoan', false); refresh(); }} />}
+                </Modal>}
+                {modals.applyCompany && <Modal isOpen={modals.applyCompany} onClose={() => toggleModal('applyCompany', false)} title="Unlock Company"><ApplyPremiumWidget targetAccess="company" onClose={() => toggleModal('applyCompany', false)} onUpgradeSuccess={handleUpgradeSubmit} /></Modal>}
+                {modals.applyFamily && <Modal isOpen={modals.applyFamily} onClose={() => toggleModal('applyFamily', false)} title="Unlock Family"><ApplyPremiumWidget targetAccess="family" onClose={() => toggleModal('applyFamily', false)} onUpgradeSuccess={handleUpgradeSubmit} /></Modal>}
             </Suspense>
         </div>
     );

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, lazy, Suspense, useContext } from "react"; 
 import { useNavigate } from "react-router-dom";
 import { AppContext } from '../../Context/AppContext'; 
-import { collection, getDocs, updateDoc, doc, serverTimestamp, query, where } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
 import { db } from "../../config/firebase-config";
 
 // --- LAZY IMPORTS ---
@@ -9,6 +9,7 @@ const Modal = lazy(() => import("../../Components/Modal"));
 const AdminReportChartWidget = lazy(() => import("../../Components/Admin/Analytics/AdminReportChartWidget"));
 const AdminUserTableWidget = lazy(() => import("../../Components/Admin/Users/AdminUserTableWidget")); 
 const SubscriptionReportWidget = lazy(() => import("../../Components/Admin/Finance/SubscriptionReportWidget"));
+const RevenueLedgerWidget = lazy(() => import("../../Components/Admin/Finance/RevenueLedgerWidget")); 
 
 // --- ICONS ---
 const Icons = {
@@ -22,10 +23,14 @@ const Icons = {
 };
 
 // --- CONFIG ---
-const getPlanValue = (plan) => {
-    if (plan === 'yearly') return 15000.00;
-    if (plan === 'monthly') return 1500.00;
-    return 1500.00; 
+const getPlanValue = (plan, type = 'company') => {
+    if (type === 'company') {
+        if (plan === 'yearly') return 15000.00;
+        return 1500.00; 
+    } else {
+        if (plan === 'yearly') return 5000.00;
+        return 500.00;
+    }
 };
 
 // --- REUSABLE COMPONENTS ---
@@ -81,7 +86,6 @@ const AddAdminForm = ({ onAdd, onCancel }) => {
     );
 };
 
-// --- NEW: MANAGE TEAM WIDGET (Combines List + Add) ---
 const ManageTeamWidget = ({ adminUsers, onAddAdmin }) => {
     const [showAddForm, setShowAddForm] = useState(false);
 
@@ -95,7 +99,7 @@ const ManageTeamWidget = ({ adminUsers, onAddAdmin }) => {
                             <p className="text-xs text-slate-500">Manage dashboard access.</p>
                         </div>
                         <button onClick={() => setShowAddForm(true)} className="bg-purple-600 text-white px-3 py-2 rounded-lg text-xs font-bold shadow hover:bg-purple-700 transition-all flex items-center gap-2">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                            {Icons.Plus}
                             Promote New Admin
                         </button>
                     </div>
@@ -103,7 +107,6 @@ const ManageTeamWidget = ({ adminUsers, onAddAdmin }) => {
                     <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                         <div className="flex justify-between items-center">
                             <h4 className="font-bold text-purple-700 text-sm">Promote User</h4>
-                            <button onClick={() => setShowAddForm(false)} className="text-xs text-slate-400">Close</button>
                         </div>
                         <AddAdminForm onAdd={async (email) => { await onAddAdmin(email); setShowAddForm(false); }} onCancel={() => setShowAddForm(false)} />
                     </div>
@@ -127,21 +130,23 @@ export default function AdminDashboard() {
 
     // State
     const [users, setUsers] = useState([]);
+    const [premiums, setPremiums] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modals, setModals] = useState({ revenue: false, entities: false, reports: false, manageTeam: false });
     
     // Derived Data
-    const [premiumUsers, setPremiumUsers] = useState([]);
+    const [premiumUsers, setPremiumUsers] = useState([]); 
     const [adminUsers, setAdminUsers] = useState([]);
-    const [pendingUsers, setPendingUsers] = useState([]);
+    const [pendingCount, setPendingCount] = useState(0);
+    const [currentTotalFunds, setCurrentTotalFunds] = useState(0);
 
     // Report State
-    const [currentTotalFunds, setCurrentTotalFunds] = useState(0);
     const [report, setReport] = useState(null);
     const [period, setPeriod] = useState('monthly');
 
-    const generateReport = useCallback((userList, currentPeriod) => {
-        if (!userList || userList.length === 0) return;
+    // --- REVENUE GENERATION ---
+    const generateReport = useCallback((premiumList, currentPeriod) => {
+        if (!premiumList) return;
         const now = new Date();
         const startDate = new Date(); 
         
@@ -152,20 +157,22 @@ export default function AdminDashboard() {
         const revenueData = {};
         let periodRevenue = 0;
         let activeCount = 0;
+        
+        const currentAdminId = user.id;
 
-        userList.forEach(u => {
-            if (u.is_premium) {
-                const timestamp = u.premium_granted_at || u.created_at;
-                if (timestamp?.seconds) {
-                    const txDate = new Date(timestamp.seconds * 1000);
-                    if (txDate >= startDate && txDate <= now) {
-                        const dateKey = txDate.toLocaleDateString();
-                        if (!revenueData[dateKey]) revenueData[dateKey] = 0;
-                        const transactionValue = getPlanValue(u.premium_plan);
-                        revenueData[dateKey] += transactionValue;
-                        periodRevenue += transactionValue;
-                        activeCount++;
-                    }
+        premiumList.forEach(p => {
+            // Skip Admin's own payment records
+            if (p.user_id === currentAdminId) return; 
+
+            const timestamp = p.granted_at;
+            if (timestamp?.seconds) {
+                const txDate = new Date(timestamp.seconds * 1000);
+                if (txDate >= startDate && txDate <= now) {
+                    const dateKey = txDate.toLocaleDateString();
+                    if (!revenueData[dateKey]) revenueData[dateKey] = 0;
+                    revenueData[dateKey] += (p.amount || 0);
+                    periodRevenue += (p.amount || 0);
+                    activeCount++;
                 }
             }
         });
@@ -188,66 +195,126 @@ export default function AdminDashboard() {
             reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${now.toLocaleDateString()}`,
             transactionCount: activeCount
         });
-    }, []);
+    }, [user.id]);
 
+    // --- FETCH DATA ---
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const usersSnapshot = await getDocs(collection(db, "users"));
-            const usersList = usersSnapshot.docs.map(u => ({ id: u.id, ...u.data() }));
+            const [usersSnap, premiumsSnap] = await Promise.all([
+                getDocs(collection(db, "users")),
+                getDocs(collection(db, "premiums"))
+            ]);
+
+            const premiumsList = premiumsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const usersList = usersSnap.docs.map(u => ({ id: u.id, ...u.data() }));
             
-            // SORT: Pending requests to top
+            // Sort Users: Pending at top
             usersList.sort((a, b) => {
-                if (a.subscription_status === 'pending_approval' && b.subscription_status !== 'pending_approval') return -1;
-                if (a.subscription_status !== 'pending_approval' && b.subscription_status === 'pending_approval') return 1;
-                return (b.premium_granted_at?.seconds || 0) - (a.premium_granted_at?.seconds || 0);
+                const aIsPending = a.subscription_status === 'pending_approval' || a.family_subscription_status === 'pending_approval';
+                const bIsPending = b.subscription_status === 'pending_approval' || b.family_subscription_status === 'pending_approval';
+                if (aIsPending && !bIsPending) return -1;
+                if (!aIsPending && bIsPending) return 1;
+                return (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0);
             });
             
             setUsers(usersList);
-            const premiums = usersList.filter(u => u.is_premium);
+            setPremiums(premiumsList);
+
+            const premiumsOnly = usersList.filter(u => u.is_premium || u.is_family_premium);
             const admins = usersList.filter(u => u.role === 'admin');
-            const pendings = usersList.filter(u => u.subscription_status === 'pending_approval');
+            const pendingTotal = usersList.filter(u => u.subscription_status === 'pending_approval' || u.family_subscription_status === 'pending_approval').length;
             
-            setPremiumUsers(premiums);
+            setPremiumUsers(premiumsOnly);
             setAdminUsers(admins);
-            setPendingUsers(pendings);
+            setPendingCount(pendingTotal);
 
-            const totalValue = premiums.reduce((sum, u) => sum + getPlanValue(u.premium_plan), 0);
+            // Calculate Lifetime Funds from the 'premiums' collection
+            const currentAdminId = user.id;
+            const totalValue = premiumsList.reduce((sum, p) => {
+                if (p.user_id === currentAdminId) return sum; 
+                return sum + (p.amount || 0);
+            }, 0);
+
             setCurrentTotalFunds(totalValue);
-            
-            generateReport(usersList, period);
-        } catch (error) { console.error(error); } finally { setLoading(false); }
-    }, [generateReport, period]);
+            generateReport(premiumsList, period);
+        } catch (error) { 
+            console.error("Data Fetch Error:", error); 
+        } finally { 
+            setLoading(false); 
+        }
+    }, [generateReport, period, user.id]);
 
-    useEffect(() => { if (users.length > 0) generateReport(users, period); }, [period, users, generateReport]);
-    // FIXED: Added fetchData to dependency array
     useEffect(() => { fetchData(); }, [fetchData]);
+    useEffect(() => { if (premiums.length > 0) generateReport(premiums, period); }, [period, premiums, generateReport]);
 
-    // --- APPROVAL LOGIC ---
-    const togglePremium = async (userId, currentStatus, isApproval = false) => {
-        const msg = isApproval ? "APPROVE Payment & Grant Access?" : `Confirm ${currentStatus ? 'revoke' : 'grant'} company access?`;
-        if(!confirm(msg)) return;
-
+    // --- TOGGLE PREMIUM (BATCHED WITH PREMIUMS COLLECTION) ---
+    const handleTogglePremium = async (userId, action, type) => {
         try {
+            const batch = writeBatch(db);
             const userRef = doc(db, "users", userId);
-            let updates = {};
+            
+            if (action === 'approve' || action === 'grant') {
+                const isCompany = type === 'company';
+                const plan = 'monthly';
+                const amount = getPlanValue(plan, type);
+                
+                // 1. Create entry in 'premiums' collection
+                const newPremiumRef = doc(collection(db, "premiums"));
+                const premiumData = {
+                    user_id: userId,
+                    access_type: type,
+                    amount: amount,
+                    plan_cycle: plan,
+                    status: "active",
+                    granted_at: serverTimestamp(),
+                    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 Day expiry
+                    payment_method: action === 'approve' ? "GCash" : "Admin Manual",
+                    payment_ref: action === 'approve' ? (users.find(u => u.id === userId)?.payment_ref || "VERIFIED") : "ADMIN_GRANTED"
+                };
 
-            if (isApproval) {
-                // APPROVAL: Grant Premium & Clear Pending
-                updates = { is_premium: true, subscription_status: 'active', premium_granted_at: serverTimestamp() };
-            } else if (!currentStatus) {
-                // MANUAL GRANT
-                updates = { is_premium: true, premium_granted_at: serverTimestamp(), subscription_status: 'active', premium_plan: 'monthly' };
+                // 2. Update 'users' document
+                const userUpdates = {};
+                if (isCompany) {
+                    userUpdates.is_premium = true;
+                    userUpdates.subscription_status = 'active';
+                    userUpdates.active_company_premium_id = newPremiumRef.id;
+                    userUpdates.premium_granted_at = serverTimestamp();
+                    userUpdates.premium_plan = plan;
+                } else {
+                    userUpdates.is_family_premium = true;
+                    userUpdates.family_subscription_status = 'active';
+                    userUpdates.active_family_premium_id = newPremiumRef.id;
+                    userUpdates.family_premium_granted_at = serverTimestamp();
+                    userUpdates.family_premium_plan = plan;
+                }
+
+                batch.set(newPremiumRef, premiumData);
+                batch.update(userRef, userUpdates);
             } else {
-                // REVOKE
-                updates = { is_premium: false, premium_granted_at: null, subscription_status: null, premium_plan: null };
+                // REVOKE logic
+                const userUpdates = {};
+                if (type === 'company') {
+                    userUpdates.is_premium = false;
+                    userUpdates.subscription_status = 'inactive';
+                    userUpdates.active_company_premium_id = "";
+                } else {
+                    userUpdates.is_family_premium = false;
+                    userUpdates.family_subscription_status = 'inactive';
+                    userUpdates.active_family_premium_id = "";
+                }
+                batch.update(userRef, userUpdates);
             }
 
-            await updateDoc(userRef, updates);
+            await batch.commit();
             fetchData(); 
-        } catch (error) { alert("Error: " + error.message); }
+        } catch (error) { 
+            console.error("Error updating user access:", error);
+            alert("Failed to update user."); 
+        }
     };
 
+    // --- PROMOTE ADMIN ---
     const handleAddAdmin = async (email) => {
         try {
             const q = query(collection(db, "users"), where("email", "==", email));
@@ -257,24 +324,12 @@ export default function AdminDashboard() {
             alert(`${email} is now an Admin.`);
             fetchData();
         } catch (error) { 
-            // FIXED: Used the 'error' variable
             console.error(error);
             alert("Failed."); 
         }
     };
 
-    // Transform data for Reports Widget
-    const subscriptionTransactions = premiumUsers.map(u => ({
-        id: u.id,
-        created_at: u.premium_granted_at || u.created_at,
-        subscriber: u.full_name || u.email,
-        plan: u.premium_plan || 'monthly',
-        method: u.payment_method || 'Manual',
-        ref: u.payment_ref || 'N/A',
-        amount: getPlanValue(u.premium_plan)
-    }));
-
-    if (loading) return <div className="p-10 text-center animate-pulse text-slate-400">Loading System...</div>;
+    if (loading) return <div className="p-10 text-center animate-pulse text-slate-400">Loading Admin Realm...</div>;
 
     return (
         <div className="w-full">
@@ -296,7 +351,6 @@ export default function AdminDashboard() {
                 
                 <div className="flex gap-3">
                     <Btn onClick={() => setModals({ ...modals, manageTeam: true })} type="admin" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>}>Manage Team</Btn>
-                    <Btn onClick={fetchData} icon={Icons.Refresh}>Refresh</Btn>
                 </div>
             </header>
 
@@ -314,12 +368,12 @@ export default function AdminDashboard() {
                 <DashboardCard 
                     title="User Management" 
                     value={users.length} 
-                    subtext={pendingUsers.length > 0 ? `⚠️ ${pendingUsers.length} PENDING REQUEST(S)` : `${premiumUsers.length} Companies Active`}
-                    linkText={pendingUsers.length > 0 ? "Review Requests Now" : "Manage Access"}
+                    subtext={pendingCount > 0 ? `⚠️ ${pendingCount} PENDING REQUEST(S)` : `${premiumUsers.length} Active Subscriptions`}
+                    linkText={pendingCount > 0 ? "Review Requests Now" : "Manage Access"}
                     onClick={() => setModals({ ...modals, entities: true })} 
                     icon={Icons.Entities} 
-                    colorClass={pendingUsers.length > 0 ? "text-amber-600" : "text-indigo-600"}
-                    isAlert={pendingUsers.length > 0} 
+                    colorClass={pendingCount > 0 ? "text-amber-600" : "text-indigo-600"}
+                    isAlert={pendingCount > 0} 
                 />
                 <DashboardCard 
                     title="Revenue Reports" 
@@ -341,11 +395,13 @@ export default function AdminDashboard() {
             <Suspense fallback={null}>
                 {modals.revenue && ( 
                     <Modal isOpen={modals.revenue} onClose={() => setModals({ ...modals, revenue: false })} title="Revenue Ledger"> 
-                        <AdminUserTableWidget 
-                            users={premiumUsers} 
-                            type="revenue" 
-                            headerText={<span className="flex justify-between w-full font-bold text-emerald-600"><span>Total Funds:</span><span>₱{currentTotalFunds.toLocaleString()}</span></span>} 
-                        /> 
+                        <div className="space-y-4">
+                            <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex justify-between items-center">
+                                <span className="font-bold text-emerald-600 text-sm uppercase tracking-wide">Total Funds: </span>
+                                <span className="font-bold text-1xl text-emerald-600">₱{currentTotalFunds.toLocaleString()}</span>
+                            </div>
+                            <RevenueLedgerWidget premiums={premiums} users={users} currentAdminId={user.id} />
+                        </div>
                     </Modal> 
                 )}
                 {modals.entities && ( 
@@ -353,14 +409,26 @@ export default function AdminDashboard() {
                         <AdminUserTableWidget 
                             users={users} 
                             type="entity" 
-                            onTogglePremium={togglePremium} 
-                            headerText={pendingUsers.length > 0 ? "⚠️ Approval Needed" : "Manage Company Status"}
+                            onTogglePremium={handleTogglePremium} 
+                            headerText={pendingCount > 0 ? "⚠️ Approval Needed" : "Manage Access Rights"}
                         /> 
                     </Modal> 
                 )}
                 {modals.reports && ( 
                     <Modal isOpen={modals.reports} onClose={() => setModals({ ...modals, reports: false })} title="Subscription Revenue Reports"> 
-                        <SubscriptionReportWidget transactions={subscriptionTransactions} /> 
+                        <SubscriptionReportWidget transactions={premiums.map(p => {
+                            const u = users.find(usr => usr.id === p.user_id);
+                            return {
+                                id: p.id,
+                                created_at: p.granted_at,
+                                subscriber: u?.full_name || u?.email || "Unknown",
+                                plan: p.plan_cycle,
+                                method: p.payment_method,
+                                ref: p.payment_ref,
+                                amount: p.amount,
+                                type: p.access_type
+                            };
+                        })} /> 
                     </Modal> 
                 )}
                 {modals.manageTeam && ( 

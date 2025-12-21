@@ -21,7 +21,7 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
     const totalOwed = loan.total_owed || loan.amount;
     const outstanding = totalOwed - (loan.repaid_amount || 0);
 
-    const [amount, setAmount] = useState<string>(outstanding.toFixed(2));
+    const [amount, setAmount] = useState<string>('');
     const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>('Record Repayment Received');
     const [loading, setLoading] = useState<boolean>(false);
@@ -96,9 +96,9 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
 
             if (!loanResponse.ok) throw new Error("Failed to update loan record.");
 
-            // 4. POST Transaction (Record Income)
+            // 4. POST Transaction (Record Income for Creditor)
             const debtorName = loan.debtor?.full_name || loan.debtor_name || 'the borrower';
-            const transactionData = {
+            const creditorIncomeData = {
                 user_id: user.uid,
                 family_id: null, // Personal income
                 type: 'income',
@@ -108,13 +108,37 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
                 // created_at is handled by backend default
             };
 
-            const txResponse = await fetch(`${API_URL}/transactions`, {
+            const creditorTxResponse = await fetch(`${API_URL}/transactions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(transactionData)
+                body: JSON.stringify(creditorIncomeData)
             });
 
-            if (!txResponse.ok) throw new Error("Loan updated, but failed to record income transaction.");
+            if (!creditorTxResponse.ok) throw new Error("Loan updated, but failed to record creditor income transaction.");
+
+            // 5. POST Transaction (Record Expense for Debtor) - CRITICAL FIX
+            if (loan.debtor_id) {
+                const creditorName = user.full_name || 'the lender';
+                const debtorExpenseData = {
+                    user_id: loan.debtor_id, // Debtor's UID
+                    family_id: null, // Personal expense
+                    type: 'expense',
+                    amount: repaymentAmount,
+                    description: `Repayment sent to ${creditorName} for: ${loan.description}`,
+                    attachment_url: receiptUrl // Optional: Debtor doesn't usually need the receipt, but keeping it consistent
+                };
+
+                // NOTE: We log a warning if this fails, but allow the Creditor transaction to succeed.
+                const debtorTxResponse = await fetch(`${API_URL}/transactions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(debtorExpenseData)
+                });
+                
+                if (!debtorTxResponse.ok) {
+                    console.warn(`Warning: Failed to record debtor expense transaction for UID: ${loan.debtor_id}`);
+                }
+            }
 
             onSuccess();
 

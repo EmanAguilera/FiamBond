@@ -125,6 +125,7 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
     const isBorrower = user.uid === loan.debtor_id;
     const totalOwed = loan.total_owed || loan.amount; 
     const outstanding = totalOwed - (loan.repaid_amount || 0);
+    const hasNoRepayments = (loan.repaid_amount || 0) === 0;
     
     const isPendingInitialConfirmation = isBorrower && loan.status === 'pending_confirmation';
     const isPendingRepaymentConfirmation = isCreditor && !!loan.pending_repayment;
@@ -236,8 +237,12 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
                                     Make Repayment
                                 </button>
                             )}
-                            {isCreditor && outstanding > 0 && loan.status === 'outstanding' && (
-                                <button onClick={() => setIsRecordRepaymentModalOpen(true)} className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors shadow-sm">
+                            {isCreditor && outstanding > 0 && loan.status === 'outstanding' && !loan.pending_repayment && (
+                                <button
+                                    onClick={() => setIsRecordRepaymentModalOpen(true)}
+                                    disabled={!isPersonalLoan}
+                                    className={`px-3 py-1.5 text-xs font-bold text-white rounded transition-colors shadow-sm ${!isPersonalLoan ? 'bg-slate-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                                >
                                     Record Repayment
                                 </button>
                             )}
@@ -339,9 +344,9 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
                 const isCreditor = user.uid === loan.creditor_id;
                 const isBorrower = user.uid === loan.debtor_id;
                 
-                if ((isBorrower && loan.status === 'pending_confirmation') || (isCreditor && !!loan.pending_repayment)) { 
-                    actionRequired.push(loan); 
-                } else if (isCreditor) { 
+                if ((loan.status === 'pending_confirmation') || (isCreditor && !!loan.pending_repayment)) {
+                    actionRequired.push(loan);
+                } else if (isCreditor) {
                     lent.push(loan); 
                 } else if (isBorrower) { 
                     borrowed.push(loan); 
