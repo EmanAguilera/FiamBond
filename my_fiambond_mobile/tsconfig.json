@@ -1,0 +1,15 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "./src/types/react-native-web.d.ts"
+, "src/Components/Personal/Finance/PersonalTransactionsWidget.jsx", "src/Components/Personal/Goal/GoalListsWidget.jsx"  ],
+  "exclude": [
+    "node_modules",
+    "src/config/firebase-config.js"
+  ]
+}

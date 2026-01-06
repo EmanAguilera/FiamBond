@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState, useCallback, lazy, Suspense, useMemo } from "react";
 import { AppContext } from "../../Context/AppContext.jsx";
 import { useNavigate } from "react-router-dom"; 
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"; 
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore"; 
 import { db } from "../../config/firebase-config.js"; 
 
 // --- WIDGET IMPORTS ---
@@ -122,9 +122,6 @@ export default function UserDashboard() {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
-    // UI & Data State
-    const [isAdmin, setIsAdmin] = useState(false);
-    
     // NEW SUBSCRIPTION LOGIC (Using AppContext detailed dates)
     const isCompanyActive = useMemo(() => {
         if (user?.role === 'admin') return true;
@@ -232,7 +229,10 @@ export default function UserDashboard() {
             await updateDoc(userRef, updates);
             toggleModal(isFamily ? 'applyFamily' : 'applyCompany', false);
             alert("Success! Request submitted for review.");
-        } catch (error) { alert("Failed to submit request."); }
+        } catch (error) { // FIX: Changed '_error' to 'error' and handle it directly.
+            console.error("Upgrade submission failed:", error); 
+            alert("Failed to submit request."); 
+        }
     };
 
     if (activeFamilyRealm) return <Suspense fallback={<div/>}><FamilyRealm family={activeFamilyRealm} onBack={() => setActiveFamilyRealm(null)} onDataChange={refresh} /></Suspense>;
