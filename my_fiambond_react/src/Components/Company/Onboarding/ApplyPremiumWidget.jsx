@@ -2,8 +2,8 @@ import { useState, useContext, useRef } from "react";
 import Tesseract from 'tesseract.js';
 import { AppContext } from "../../../Context/AppContext"; 
 
+// --- UPDATED: ONLY GCASH PROVIDER ---
 const PAYMENT_PROVIDERS = {
-    // ... (same as before)
     gcash: {
         id: 'gcash',
         label: 'GCash',
@@ -13,26 +13,6 @@ const PAYMENT_PROVIDERS = {
         bgLight: 'bg-blue-50',
         number: '0917-123-4567',
         accountName: 'Eman Ryan L. Aguilera'
-    },
-    maya: {
-        id: 'maya',
-        label: 'Maya',
-        color: 'bg-green-600',
-        ring: 'ring-green-100',
-        text: 'text-green-600',
-        bgLight: 'bg-green-50',
-        number: '0918-987-6543',
-        accountName: 'Eman Ryan L. Aguilera'
-    },
-    bdo: {
-        id: 'bdo',
-        label: 'BDO Unibank',
-        color: 'bg-indigo-700',
-        ring: 'ring-indigo-100',
-        text: 'text-indigo-700',
-        bgLight: 'bg-indigo-50',
-        number: '0012-3456-7890',
-        accountName: 'FiamBond Inc.'
     }
 };
 
@@ -54,19 +34,22 @@ export default function ApplyPremiumWidget({ onClose, onUpgradeSuccess, targetAc
     
     const [step, setStep] = useState(1);
     const [billingCycle, setBillingCycle] = useState('monthly');
-    const [selectedProviderKey, setSelectedProviderKey] = useState('gcash');
-    
+    // FIX: Removed setSelectedProviderKey as it's not used now that provider is fixed to GCash
     const [isScanning, setIsScanning] = useState(false);
     const [refNumber, setRefNumber] = useState('');
     const fileInputRef = useRef(null);
+
+    // FIX: Provider key is fixed, no need for state
+    const selectedProviderKey = 'gcash'; 
 
     // Access tier-specific price
     const selectedPlan = prices[billingCycle][targetAccess]; 
     const activeProvider = PAYMENT_PROVIDERS[selectedProviderKey];
     
     // UI Labels
-    const accessLabel = targetAccess === 'family' ? 'Family Access' : 'Company Access';
+    // FIX: accessLabel was unused. Calculating access text directly now.
     const accessHeader = targetAccess === 'family' ? 'Premium Family Access' : 'Full Company Access';
+    const getAccessLabel = () => targetAccess === 'family' ? 'Family Access' : 'Company Access'; // Helper for repeated use
 
     // --- AI SCANNING ---
     const handleFileUpload = (event) => {
@@ -143,15 +126,11 @@ export default function ApplyPremiumWidget({ onClose, onUpgradeSuccess, targetAc
                         <button onClick={() => setBillingCycle('yearly')} className={`flex-1 py-2 rounded-md transition-all ${billingCycle === 'yearly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Yearly ({targetAccess === 'company' ? '-20%' : '-16.6%'})</button>
                     </div>
 
-                    <p className="text-xs text-left font-bold text-gray-400 uppercase mb-2">Select Payment Method</p>
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                        {Object.keys(PAYMENT_PROVIDERS).map((key) => {
-                            const p = PAYMENT_PROVIDERS[key];
-                            return (
-                                <button key={key} onClick={() => setSelectedProviderKey(key)} className={`py-3 px-1 text-[10px] sm:text-xs font-bold rounded-xl border transition-all duration-200 ${selectedProviderKey === key ? `${p.color} text-white border-transparent shadow-lg transform scale-105` : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>{p.label}</button>
-                            );
-                        })}
-                    </div>
+                    {/* FIX: Removed redundant text-gray-800 class */}
+                    <p className="text-sm font-bold mb-3 text-center inline-flex items-center px-4 py-2 rounded-full bg-blue-100/70 text-blue-800">
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm-1 15v-2h2v2h-2zm0-4V7h2v6h-2z" /></svg>
+                        Pay via GCash Only
+                    </p>
 
                     <div className={`border-2 border-dashed ${activeProvider.bgLight} ${activeProvider.text.replace('text', 'border')} p-5 rounded-xl mb-6 relative overflow-hidden transition-all duration-300`}>
                         <p className="text-xs text-gray-600 mb-1">Send <strong className="text-gray-900">{selectedPlan.label}</strong> to:</p>
@@ -159,8 +138,8 @@ export default function ApplyPremiumWidget({ onClose, onUpgradeSuccess, targetAc
                         <p className="text-xs text-gray-500 mt-1 uppercase font-semibold">{activeProvider.accountName}</p>
                     </div>
 
-                    {/* UPDATED BUTTON TEXT */}
-                    <button onClick={() => setStep(2)} className={`w-full py-3 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-all ${activeProvider.color}`}>I have paid for {accessLabel}, Scan Receipt</button>
+                    {/* FIX: Using the helper function for the button text */}
+                    <button onClick={() => setStep(2)} className={`w-full py-3 text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-all ${activeProvider.color}`}>I have sent {selectedPlan.label} to GCash, Scan Receipt</button>
                     <button onClick={onClose} className="mt-3 text-xs text-gray-400 hover:text-gray-600">Cancel</button>
                 </div>
             )}
@@ -178,21 +157,21 @@ export default function ApplyPremiumWidget({ onClose, onUpgradeSuccess, targetAc
                         ) : (
                             <div className="flex flex-col items-center group">
                                 <svg className={`w-10 h-10 mb-3 transition-transform group-hover:-translate-y-1 ${activeProvider.text}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                <p className="text-sm font-bold text-gray-700">Tap to Upload Screenshot</p>
+                                <p className="text-sm font-bold text-gray-700">Tap to Upload Screenshot/Receipt</p>
                             </div>
                         )}
                     </div>
 
                     <div className="text-left mb-6">
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Reference Number</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">GCash Reference Number</label>
                         <div className="relative">
                             <input type="text" value={refNumber} onChange={(e) => setRefNumber(e.target.value)} placeholder={isScanning ? "Scanning..." : "e.g. 100554223"} className={`w-full p-3 pl-4 border rounded-lg outline-none font-mono text-lg tracking-widest transition-all ${refNumber ? 'border-green-500 bg-green-50 text-green-800 focus:ring-2 focus:ring-green-200' : 'border-gray-300 focus:border-indigo-500'}`} />
                         </div>
                     </div>
 
-                    {/* UPDATED BUTTON TEXT */}
-                    <button onClick={handleSubmit} disabled={isScanning || !refNumber} className={`w-full py-3 text-white rounded-lg font-bold shadow-lg transition-all ${isScanning || !refNumber ? 'bg-gray-300 cursor-not-allowed' : `${activeProvider.color} hover:opacity-90`}`}>Verify & Unlock {accessLabel}</button>
-                    <button onClick={() => { setStep(1); setRefNumber(''); }} className="w-full mt-3 py-2 text-gray-400 text-xs font-medium hover:text-gray-600">Change Payment Method</button>
+                    {/* FIX: Using the helper function for the button text */}
+                    <button onClick={handleSubmit} disabled={isScanning || !refNumber} className={`w-full py-3 text-white rounded-lg font-bold shadow-lg transition-all ${isScanning || !refNumber ? 'bg-gray-300 cursor-not-allowed' : `${activeProvider.color} hover:opacity-90`}`}>Submit for Admin Verification & Unlock {getAccessLabel()}</button>
+                    <button onClick={() => { setStep(1); setRefNumber(''); }} className="w-full mt-3 py-2 text-gray-400 text-xs font-medium hover:text-gray-600">Back to Payment</button>
                 </div>
             )}
         </div>
