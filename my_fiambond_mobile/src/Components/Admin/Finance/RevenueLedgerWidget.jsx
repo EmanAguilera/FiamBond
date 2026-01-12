@@ -1,17 +1,11 @@
-import React, { memo, useMemo } from 'react';
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    ScrollView, 
-    Dimensions 
-} from 'react-native';
-// NOTE: Ensure your AdminUserRow component is a React Native component
-import { AdminUserRow } from '../Users/AdminUserRow'; 
+import React, { memo } from 'react';
+import { View, Text, ScrollView } from 'react-native';
+import { AdminUserRow } from '../Users/AdminUserRow.tsx'; 
 
-const windowHeight = Dimensions.get('window').height;
+// Removed TypeScript interface to make this a valid JavaScript file.
+// If you want type checking, consider renaming the file to .tsx and ensuring your project supports TypeScript.
 
-const RevenueLedgerWidget = ({ premiums, users, currentAdminId }) => {
+const RevenueLedgerWidget = ({ premiums = [], users = [], currentAdminId }) => {
 
     const getAllTransactions = () => {
         // Build the ledger from the premiums collection (History)
@@ -29,9 +23,6 @@ const RevenueLedgerWidget = ({ premiums, users, currentAdminId }) => {
                     ? new Date(dateVal.seconds * 1000).toLocaleDateString() 
                     : 'Unknown Date';
 
-                const badgeTheme = p.access_type === 'family' ? 'blue' : 'emerald';
-                const colorKey = badgeTheme === 'emerald' ? 'emerald' : 'indigo'; // Maps to RN styles
-
                 return {
                     uniqueId: p.id,
                     user: userData,
@@ -39,8 +30,9 @@ const RevenueLedgerWidget = ({ premiums, users, currentAdminId }) => {
                     plan: (p.plan_cycle || 'MONTHLY').toUpperCase(),
                     price: p.amount || 0,
                     date: dateStr,
-                    colorKey: colorKey, // Used to select price text color style
-                    badgeTheme: badgeTheme, // Used to select badge color styles
+                    // Colors and Themes
+                    color: p.access_type === 'family' ? 'text-indigo-600' : 'text-emerald-600',
+                    badgeTheme: p.access_type === 'family' ? 'blue' : 'emerald',
                     timestamp: dateVal?.seconds || 0
                 };
             })
@@ -48,52 +40,39 @@ const RevenueLedgerWidget = ({ premiums, users, currentAdminId }) => {
             .sort((a, b) => b.timestamp - a.timestamp);
     };
 
-    // Use useMemo to prevent recalculating transactions on every render if props haven't changed
-    const transactions = useMemo(getAllTransactions, [premiums, users, currentAdminId]);
-    
-    // Style helper functions
-    const getPriceColorStyle = (colorKey) => {
-        return colorKey === 'emerald' ? styles.priceTextEmerald : styles.priceTextIndigo;
-    };
-    const getBadgeStyle = (badgeTheme) => {
-        return badgeTheme === 'emerald' ? styles.badgeEmerald : styles.badgeIndigo;
-    };
-    const getBadgeTextStyle = (badgeTheme) => {
-        return badgeTheme === 'emerald' ? styles.badgeTextEmerald : styles.badgeTextIndigo;
-    };
-
+    const transactions = getAllTransactions();
 
     return (
-        <View style={styles.container}>
-            {/* max-h-[60vh] overflow-y-auto pr-2 */}
+        <View className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
             <ScrollView 
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollViewContent}
+                className="max-h-[500px]" 
+                showsVerticalScrollIndicator={false}
             >
                 {transactions.length > 0 ? (
-                    <View style={styles.listContainer}>
+                    <View>
                         {transactions.map(item => (
                             <AdminUserRow 
                                 key={item.uniqueId} 
                                 user={item.user}
-                                // We override the buttons to show the price instead
+                                // Overriding rightContent to show price and meta
                                 rightContent={
-                                    <View style={styles.rightContentStyle}>
-                                        {/* + ₱{item.price.toLocaleString()} */}
-                                        <Text style={[styles.priceTextBase, getPriceColorStyle(item.colorKey)]}>
-                                            + ₱{item.price.toLocaleString('en-US')}
+                                    <View className="items-end min-w-[110px]">
+                                        <Text className={`font-black text-lg tracking-tighter ${item.color}`}>
+                                            + ₱{item.price.toLocaleString()}
                                         </Text>
-                                        
-                                        <View style={styles.badgeInfoContainer}>
-                                            {/* Badge: {item.type} • {item.plan} */}
-                                            <View style={[styles.badgeBase, getBadgeStyle(item.badgeTheme)]}>
-                                                <Text style={[styles.badgeTextSmall, getBadgeTextStyle(item.badgeTheme)]}>
+                                        <View className="flex-row items-center gap-x-2 mt-1">
+                                            <View className={`px-2 py-0.5 rounded-full border ${
+                                                item.badgeTheme === 'emerald' 
+                                                ? 'bg-emerald-50 border-emerald-100' 
+                                                : 'bg-indigo-50 border-indigo-100'
+                                            }`}>
+                                                <Text className={`text-[8px] font-black uppercase ${
+                                                    item.badgeTheme === 'emerald' ? 'text-emerald-700' : 'text-indigo-700'
+                                                }`}>
                                                     {item.type} • {item.plan}
                                                 </Text>
                                             </View>
-                                            
-                                            {/* Date: {item.date} */}
-                                            <Text style={styles.dateText}>
+                                            <Text className="text-[9px] text-slate-400 font-bold uppercase">
                                                 {item.date}
                                             </Text>
                                         </View>
@@ -103,105 +82,18 @@ const RevenueLedgerWidget = ({ premiums, users, currentAdminId }) => {
                         ))}
                     </View>
                 ) : (
-                    <View style={styles.noDataContainer}>
-                        <Text style={styles.noDataText}>No revenue transactions recorded yet.</Text>
+                    <View className="p-20 items-center justify-center">
+                        <Text className="text-slate-400 italic text-sm text-center">
+                            No revenue transactions recorded yet.
+                        </Text>
                     </View>
                 )}
+                
+                {/* Scroll Bottom Padding */}
+                <View className="h-10" />
             </ScrollView>
         </View>
     );
 };
 
 export default memo(RevenueLedgerWidget);
-
-// --- STYLESHEET (Mapping Tailwind to React Native) ---
-const styles = StyleSheet.create({
-    container: {
-        maxHeight: windowHeight * 0.60, // max-h-[60vh]
-        overflow: 'hidden',
-        backgroundColor: '#fff',
-        borderRadius: 8,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollViewContent: {
-        paddingRight: 8, // pr-2
-    },
-    listContainer: {
-        flexDirection: 'column',
-        gap: 8, // gap-2
-    },
-
-    // Transaction/Price Display (flex flex-col items-end min-w-[100px])
-    rightContentStyle: {
-        flexDirection: 'column',
-        alignItems: 'flex-end',
-        minWidth: 100,
-    },
-    
-    // Price Text (font-bold text-lg tracking-tight)
-    priceTextBase: {
-        fontWeight: 'bold',
-        fontSize: 18, // text-lg
-        letterSpacing: -0.5, // tracking-tight
-    },
-    priceTextEmerald: {
-        color: '#059669', // text-emerald-600
-    },
-    priceTextIndigo: {
-        color: '#4f46e5', // text-indigo-600
-    },
-
-    // Badge and Date Info (flex items-center gap-2 mt-1 opacity-90)
-    badgeInfoContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8, // gap-2
-        marginTop: 4, // mt-1
-        opacity: 0.9,
-    },
-
-    // Badge Base (border px-1.5 py-0.5 rounded uppercase)
-    badgeBase: {
-        borderWidth: 1,
-        paddingHorizontal: 6, // px-1.5
-        paddingVertical: 2, // py-0.5
-        borderRadius: 4, 
-        textTransform: 'uppercase',
-    },
-    badgeTextSmall: {
-        fontSize: 10, // text-[10px]
-        fontWeight: 'bold',
-        letterSpacing: 0.5, // tracking-wider
-    },
-    
-    // Emerald Badge (bg-emerald-50 text-emerald-700 border-emerald-200)
-    badgeEmerald: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' },
-    badgeTextEmerald: { color: '#047857' },
-    
-    // Indigo Badge (bg-indigo-50 text-indigo-700 border-indigo-200)
-    badgeIndigo: { backgroundColor: '#eef2ff', borderColor: '#c7d2fe' },
-    badgeTextIndigo: { color: '#4338ca' },
-
-    // Date Text (text-[10px] text-slate-400 font-medium)
-    dateText: {
-        fontSize: 10,
-        color: '#94a3b8', // text-slate-400
-        fontWeight: '500', // font-medium
-    },
-
-    // No Data State (flex flex-col items-center justify-center py-12 text-center)
-    noDataContainer: {
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 48, // py-12
-        textAlign: 'center',
-    },
-    noDataText: {
-        color: '#94a3b8', // text-slate-400
-        fontStyle: 'italic', // italic
-        fontSize: 14, // text-sm
-    }
-});

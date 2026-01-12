@@ -1,36 +1,45 @@
 import React, { useContext, useEffect, useState } from "react";
-import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
-// Import the necessary Firestore functions for React Native
-import { doc, getDoc } from "firebase/firestore"; 
+import { 
+    View, 
+    Text, 
+    ActivityIndicator, 
+    SafeAreaView 
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { AppContext } from "../../Context/AppContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../config/firebase-config";
 
-// NOTE: You must replace these imports with your actual project structure and Native equivalents
-// Assuming AppContext, db, and config are correctly set up
-import { AppContext } from "../../Context/AppContext"; 
-import { db } from "../../config/firebase-config"; 
+// Removed TypeScript interface to make this a valid JavaScript file.
+// If you want type checking, consider renaming the file to .tsx and ensuring your project supports TypeScript.
 
-// The component takes the screens to render as props
-export default function AdminRoute({ AdminComponent, FallbackComponent }) {
-    const { user, loading } = useContext(AppContext);
+export default function AdminRoute({ children }) {
+    const context = useContext(AppContext);
+    const user = context?.user;
+    const loading = context?.loading;
+    
+    const navigation = useNavigation();
     const [isAdmin, setIsAdmin] = useState(false);
     const [checkingRole, setCheckingRole] = useState(true);
 
     useEffect(() => {
         const checkAdminRole = async () => {
-            if (user && user.uid) {
+            if (user) {
                 try {
-                    // Check if the user document exists and has the 'admin' role
                     const userDoc = await getDoc(doc(db, "users", user.uid));
                     if (userDoc.exists() && userDoc.data().role === "admin") {
                         setIsAdmin(true);
                     } else {
-                        setIsAdmin(false);
+                        // REPLACEMENT FOR <Navigate to="/" replace />
+                        // Redirects the user back to the Home screen if they aren't an admin
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Home' }],
+                        });
                     }
                 } catch (error) {
                     console.error("Error verifying admin:", error);
-                    setIsAdmin(false); // Fallback on error
                 }
-            } else {
-                setIsAdmin(false);
             }
             setCheckingRole(false);
         };
@@ -38,48 +47,22 @@ export default function AdminRoute({ AdminComponent, FallbackComponent }) {
         if (!loading) {
             checkAdminRole();
         }
-        
-        // Reset state when loading is true (e.g., waiting for user to load after log out)
-        if (loading) {
-            setIsAdmin(false);
-            setCheckingRole(true);
-        }
-        
-        // Clean up any effects if the component unmounts quickly
-        return () => {
-             setIsAdmin(false);
-             setCheckingRole(true);
-        };
-        
-    }, [user, loading]);
+    }, [user, loading, navigation]);
 
-
-    // --- RENDERING LOGIC ---
-
+    // --- LOADING STATE ---
     if (loading || checkingRole) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#4F46E5" />
-                <Text style={styles.loadingText}>Verifying Permissions...</Text>
-            </View>
+            <SafeAreaView className="flex-1 bg-white items-center justify-center">
+                <ActivityIndicator size="large" color="#4f46e5" />
+                <Text className="mt-4 text-slate-500 font-bold tracking-tight">
+                    Verifying Permissions...
+                </Text>
+            </SafeAreaView>
         );
     }
 
-    // Render the appropriate component based on admin status
-    return isAdmin ? <AdminComponent /> : <FallbackComponent />;
+    // --- RENDER CHILDREN (Replacement for <Outlet />) ---
+    // If the user is an admin, we render the screen content.
+    // Otherwise, we return null (the useEffect above handles the redirect).
+    return isAdmin ? <>{children}</> : null;
 }
-
-// --- STYLESHEET ---
-const styles = StyleSheet.create({
-    loadingContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-    },
-    loadingText: {
-        marginTop: 10,
-        fontSize: 16,
-        color: '#475569',
-    },
-});

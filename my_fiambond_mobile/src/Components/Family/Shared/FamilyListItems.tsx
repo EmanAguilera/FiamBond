@@ -1,100 +1,44 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useContext, memo } from 'react';
 import { 
     View, 
     Text, 
-    TouchableOpacity, 
     TextInput, 
-    StyleSheet, 
+    TouchableOpacity, 
     Alert, 
-    Dimensions, 
-    Platform,
-    ActivityIndicator,
-    ViewStyle
+    ActivityIndicator 
 } from 'react-native';
 import { AppContext } from '../../../Context/AppContext.jsx';
 
-// --- INTERFACES FOR TYPE SAFETY ---
-interface Family {
-    id: string;
-    family_name: string;
-    owner_id: string;
-    owner?: { full_name: string };
-    [key: string]: any;
-}
-
 interface FamilyListItemProps {
-    family: Family;
-    onFamilyUpdated: (updatedFamily: Family) => void;
+    family: any;
+    onFamilyUpdated: (updatedFamily: any) => void;
     onFamilyDeleted: (familyId: string) => void;
 }
 
-// Interfaces for Context Fix 
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
+function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }: FamilyListItemProps) {
+    const context = useContext(AppContext) as any;
+    const user = context?.user;
 
-// Button Base Style properties (for manual merging)
-// NOTE: This is the single definition, fixing error 2451 by removing the redundant one below.
-const BASE_BTN_PROPERTIES = {
-    paddingVertical: 6, 
-    paddingHorizontal: 12, 
-    borderRadius: 6, 
-    alignItems: 'center',
-    justifyContent: 'center',
-} as const;
-
-export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }: FamilyListItemProps) {
-    const { user } = useContext(AppContext)! as AppContextType; 
-    
     const [isEditing, setIsEditing] = useState(false);
     const [familyName, setFamilyName] = useState(family.family_name);
-    const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const API_URL = 'http://localhost:3000/api'; 
+    // API URL Setup (Use your computer's IP for physical devices)
+    const API_URL = 'http://localhost:3000';
 
     const isOwner = user?.uid === family.owner_id;
-    const canPerformActions = isOwner;
 
-    // Memoize the dynamic styles based on screen width
-    const dynamicStyles = useMemo(() => {
-        const isSmallScreen = Dimensions.get('window').width < 600;
-        return StyleSheet.create({
-            displayArea: {
-                flexDirection: isSmallScreen ? 'column' : 'row',
-                justifyContent: 'space-between',
-                alignItems: isSmallScreen ? 'flex-start' : 'center',
-                gap: 16, 
-            },
-            actionsWrapper: {
-                flexDirection: 'row',
-                width: isSmallScreen ? '100%' : 'auto',
-                alignItems: 'center',
-                gap: 8, 
-                flexShrink: 0,
-                marginTop: isSmallScreen ? 8 : 0,
-            },
-            btnFlex: {
-                flex: isSmallScreen ? 1 : 0, 
-            }
-        });
-    }, [Dimensions.get('window').width]);
-    
     async function handleUpdate() {
-        if (!familyName.trim() || familyName === family.family_name) {
-            setIsEditing(false);
+        if (!familyName.trim()) {
+            setError("Name cannot be empty.");
             return;
         }
 
         setLoading(true);
         setError(null);
         try {
+            // 1. Send PATCH request to Node.js Backend
             const response = await fetch(`${API_URL}/families/${family.id}`, {
                 method: 'PATCH',
                 headers: {
@@ -104,18 +48,18 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
             });
 
             if (!response.ok) {
-                throw new Error('Failed to update family name on server.');
+                throw new Error('Failed to update family name.');
             }
 
+            // 2. Update UI via Parent Callback
             const updatedFamily = { ...family, family_name: familyName };
             onFamilyUpdated(updatedFamily);
             setIsEditing(false);
             Alert.alert("Success", "Family name updated.");
 
-        } catch (err: any) {
-            console.error('Failed to update family:', err);
+        } catch (err) {
+            console.error('Update error:', err);
             setError('Failed to update the family name.');
-            Alert.alert("Error", 'Failed to update the family name.');
         } finally {
             setLoading(false);
         }
@@ -123,8 +67,8 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
 
     async function handleDelete() {
         Alert.alert(
-            "Confirm Deletion",
-            `Are you sure you want to delete the family "${family.family_name}"? This action cannot be undone.`,
+            "Delete Family",
+            `Are you sure you want to delete "${family.family_name}"? This action cannot be undone.`,
             [
                 { text: "Cancel", style: "cancel" },
                 { 
@@ -138,160 +82,89 @@ export default function FamilyListItem({ family, onFamilyUpdated, onFamilyDelete
                                 method: 'DELETE',
                             });
 
-                            if (!response.ok) {
-                                throw new Error('Failed to delete family on server.');
-                            }
+                            if (!response.ok) throw new Error('Failed to delete.');
                             
                             onFamilyDeleted(family.id);
-                            Alert.alert("Success", "Family deleted.");
-
-                        } catch (err: any) {
-                            console.error('Failed to delete family:', err);
+                            Alert.alert("Deleted", "Family realm has been removed.");
+                        } catch (err) {
                             setError('Failed to delete the family.');
-                            Alert.alert("Error", 'Failed to delete the family.');
                         } finally {
                             setLoading(false);
                         }
-                    } 
-                },
+                    }
+                }
             ]
         );
     }
 
     return (
-        <View style={styles.container}>
+        <View className="p-5 bg-white border border-slate-100 rounded-3xl mb-4 shadow-sm">
             {isEditing ? (
-                <View style={styles.editForm}>
+                <View className="space-y-4">
+                    <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Rename Family</Text>
                     <TextInput
-                        style={styles.textInput}
                         value={familyName}
                         onChangeText={setFamilyName}
-                        editable={!loading}
+                        placeholder="Family Name"
+                        className="w-full p-4 border border-slate-200 rounded-2xl bg-slate-50 text-slate-800 text-base"
+                        autoFocus
+                        returnKeyType="done"
                     />
-                    <TouchableOpacity onPress={handleUpdate} style={[styles.primaryBtnSm, dynamicStyles.btnFlex]} disabled={loading}>
-                        {loading ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.primaryBtnTextSm}>Save</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setIsEditing(false)} style={[styles.secondaryBtnSm, dynamicStyles.btnFlex]} disabled={loading}>
-                        <Text style={styles.secondaryBtnTextSm}>Cancel</Text>
-                    </TouchableOpacity>
+                    <View className="flex-row gap-2">
+                        <TouchableOpacity 
+                            onPress={handleUpdate}
+                            disabled={loading}
+                            className="flex-1 bg-indigo-600 py-3 rounded-xl items-center justify-center"
+                        >
+                            {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold">Save</Text>}
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            onPress={() => { setIsEditing(false); setFamilyName(family.family_name); }}
+                            className="flex-1 bg-slate-100 py-3 rounded-xl items-center justify-center"
+                        >
+                            <Text className="text-slate-600 font-bold">Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             ) : (
-                <View style={dynamicStyles.displayArea}>
-                    <View style={styles.detailsWrapper}> 
-                        <Text style={styles.familyName} numberOfLines={1}>{family.family_name}</Text>
-                        <Text style={styles.ownerText} numberOfLines={1}>Owner: {family.owner?.full_name || 'Loading...'}</Text>
+                <View className="flex-row justify-between items-center">
+                    <View className="flex-1 mr-4"> 
+                        <Text className="font-bold text-lg text-slate-800" numberOfLines={1}>
+                            {family.family_name}
+                        </Text>
+                        <Text className="text-[10px] text-slate-400 font-medium uppercase mt-1">
+                            Owner: {family.owner?.full_name || 'Loading...'}
+                        </Text>
                     </View>
                     
-                    <View style={dynamicStyles.actionsWrapper}> 
+                    <View className="flex-row items-center gap-2"> 
                         {isOwner && (
                             <>
                                 <TouchableOpacity
                                     onPress={() => setIsEditing(true)}
-                                    style={[styles.secondaryBtnSm, dynamicStyles.btnFlex]}
-                                    disabled={!canPerformActions || loading}
+                                    className="bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-100"
                                 >
-                                    <Text style={styles.secondaryBtnTextSm}>Rename</Text>
+                                    <Text className="text-indigo-600 font-bold text-[10px]">Rename</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={handleDelete}
-                                    style={[styles.dangerBtnSm, dynamicStyles.btnFlex]}
-                                    disabled={!canPerformActions || loading}
+                                    className="bg-rose-50 px-3 py-2 rounded-lg border border-rose-100"
                                 >
-                                    {loading ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.dangerBtnTextSm}>Delete</Text>}
+                                    <Text className="text-rose-600 font-bold text-[10px]">Delete</Text>
                                 </TouchableOpacity>
                             </>
                         )}
                     </View>
                 </View>
             )}
-            {error && <Text style={styles.errorText}>{error}</Text>}
+
+            {error && (
+                <View className="mt-3 bg-rose-50 p-2 rounded-lg">
+                    <Text className="text-[10px] text-rose-600 text-center font-bold">{error}</Text>
+                </View>
+            )}
         </View>
     );
 }
 
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        padding: 16, 
-        backgroundColor: '#F9FAFB', 
-        borderWidth: 1,
-        borderColor: '#E5E7EB', 
-        borderRadius: 6, 
-        gap: 12, 
-    },
-    
-    // Edit Form Styles
-    editForm: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12, 
-    },
-    textInput: {
-        flex: 1,
-        padding: 8, 
-        borderWidth: 1,
-        borderColor: '#D1D5DB', 
-        borderRadius: 6, 
-        fontSize: 16,
-    },
-    
-    // Display Styles
-    detailsWrapper: {
-        minWidth: 0, 
-        flexShrink: 1, 
-    },
-    familyName: {
-        fontWeight: '600', 
-        fontSize: 18, 
-        color: '#374151', 
-    },
-    ownerText: {
-        fontSize: 12, 
-        color: '#6B7280', 
-    },
-    
-    // Primary Button (Save)
-    primaryBtnSm: {
-        ...BASE_BTN_PROPERTIES, 
-        backgroundColor: '#4F46E5', 
-    } as ViewStyle, 
-
-    primaryBtnTextSm: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 14,
-    },
-    
-    // Secondary Button (Rename/Cancel)
-    secondaryBtnSm: {
-        ...BASE_BTN_PROPERTIES, 
-        backgroundColor: 'white', 
-        borderWidth: 1,
-        borderColor: '#D1D5DB', 
-    } as ViewStyle, 
-
-    secondaryBtnTextSm: {
-        color: '#4B5563', 
-        fontWeight: 'bold',
-        fontSize: 14,
-    },
-    
-    // Danger Button (Delete)
-    dangerBtnSm: {
-        ...BASE_BTN_PROPERTIES, 
-        backgroundColor: '#DC2626', 
-    } as ViewStyle, 
-
-    dangerBtnTextSm: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 14,
-    },
-    
-    // Error Text
-    errorText: {
-        color: '#DC2626', 
-        fontSize: 12, 
-        marginTop: 8,
-    },
-});
+export default memo(FamilyListItem);

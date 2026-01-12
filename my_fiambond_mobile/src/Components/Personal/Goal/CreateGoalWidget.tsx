@@ -1,184 +1,144 @@
 import React, { useState, useContext } from "react";
 import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Alert, 
-  ActivityIndicator, 
-  Platform 
+    View, 
+    Text, 
+    TextInput, 
+    TouchableOpacity, 
+    ActivityIndicator, 
+    Alert, 
+    Platform 
 } from "react-native";
-import { AppContext } from "../../../Context/AppContext.jsx";
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { AppContext } from "../../../Context/AppContext";
 
-// --- INTERFACES FOR TYPE SAFETY ---
 interface CreateGoalWidgetProps {
-  onSuccess?: () => void;
+    onSuccess?: () => void;
 }
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
-
-// NOTE: For a production app, the date input below should be replaced with a native date picker
-// component like '@react-native-community/datetimepicker' or similar.
 
 export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
-  // FIX 1: Assert context type with non-null assertion (!)
-  const { user } = useContext(AppContext)! as AppContextType; 
-  const API_URL = 'http://localhost:3000/api'; // Simplified URL
-
-  const [formData, setFormData] = useState({ name: "", target_amount: "", target_date: "" });
-  const [loading, setLoading] = useState(false);
-
-  const handleCreateGoal = async () => {
-    // Safe check for user object access (user is now User | null)
-    if (!user || !user.uid) return Alert.alert("Error", "Login required");
+    // Cast context to any for safety with existing JS context files
+    const context = useContext(AppContext) as any;
+    const user = context?.user;
     
-    if (!formData.name || !formData.target_amount || !formData.target_date) {
-        return Alert.alert("Error", "All fields are required.");
-    }
+    // Replace with your local IP if testing on a physical device
+    const API_URL = 'http://localhost:3000';
 
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/goals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.uid, // SAFE access now
-          family_id: null, 
-          name: formData.name,
-          target_amount: parseFloat(formData.target_amount),
-          // Ensure target_date is a valid ISO string
-          target_date: new Date(formData.target_date).toISOString(), 
-          status: "active",
-        }),
-      });
+    const [formData, setFormData] = useState({ 
+        name: "", 
+        target_amount: "", 
+        target_date: new Date() 
+    });
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-      // FIX 2: Corrected 'new new Error' to 'new Error'
-      if (!res.ok) throw new Error('Server error'); 
+    const handleCreateGoal = async () => {
+        if (!user) return Alert.alert("Error", "Login required");
+        if (!formData.name || !formData.target_amount) {
+            return Alert.alert("Error", "Please fill in all fields");
+        }
 
-      Alert.alert("Success", "Goal Set Successfully");
-      setFormData({ name: "", target_amount: "", target_date: "" });
-      onSuccess?.();
-    } catch (err: any) {
-      console.error(err);
-      Alert.alert("Error", "Error creating goal");
-    } finally {
-      setLoading(false);
-    }
-  };
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/goals`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.uid,
+                    family_id: null, 
+                    name: formData.name,
+                    target_amount: parseFloat(formData.target_amount),
+                    target_date: formData.target_date.toISOString(),
+                    status: "active",
+                }),
+            });
 
-  return (
-    <View style={styles.container}>
-      {/* Name */}
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Goal Name</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="e.g. New Laptop"
-          value={formData.name}
-          onChangeText={text => setFormData({...formData, name: text})}
-          editable={!loading}
-        />
-      </View>
+            if (!res.ok) throw new Error('Server error');
 
-      {/* Amount */}
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Target Amount (₱)</Text>
-        <TextInput
-          style={styles.textInput}
-          keyboardType="numeric"
-          placeholder="0.00"
-          value={formData.target_amount}
-          onChangeText={text => setFormData({...formData, target_amount: text.replace(/[^0-9.]/g, '')})}
-          editable={!loading}
-        />
-      </View>
+            Alert.alert("Success", "Goal Set Successfully");
+            setFormData({ name: "", target_amount: "", target_date: new Date() });
+            onSuccess?.();
+        } catch (err) {
+            Alert.alert("Error", "Error creating goal");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-      {/* Date */}
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Target Date</Text>
-        {/* RN Date Input: Replaced with a simple text input. Use native picker in prod. */}
-        <TextInput
-          style={styles.textInput}
-          placeholder="YYYY-MM-DD"
-          keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'} // Better on iOS for date
-          value={formData.target_date}
-          onChangeText={text => setFormData({...formData, target_date: text})}
-          editable={!loading}
-        />
-        {Platform.OS === 'web' && <Text style={styles.datePlaceholder}>Note: Use a native DatePicker in production.</Text>}
-      </View>
+    const onChangeDate = (event: any, selectedDate?: Date) => {
+        setShowDatePicker(Platform.OS === 'ios'); // Keep open on iOS, close on Android
+        if (selectedDate) {
+            setFormData({ ...formData, target_date: selectedDate });
+        }
+    };
 
-      <TouchableOpacity 
-        onPress={handleCreateGoal} 
-        disabled={loading || !formData.name || !formData.target_amount || !formData.target_date} 
-        style={[
-            styles.submitButton, 
-            (loading || !formData.name || !formData.target_amount || !formData.target_date) && styles.disabledButton
-        ]}
-      >
-        {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitButtonText}>Set Goal</Text>}
-      </TouchableOpacity>
-    </View>
-  );
+    const inputClass = "w-full p-4 border border-slate-200 rounded-2xl bg-white text-slate-700 text-base mb-4";
+
+    return (
+        <View className="p-1">
+            {/* Goal Name */}
+            <View>
+                <Text className="text-sm font-bold text-slate-700 mb-2">Goal Name</Text>
+                <TextInput
+                    placeholder="e.g. New Laptop"
+                    placeholderTextColor="#94a3b8"
+                    value={formData.name}
+                    onChangeText={text => setFormData({...formData, name: text})}
+                    className={inputClass}
+                />
+            </View>
+
+            {/* Amount */}
+            <View>
+                <Text className="text-sm font-bold text-slate-700 mb-2">Target Amount (₱)</Text>
+                <TextInput
+                    placeholder="0.00"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="numeric"
+                    value={formData.target_amount}
+                    onChangeText={text => setFormData({...formData, target_amount: text})}
+                    className={inputClass} 
+                />
+            </View>
+
+            {/* Date Selector */}
+            <View>
+                <Text className="text-sm font-bold text-slate-700 mb-2">Target Date</Text>
+                <TouchableOpacity 
+                    onPress={() => setShowDatePicker(true)}
+                    className={inputClass}
+                >
+                    <Text className={formData.target_date ? "text-slate-700" : "text-slate-400"}>
+                        {formData.target_date.toLocaleDateString()}
+                    </Text>
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                    <DateTimePicker
+                        value={formData.target_date}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={onChangeDate}
+                        minimumDate={new Date()}
+                    />
+                )}
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity 
+                onPress={handleCreateGoal}
+                disabled={loading}
+                activeOpacity={0.7}
+                className={`w-full py-4 rounded-2xl shadow-lg items-center mt-2 ${
+                    loading ? 'bg-indigo-300' : 'bg-indigo-600'
+                }`}
+                style={!loading && { shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }}
+            >
+                {loading ? (
+                    <ActivityIndicator color="white" />
+                ) : (
+                    <Text className="text-white font-bold text-lg">Set Goal</Text>
+                )}
+            </TouchableOpacity>
+        </View>
+    );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        padding: 16, // Simulating widget padding
-        gap: 16, // space-y-4
-    },
-    formGroup: {
-        gap: 4, // mb-1 spacing from label
-    },
-    label: {
-        fontSize: 14, // text-sm
-        fontWeight: 'bold',
-        color: '#374151', // text-gray-700
-    },
-    textInput: {
-        width: '100%',
-        padding: 12, // p-3
-        borderWidth: 1,
-        borderColor: '#E5E7EB', // border-slate-200
-        borderRadius: 8, // rounded-lg
-        backgroundColor: 'white',
-        color: '#334155', // text-slate-700
-        fontSize: 16,
-    },
-    datePlaceholder: {
-        fontSize: 12,
-        color: '#9CA3AF',
-        marginTop: 4,
-    },
-    submitButton: {
-        width: '100%',
-        paddingVertical: 12, // py-3
-        backgroundColor: '#4F46E5', // bg-indigo-600
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#4F46E5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
-        elevation: 5, // shadow-lg shadow-indigo-200
-        marginTop: 8, // mt-2
-    },
-    submitButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    disabledButton: {
-        opacity: 0.5,
-    }
-});

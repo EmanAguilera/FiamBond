@@ -1,585 +1,310 @@
-import React, { useState, useContext, useCallback, useEffect } from 'react';
+// CompanyRealm.jsx
+import React, { useState, lazy, Suspense, useContext, useCallback, useEffect } from 'react';
 import { 
     View, 
     Text, 
-    StyleSheet, 
     TouchableOpacity, 
     ScrollView, 
+    SafeAreaView, 
     ActivityIndicator, 
-    Dimensions 
+    Modal as RNModal,
+    Dimensions
 } from 'react-native';
-import { AppContext } from '../../Context/AppContext.jsx';
-import { db } from '../../config/firebase-config.ts';
+import { AppContext } from '../../Context/AppContext';
+import { db } from '../../config/firebase-config';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
+import Svg, { Path } from 'react-native-svg';
 
-// --- DIRECTLY IMPORTED WIDGETS (Assumed Native versions) ---
-import Modal from '../../Components/Modal.jsx';
-import CompanyReportChartWidget from '../../Components/Company/Analytics/CompanyReportChartWidget.jsx';
-import CreateCompanyTransactionWidget from '../../Components/Company/Finance/CreateCompanyTransactionWidget.tsx';
-import ManageEmployeesWidget from '../../Components/Company/Employees/ManageEmployeesWidget.jsx';
-import CompanyLedgerListWidget from '../../Components/Company/Finance/CompanyLedgerListWidget.jsx';
-import CompanyEmployeeListWidget from '../../Components/Company/Employees/CompanyEmployeeListWidget.jsx';
-import CompanyGoalListWidget from '../../Components/Company/Goal/CompanyGoalListWidget.jsx';
-import CreateCompanyGoalWidget from '../../Components/Company/Goal/CreateCompanyGoalWidget.tsx';
-import CompanyPayrollWidget from '../../Components/Company/Payroll/CompanyPayrollWidget.jsx';
-import PayrollHistoryWidget from '../../Components/Company/Payroll/PayrollHistoryWidget.jsx';
+// --- WIDGETS (Lazy Loaded) ---
+const CompanyReportChartWidget = lazy(() => import('../../Components/Company/Analytics/CompanyReportChartWidget'));
+const CreateCompanyTransactionWidget = lazy(() => import('../../Components/Company/Finance/CreateCompanyTransactionWidget'));
+const ManageEmployeesWidget = lazy(() => import('../../Components/Company/Employees/ManageEmployeesWidget'));
+const CompanyLedgerListWidget = lazy(() => import('../../Components/Company/Finance/CompanyLedgerListWidget'));
+const CompanyEmployeeListWidget = lazy(() => import('../../Components/Company/Employees/CompanyEmployeeListWidget'));
+const CompanyGoalListWidget = lazy(() => import('../../Components/Company/Goal/CompanyGoalListWidget'));
+const CreateCompanyGoalWidget = lazy(() => import('../../Components/Company/Goal/CreateCompanyGoalWidget'));
+const CompanyPayrollWidget = lazy(() => import('../../Components/Company/Payroll/CompanyPayrollWidget'));
+const PayrollHistoryWidget = lazy(() => import('../../Components/Company/Payroll/PayrollHistoryWidget'));
 
-// --- INTERFACES (Removed - use JSDoc for minimal typing in .jsx) ---
-
-// --- ICON PLACEHOLDER ---
-/**
- * @param {{name: string, style: object, size: number}} props
- */
-const Icon = ({ name, style, size = 16 }) => {
-    let iconText = '';
-    switch (name) {
-        case 'Plus': iconText = '+'; break;
-        case 'Back': iconText = '←'; break;
-        case 'Users': iconText = '👥'; break;
-        case 'Wallet': iconText = '💳'; break;
-        case 'Target': iconText = '🎯'; break;
-        case 'Cash': iconText = '💰'; break;
-        case 'Printer': iconText = '🖨️'; break;
-        default: iconText = '?';
-    }
-    return <Text style={[{ fontSize: size, lineHeight: size }, style]}>{iconText}</Text>;
-};
+// --- ICONS ---
 const Icons = {
-    Plus: <Icon name="Plus" />,
-    Back: <Icon name="Back" />,
-    Users: <Icon name="Users" />,
-    Wallet: <Icon name="Wallet" size={32} />,
-    Target: <Icon name="Target" size={32} />,
-    Printer: <Icon name="Printer" size={32} />,
-    Cash: <Icon name="Cash" />
+    Plus: <Svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></Svg>,
+    Back: <Svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></Svg>,
+    Users: <Svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" /></Svg>,
+    Wallet: <Svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></Svg>,
+    Target: <Svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></Svg>,
+    Printer: <Svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></Svg>
 };
 
 // --- REUSABLE BUTTON ---
-/**
- * @param {{onClick: function, type: 'pri'|'sec'|'ghost', icon: React.ReactNode, children: React.ReactNode, style: object}} props
- */
-const Btn = ({ onClick, type = 'sec', icon, children, style = {} }) => {
-    const stylesMap = {
-        pri: [styles.btnBase, styles.bgIndigo600, styles.shadowSm, styles.btnWFull],
-        sec: [styles.btnBase, styles.bgWhite, styles.borderSlate300, styles.textSlate600, styles.btnWFull],
-        ghost: [styles.btnBase, styles.bgTransparent, styles.textSlate500, styles.btnWFull],
+const Btn = ({ onClick, type = 'sec', icon, children, className = '' }) => {
+    const styles = {
+        pri: "bg-indigo-600 border-transparent",
+        sec: "bg-white border-slate-300",
+        ghost: "bg-transparent border-transparent"
     };
-    const finalStyle = stylesMap[type] || stylesMap.sec;
-
+    const textStyles = {
+        pri: "text-white",
+        sec: "text-slate-600",
+        ghost: "text-slate-500"
+    };
     return (
-        <TouchableOpacity onPress={onClick} style={[...finalStyle, style]} activeOpacity={0.7}>
-            {icon}
-            <Text style={[styles.btnText, type === 'sec' ? styles.textSlate600 : styles.textWhite]}>{children}</Text>
+        <TouchableOpacity 
+            onPress={onClick} 
+            activeOpacity={0.7}
+            className={`${styles[type]} px-4 py-3 rounded-xl border flex-row items-center justify-center gap-2 ${className}`}
+        >
+            <View className="w-4 h-4">{icon}</View>
+            <Text className={`${textStyles[type]} font-bold text-sm`}>{children}</Text>
         </TouchableOpacity>
     );
 };
 
 // --- DASHBOARD CARD ---
-/**
- * @param {{title: string, value: any, subtext: string, linkText: string, onClick: function, icon: React.ReactNode, colorClass: {rnColor: string}}} props
- */
 const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorClass }) => (
-    <TouchableOpacity onPress={onClick} style={styles.cardContainer} activeOpacity={0.8}>
-        <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{title}</Text>
-            <View style={[{ color: colorClass.rnColor }]}>{icon}</View>
+    <TouchableOpacity 
+        onPress={onClick} 
+        activeOpacity={0.9} 
+        className="bg-white border border-slate-200 rounded-3xl p-6 mb-4 shadow-sm"
+    >
+        <View className="flex-row justify-between items-start">
+            <Text className="font-bold text-slate-500 text-[10px] uppercase tracking-widest">{title}</Text>
+            <View className={`w-7 h-7 ${colorClass}`}>{icon}</View>
         </View>
-        <View style={styles.cardValueWrapper}>
-            <Text style={[styles.cardValue, { color: colorClass.rnColor }]}>{value}</Text>
+        <View className="mt-2">
+            <Text className={`text-3xl font-bold ${colorClass}`}>{value}</Text>
+            {subtext && <Text className="text-slate-400 text-xs font-medium mt-1">{subtext}</Text>}
         </View>
-        {subtext && <Text style={styles.cardSubtext}>{subtext}</Text>}
-        <Text style={styles.cardLink}>{linkText} →</Text>
+        <Text className="text-indigo-600 text-xs mt-4 font-bold">{linkText} →</Text>
     </TouchableOpacity>
 );
 
-const CardColors = {
-    emerald: { rnColor: '#059669' }, // text-emerald-600
-    rose: { rnColor: '#E11D48' },    // text-rose-600
-    amber: { rnColor: '#D97706' },   // text-amber-600
-};
-
-// --- HELPER ---
-const formatDataForChart = (transactions) => {
-    if (!transactions || !transactions.length) return { labels: [], datasets: [] };
-    const data = {};
-    transactions.forEach(tx => {
-        if (tx.created_at && typeof tx.created_at.toDate === 'function') {
-            const date = tx.created_at.toDate().toLocaleDateString();
-            if (!data[date]) data[date] = { income: 0, expense: 0 };
-            tx.type === 'income' ? data[date].income += tx.amount : data[date].expense += tx.amount;
-        }
-    });
-    const labels = Object.keys(data).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    return {
-        labels,
-        datasets: [
-            { label: 'Revenue (₱)', data: labels.map(l => data[l].income), backgroundColor: 'rgba(99, 102, 241, 0.5)' },
-            { label: 'Expenses (₱)', data: labels.map(l => data[l].expense), backgroundColor: 'rgba(244, 63, 94, 0.5)' }
-        ]
-    };
-};
-
-/**
- * @param {{company: {id: string, name: string}, onBack: function, onDataChange: function}} props
- */
-export default function CompanyRealm({ company, onBack, onDataChange }) {
+// --- MAIN COMPONENT ---
+export default function CompanyRealm({ route }) {
+    const { companyId } = route.params;
     const { user } = useContext(AppContext);
-    const API_URL = 'http://localhost:3000/api'; // Simplified URL
 
-    const [modals, setModals] = useState({ 
-        addTx: false, 
-        addGoal: false, 
-        manageEmp: false, 
-        viewTx: false, 
-        viewGoals: false, 
-        viewEmp: false,
-        runPayroll: false, 
-        payrollHistory: false
-    });
-    
-    const [loading, setLoading] = useState(true);
+    const [company, setCompany] = useState(null);
+    const [members, setMembers] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [goals, setGoals] = useState([]);
-    const [members, setMembers] = useState([]);
-    const [summaryData, setSummaryData] = useState({ netPosition: 0, payrollCount: 0 });
-    
-    // Report States
+    const [loading, setLoading] = useState(true);
     const [report, setReport] = useState(null);
     const [period, setPeriod] = useState('monthly');
 
-    const toggle = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
+    const [modals, setModals] = useState({
+        addTx: false,
+        addGoal: false,
+        manageEmp: false,
+        viewTx: false,
+        viewGoals: false,
+        runPayroll: false,
+        payrollHistory: false,
+        viewEmp: false
+    });
 
-    const fetchData = useCallback(async () => {
-        if (!company || !user) return;
+    const toggle = (key, value) => setModals(prev => ({ ...prev, [key]: value }));
+
+    const getMembers = useCallback(async () => {
+        if (!company) return [];
+        try {
+            const usersQuery = query(collection(db, "users"), where(documentId(), "in", company.members));
+            const usersSnapshot = await getDocs(usersQuery);
+            return usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch {
+            return [];
+        }
+    }, [company]);
+
+    const getTransactions = useCallback(async () => {
+        try {
+            const res = await fetch(`http://localhost:3000/api/transactions?company_id=${companyId}`);
+            return await res.json();
+        } catch {
+            return [];
+        }
+    }, [companyId]);
+
+    const getGoals = useCallback(async () => {
+        try {
+            const res = await fetch(`http://localhost:3000/api/goals?company_id=${companyId}`); 
+            return await res.json();
+        } catch {
+            return [];
+        }
+    }, [companyId]);
+
+    const getReport = useCallback(async () => {
+        try {
+            const res = await fetch(`http://localhost:3000/api/reports/company/${companyId}?period=${period}`);
+            return await res.json();
+        } catch {
+            return null;
+        }
+    }, [companyId, period]);
+
+    const handleRefresh = useCallback(async () => {
         setLoading(true);
         try {
-            const [txRes, goalRes, compRes] = await Promise.all([
-                fetch(`${API_URL}/transactions?company_id=${company.id}`),
-                fetch(`${API_URL}/goals?company_id=${company.id}`),
-                fetch(`${API_URL}/companies/${company.id}`)
-            ]);
-
-            const txData = await txRes.json();
-            const formattedTx = txData.map(tx => ({ ...tx, id: tx._id, created_at: { toDate: () => new Date(tx.created_at) }}));
-            setTransactions(formattedTx);
-
-            let net = 0;
-            let pCount = 0;
+            const companySnap = await getDocs(query(collection(db, "companies"), where(documentId(), "==", companyId)));
+            if (!companySnap.empty) setCompany({ id: companySnap.docs[0].id, ...companySnap.docs[0].data() });
             
-            formattedTx.forEach(tx => {
-                tx.type === 'income' ? net += tx.amount : net -= tx.amount;
-                if(tx.category === 'Payroll' || tx.description?.toLowerCase().includes('salary')) {
-                    pCount++;
-                }
-            });
-
-            setSummaryData({ netPosition: net, payrollCount: pCount });
-            setGoals(await goalRes.json());
-
-            if (compRes.ok) {
-                const memberIds = (await compRes.json()).member_ids || [];
-                if (memberIds.length) {
-                    const snap = await getDocs(query(collection(db, "users"), where(documentId(), "in", memberIds.slice(0, 10))));
-                    setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                }
-            }
-        } catch (e) { console.error(e); Alert.alert("Error", "Failed to load company data."); } finally { setLoading(false); }
-    }, [company, user]);
-
-    // Enhanced Report Logic matching UserRealm
-    const generateReport = useCallback(() => {
-        if (!transactions) return;
-        
-        const endDate = new Date();
-        const startDate = new Date();
-
-        // Calculate Date Range
-        if (period === 'weekly') {
-            startDate.setDate(endDate.getDate() - 7);
-        } else if (period === 'yearly') {
-            startDate.setFullYear(endDate.getFullYear() - 1);
-        } else {
-            startDate.setMonth(endDate.getMonth() - 1);
+            setMembers(await getMembers());
+            setTransactions(await getTransactions());
+            setGoals(await getGoals());
+            setReport(await getReport());
+        } catch (err) {
+            console.error(err);
+            Alert.alert("Error", "Failed to load company data.");
+        } finally {
+            setLoading(false);
         }
+    }, [companyId, getMembers, getTransactions, getGoals, getReport]);
 
-        // Filter Transactions
-        const filtered = transactions.filter(tx => {
-            const txDate = tx.created_at.toDate();
-            return txDate >= startDate && txDate <= endDate;
-        });
+    useEffect(() => {
+        handleRefresh();
+    }, [handleRefresh]);
 
-        // Calculate Totals
-        let inflow = 0, outflow = 0;
-        filtered.forEach(tx => tx.type === 'income' ? inflow += tx.amount : outflow += tx.amount);
+    useEffect(() => {
+        if (period) getReport().then(setReport);
+    }, [period]);
 
-        setReport({ 
-            chartData: formatDataForChart(filtered), 
-            totalInflow: inflow, 
-            totalOutflow: outflow, 
-            netPosition: inflow - outflow, 
-            reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`, 
-            transactionCount: filtered.length 
-        });
-    }, [transactions, period]);
-
-    useEffect(() => { fetchData(); }, [fetchData]);
-    
-    // Regenerate report when period changes or transactions update
-    useEffect(() => { generateReport(); }, [generateReport, period]);
-
-    const handleRefresh = () => { fetchData(); if (onDataChange) onDataChange(); };
-
-    if (loading && !transactions.length) return (
-        <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4F46E5" />
-            <Text style={styles.loadingText}>Entering Corporate Realm...</Text>
-        </View>
+    if (loading || !company) return (
+        <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+            <ActivityIndicator size="large" color="#4f46e5" />
+            <Text className="mt-4 text-slate-400 font-bold">Loading Company Realm...</Text>
+        </SafeAreaView>
     );
 
     return (
-        <ScrollView style={styles.mainWrapper}>
-            {/* HEADER */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
+        <SafeAreaView className="flex-1 bg-slate-50">
+            <ScrollView className="px-5 pt-6" showsVerticalScrollIndicator={false}>
+                <TouchableOpacity onPress={() => navigation.navigate("Home")} className="bg-white border border-slate-200 px-3 py-2 rounded-xl self-start mb-6 flex-row items-center">
+                    <View className="w-4 h-4 mr-2">{Icons.Back}</View>
+                    <Text className="text-slate-500 font-bold text-xs">PERSONAL REALM</Text>
+                </TouchableOpacity>
+
+                <View className="flex-row items-center mb-8">
+                    <View className="w-1.5 h-12 bg-indigo-600 rounded-full mr-4" />
+                    <View>
+                        <Text className="text-3xl font-black text-slate-800">{company.name}</Text>
+                        <Text className="text-slate-400 text-xs font-black uppercase tracking-widest mt-1">Business Realm</Text>
+                    </View>
+                </View>
+
+                <View className="flex-row justify-end mb-8">
+                    <Btn onClick={() => toggle('manageEmp', true)} type="sec" icon={Icons.Users}>Manage Employees</Btn>
+                </View>
+
+                <DashboardCard 
+                    title="Employees" 
+                    value={members.length} 
+                    subtext={`${goals.length} Goals Set`} 
+                    linkText="View Team" 
+                    onClick={() => toggle('viewEmp', true)} 
+                    icon={Icons.Users} 
+                    colorClass="text-indigo-600" 
+                />
+                <DashboardCard 
+                    title="Balance" 
+                    value={`₱${report ? report.balance.toLocaleString() : '0'}`} 
+                    subtext={`${transactions.length} Transactions`} 
+                    linkText="View Ledger" 
+                    onClick={() => toggle('viewTx', true)} 
+                    icon={Icons.Wallet} 
+                    colorClass="text-emerald-600" 
+                />
+                <DashboardCard 
+                    title="Goals" 
+                    value={goals.length} 
+                    subtext={`${completedGoals.length} Completed`} 
+                    linkText="View Goals" 
+                    onClick={() => toggle('viewGoals', true)} 
+                    icon={Icons.Target} 
+                    colorClass="text-amber-600" 
+                />
+                <DashboardCard 
+                    title="Payroll" 
+                    value="Run Now" 
+                    subtext="Manage Salaries & Advances" 
+                    linkText="View History" 
+                    onClick={() => toggle('payrollHistory', true)} 
+                    icon={Icons.Printer} 
+                    colorClass="text-rose-600" 
+                />
+
+                <View className="bg-white rounded-[40px] p-6 mb-12 shadow-sm border border-slate-100">
+                    <View className="flex-row justify-center bg-slate-100 p-1 rounded-xl mb-6">
+                        {['weekly', 'monthly', 'yearly'].map(p => (
+                            <TouchableOpacity 
+                                key={p} 
+                                onPress={() => setPeriod(p)} 
+                                className={`flex-1 py-2 rounded-lg items-center ${period === p ? 'bg-white shadow-sm' : ''}`}
+                            >
+                                <Text className={`capitalize text-[10px] font-bold ${period === p ? 'text-indigo-600' : 'text-slate-500'}`}>{p}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                     
-                    <TouchableOpacity 
-                        onPress={onBack} 
-                        style={styles.backButtonPill}
-                    >
-                        {Icons.Back}
-                        <Text style={styles.backButtonPillText}>Back to Personal</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.titleArea}>
-                        <View style={styles.titleLine}></View>
-                        <View>
-                            <Text style={styles.titleHeader}>{company.name}</Text>
-                            <Text style={styles.titleSubtext}>Corporate Realm</Text>
+                    {report ? (
+                        <Suspense fallback={<ActivityIndicator color="#4f46e5" />}>
+                            <CompanyReportChartWidget report={report} />
+                        </Suspense>
+                    ) : (
+                        <View className="h-40 items-center justify-center">
+                            <ActivityIndicator color="#4f46e5" />
                         </View>
-                    </View>
-                </View>
-
-                {/* RESPONSIVE BUTTON GRID */}
-                <View style={styles.buttonGridWrapper}>
-                    <View style={styles.buttonGrid}>
-                        
-                        <Btn onClick={() => toggle('addTx', true)} type="pri" icon={Icons.Plus} style={styles.btnPri}>
-                            Transaction
-                        </Btn>
-
-                        <Btn onClick={() => toggle('addGoal', true)} icon={Icons.Plus} style={styles.btnSec}>Goal</Btn>
-                        <Btn onClick={() => toggle('runPayroll', true)} icon={Icons.Cash} style={styles.btnSec}>Payroll</Btn>
-                        
-                        <View style={styles.btnDivider}></View>
-                        
-                        <Btn onClick={() => toggle('viewEmp', true)} icon={Icons.Users} style={styles.btnSec}>
-                            Employees
-                        </Btn>
-                    </View>
-                </View>
-            </View>
-
-            {/* DASHBOARD CARDS */}
-            <View style={styles.cardsGrid}>
-                <DashboardCard title="Company Funds" value={`₱${summaryData.netPosition.toLocaleString()}`} subtext="Available Balance" linkText="View Transactions" onClick={() => toggle('viewTx', true)} icon={Icons.Wallet} colorClass={CardColors.emerald} />
-                <DashboardCard title="Active Goals" value={goals.filter(g => g.status === 'active').length} subtext="Targets in Progress" linkText="View Goals" onClick={() => toggle('viewGoals', true)} icon={Icons.Target} colorClass={CardColors.rose} />
-                <DashboardCard title="Payroll Reports" value={`${summaryData.payrollCount} Records`} subtext="Processed Histories"  linkText="Manage Reports" onClick={() => toggle('payrollHistory', true)} icon={Icons.Printer} colorClass={CardColors.amber} />
-            </View>
-
-            {/* CHART SECTION */}
-            <View style={styles.dashboardSection}>
-                <View style={styles.periodSelectorWrapper}>
-                    {['weekly', 'monthly', 'yearly'].map(p => (
-                        <TouchableOpacity key={p} onPress={() => setPeriod(p)} style={[styles.periodButton, period === p && styles.periodButtonActive]}>
-                            <Text style={[styles.periodButtonText, period === p && styles.periodButtonTextActive]}>{p}</Text>
-                        </TouchableOpacity>
-                    ))}
+                    )}
                 </View>
                 
-                {report ? (
-                    <CompanyReportChartWidget report={report} />
-                ) : (
-                    <View style={styles.reportLoadingBox}>
-                        <Text style={styles.reportLoadingText}>Loading Report...</Text>
-                    </View>
-                )}
-            </View>
+                <View className="h-20" />
+            </ScrollView>
 
-            {/* MODALS */}
-            {modals.addTx && <Modal isOpen={modals.addTx} onClose={() => toggle('addTx', false)} title="Record New Transaction"><CreateCompanyTransactionWidget company={company} onSuccess={() => { toggle('addTx', false); handleRefresh(); }} /></Modal>}
-            {modals.addGoal && <Modal isOpen={modals.addGoal} onClose={() => toggle('addGoal', false)} title="Record New Goal"><CreateCompanyGoalWidget company={company} onSuccess={() => { toggle('addGoal', false); handleRefresh(); }} /></Modal>}
-            
-            {/* Manage/Onboard Employees */}
-            {modals.manageEmp && <Modal isOpen={modals.manageEmp} onClose={() => toggle('manageEmp', false)} title="Manage Employee Access"><ManageEmployeesWidget company={company} members={members} onUpdate={handleRefresh} /></Modal>}
-            
-            {modals.viewTx && <Modal isOpen={modals.viewTx} onClose={() => toggle('viewTx', false)} title="Shared Company Transactions"><CompanyLedgerListWidget transactions={transactions} loading={loading} /></Modal>}
-            {modals.viewGoals && <Modal isOpen={modals.viewGoals} onClose={() => toggle('viewGoals', false)} title="Shared Company Goals"><CompanyGoalListWidget goals={goals} onDataChange={handleRefresh} /></Modal>}
-            
-            {/* Employee Directory + Add Shortcut */}
-            {modals.viewEmp && (
-                <Modal isOpen={modals.viewEmp} onClose={() => toggle('viewEmp', false)} title="Employee Directory">
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalShortcut}>
-                            <TouchableOpacity onPress={() => { toggle('viewEmp', false); toggle('manageEmp', true); }} style={styles.shortcutButton}>
-                                {Icons.Plus}
-                                <Text style={styles.shortcutText}>Onboard New Employee</Text>
+            {/* --- NATIVE MODAL WRAPPERS --- */}
+            {Object.entries(modals).map(([key, isOpen]) => (
+                <RNModal 
+                    key={key} 
+                    visible={isOpen} 
+                    animationType="slide" 
+                    presentationStyle="pageSheet"
+                    onRequestClose={() => toggle(key, false)}
+                >
+                    <SafeAreaView className="flex-1 bg-white">
+                        <View className="flex-row justify-between items-center p-5 border-b border-slate-100">
+                            <Text className="text-xl font-bold text-slate-800 capitalize">
+                                {key.replace('add', 'New ').replace('view', 'View ').replace('manage', 'Manage ').replace('run', 'Run ')}
+                            </Text>
+                            <TouchableOpacity onPress={() => toggle(key, false)} className="bg-slate-100 px-4 py-2 rounded-full">
+                                <Text className="text-slate-600 font-bold text-xs">Close</Text>
                             </TouchableOpacity>
                         </View>
-                        <CompanyEmployeeListWidget members={members} loading={loading} />
-                    </View>
-                </Modal>
-            )}
-
-            {/* Payroll Actions */}
-            {modals.runPayroll && <Modal isOpen={modals.runPayroll} onClose={() => toggle('runPayroll', false)} title="Record New Payroll"><CompanyPayrollWidget company={company} members={members} onSuccess={() => { toggle('runPayroll', false); handleRefresh(); }} /></Modal>}
-            {modals.payrollHistory && <Modal isOpen={modals.payrollHistory} onClose={() => toggle('payrollHistory', false)} title="Shared Company Payroll Reports"><PayrollHistoryWidget transactions={transactions} companyName={company.name} /></Modal>}
-        </ScrollView>
+                        
+                        <ScrollView className="flex-1 p-5" showsVerticalScrollIndicator={false}>
+                            <Suspense fallback={<ActivityIndicator size="large" className="mt-10" />}>
+                                {key === 'addTx' && <CreateCompanyTransactionWidget company={company} onSuccess={() => { toggle('addTx', false); handleRefresh(); }} />}
+                                {key === 'addGoal' && <CreateCompanyGoalWidget company={company} onSuccess={() => { toggle('addGoal', false); handleRefresh(); }} />}
+                                {key === 'manageEmp' && <ManageEmployeesWidget company={company} members={members} onUpdate={handleRefresh} />}
+                                {key === 'viewTx' && <CompanyLedgerListWidget transactions={transactions} onDataChange={handleRefresh} />}
+                                {key === 'viewGoals' && <CompanyGoalListWidget goals={goals} onDataChange={handleRefresh} />}
+                                {key === 'runPayroll' && <CompanyPayrollWidget company={company} members={members} onSuccess={() => { toggle('runPayroll', false); handleRefresh(); }} />}
+                                {key === 'payrollHistory' && <PayrollHistoryWidget transactions={transactions} companyName={company.name} />}
+                                {key === 'viewEmp' && (
+                                    <View className="space-y-6">
+                                        <TouchableOpacity 
+                                            onPress={() => { toggle('viewEmp', false); toggle('manageEmp', true); }} 
+                                            className="flex-row items-center justify-end"
+                                        >
+                                            <View className="w-4 h-4 mr-1">{Icons.Plus}</View>
+                                            <Text className="text-indigo-600 font-bold text-xs">Onboard New Employee</Text>
+                                        </TouchableOpacity>
+                                        <CompanyEmployeeListWidget members={members} />
+                                    </View>
+                                )}
+                            </Suspense>
+                        </ScrollView>
+                    </SafeAreaView>
+                </RNModal>
+            ))}
+        </SafeAreaView>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    // --- Colors & Utilities ---
-    textWhite: { color: 'white' },
-    textSlate600: { color: '#475569' },
-    textSlate500: { color: '#64748B' },
-    bgWhite: { backgroundColor: 'white' },
-    bgIndigo600: { backgroundColor: '#4F46E5' },
-    bgTransparent: { backgroundColor: 'transparent' },
-    borderSlate300: { borderColor: '#CBD5E1', borderWidth: 1 },
-    shadowSm: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    
-    // --- Layout ---
-    mainWrapper: { 
-        flex: 1, 
-        paddingHorizontal: 16, // px-4 sm:px-6 lg:px-8
-    },
-    loadingContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 40,
-    },
-    loadingText: {
-        marginTop: 10,
-        color: '#64748B',
-        fontSize: 16,
-    },
-
-    // --- Header ---
-    header: {
-        marginBottom: 32, // mb-8
-        flexDirection: 'column',
-        gap: 24, // gap-6
-    },
-    headerLeft: {
-        flexDirection: 'column',
-        gap: 4, // gap-1
-    },
-    backButtonPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8, // gap-2
-        paddingHorizontal: 12, // px-3
-        paddingVertical: 6, // py-1.5
-        borderRadius: 8,
-        backgroundColor: 'white',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        alignSelf: 'flex-start',
-        marginBottom: 16, // mb-4
-        // Use a function to resolve 'this.shadowSm' reference error in pure JS
-        ...({
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-            elevation: 2,
-        }),
-    },
-    backButtonPillText: {
-        color: '#64748B',
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    titleArea: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    titleLine: {
-        width: 4,
-        height: 48,
-        backgroundColor: '#4F46E5',
-        borderRadius: 9999,
-        opacity: 0.8,
-    },
-    titleHeader: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#1E293B',
-        letterSpacing: -0.5,
-        lineHeight: 32,
-    },
-    titleSubtext: {
-        color: '#64748B',
-        fontWeight: '500',
-        fontSize: 14,
-        marginTop: 4,
-        letterSpacing: 1,
-    },
-
-    // --- Button Grid ---
-    buttonGridWrapper: {
-        width: '100%',
-    },
-    buttonGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-        alignItems: 'center',
-    },
-    btnWFull: { flex: 1, minWidth: 100 },
-    btnBase: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 12,
-        fontWeight: '500',
-        fontSize: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    btnText: {
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    btnPri: { backgroundColor: '#4F46E5', color: 'white', },
-    btnSec: { backgroundColor: 'white', borderWidth: 1, borderColor: '#CBD5E1', color: '#475569' },
-    btnDivider: {
-        width: 1,
-        height: 40,
-        backgroundColor: '#E5E7EB',
-        marginHorizontal: 4,
-    },
-
-    // --- Cards Grid ---
-    cardsGrid: {
-        flexDirection: 'column',
-        gap: 24,
-        marginBottom: 32,
-    },
-    cardContainer: {
-        backgroundColor: 'white', // bg-white/60
-        borderWidth: 1,
-        borderColor: 'rgba(226, 232, 240, 0.5)',
-        borderRadius: 16,
-        padding: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 5,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    cardTitle: {
-        fontWeight: 'bold',
-        color: '#4B5563',
-        paddingRight: 16,
-    },
-    cardValueWrapper: { flexGrow: 1 },
-    cardValue: {
-        fontSize: 36,
-        fontWeight: 'bold',
-        marginTop: 8,
-    },
-    cardSubtext: {
-        color: '#94A3B8',
-        fontSize: 14,
-        fontWeight: '500',
-        marginTop: 4,
-    },
-    cardLink: {
-        color: '#4F46E5',
-        fontSize: 14,
-        marginTop: 12,
-        fontWeight: 'bold',
-    },
-
-    // --- Dashboard Section (Chart) ---
-    dashboardSection: {},
-    periodSelectorWrapper: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 8,
-        marginBottom: 24,
-        backgroundColor: '#F1F5F9',
-        padding: 4,
-        borderRadius: 12,
-        alignSelf: 'center',
-    },
-    periodButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    periodButtonActive: {
-        backgroundColor: 'white',
-        ...({
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-            elevation: 2,
-        }),
-    },
-    periodButtonText: {
-        fontSize: 14,
-        textTransform: 'capitalize',
-        color: '#64748B',
-    },
-    periodButtonTextActive: {
-        color: '#1E293B',
-        fontWeight: '600',
-    },
-    reportLoadingBox: {
-        width: '100%',
-        height: 384,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#F1F5F9',
-        borderRadius: 8,
-    },
-    reportLoadingText: {
-        marginTop: 10,
-        color: '#94A3AF',
-    },
-    reportErrorBox: {
-        width: '100%',
-        height: 384,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#F1F5F9',
-        borderRadius: 8,
-    },
-    reportErrorText: {
-        color: '#F87171',
-    },
-
-    // --- Modal Specific ---
-    modalContent: { padding: 16, gap: 16 },
-    modalShortcut: { flexDirection: 'row', justifyContent: 'flex-end' },
-    shortcutButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    shortcutText: { fontSize: 14, fontWeight: '500', color: '#4F46E5' },
-});

@@ -1,27 +1,24 @@
+// CompanyPayrollWidget.jsx
 import React, { useState, useContext } from 'react';
 import { 
     View, 
     Text, 
-    TouchableOpacity, 
     TextInput, 
-    StyleSheet, 
-    Alert, 
-    ActivityIndicator 
+    TouchableOpacity, 
+    ScrollView, 
+    ActivityIndicator, 
+    Alert 
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { AppContext } from '../../../Context/AppContext.jsx';
 
-// TypeScript interfaces are removed here
-
-export default function CompanyPayrollWidget({ company, members, onSuccess }) {
-    // NOTE: If user is guaranteed not null, remove the safety check. 
-    // Otherwise, ensure AppContext is correctly set up.
+export default function CompanyPayrollWidget({ company, members = [], onSuccess }) {
     const { user } = useContext(AppContext);
-    const API_URL = 'http://localhost:3000/api'; // Simplified URL
 
-    const [activeTab, setActiveTab] = useState('salary'); // 'salary' or 'advance'
+    const API_URL = 'http://localhost:3000'; // ← Change to your real backend IP/port when testing on real device
+
+    const [activeTab, setActiveTab] = useState('salary');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null); // Type annotation removed
+    const [error, setError] = useState(null);
 
     const [formData, setFormData] = useState({
         employeeId: '',
@@ -29,42 +26,36 @@ export default function CompanyPayrollWidget({ company, members, onSuccess }) {
         notes: ''
     });
 
-    // Type annotation removed
     const handleInputChange = (name, value) => {
         setFormData({ ...formData, [name]: value });
+        setError(null);
     };
 
     const handleSubmit = async () => {
-        // CONTEXT NULL CHECK (Essential for runtime safety and to avoid the theoretical TS error)
-        if (!user || !user.uid) return Alert.alert("Error", "Login required.");
-        if (loading) return;
+        if (!formData.employeeId) {
+            setError("Please select an employee.");
+            return;
+        }
+        if (!formData.amount) {
+            setError("Please enter an amount.");
+            return;
+        }
 
         setLoading(true);
         setError(null);
-
-        if (!formData.employeeId) {
-            setError("Please select an employee.");
-            setLoading(false);
-            return;
-        }
-        if (Number(formData.amount) <= 0 || isNaN(Number(formData.amount))) {
-             setError("Please enter a valid amount.");
-            setLoading(false);
-            return;
-        }
 
         const employee = members.find(m => m.id === formData.employeeId);
         const typeLabel = activeTab === 'salary' ? 'Salary Payment' : 'Cash Advance';
         
         try {
             const transactionPayload = {
-                user_id: user.uid, // Recorded by Admin
-                company_id: company.id,
-                type: 'expense', // Both are expenses for the company
+                user_id: user?.uid, 
+                company_id: company?.id,
+                type: 'expense', 
                 amount: Number(formData.amount),
                 description: `${typeLabel} for ${employee?.full_name || 'Employee'} - ${formData.notes}`,
                 category: activeTab === 'salary' ? 'Payroll' : 'Cash Advance',
-                date: new Date()
+                date: new Date().toISOString()
             };
 
             const response = await fetch(`${API_URL}/transactions`, {
@@ -73,236 +64,144 @@ export default function CompanyPayrollWidget({ company, members, onSuccess }) {
                 body: JSON.stringify(transactionPayload)
             });
 
-            if (!response.ok) throw new Error("Failed to process payroll transaction.");
+            if (!response.ok) {
+                throw new Error("Failed to process payroll transaction.");
+            }
 
-            if (onSuccess) onSuccess();
-            setFormData({ employeeId: '', amount: '', notes: '' });
             Alert.alert("Success", `${typeLabel} recorded successfully.`);
+            
+            if (onSuccess) onSuccess();
+            
+            // Reset form
+            setFormData({ employeeId: '', amount: '', notes: '' });
 
         } catch (err) {
             console.error(err);
-            setError("Failed to record transaction.");
-            Alert.alert("Error", "Failed to record transaction.");
+            setError("Failed to record transaction. Check connection.");
         } finally {
             setLoading(false);
         }
     };
 
+    const labelStyle = "text-sm font-bold text-slate-700 mb-2";
+    const inputStyle = "w-full p-4 border border-slate-200 rounded-2xl bg-white text-slate-800 text-base mb-5";
+
     return (
-        <View style={styles.container}>
-            {/* Tabs */}
-            <View style={styles.tabBar}>
+        <ScrollView className="flex-1 p-1" keyboardShouldPersistTaps="handled">
+            
+            {/* TABS */}
+            <View className="flex-row bg-slate-100 p-1 rounded-2xl mb-6">
                 <TouchableOpacity 
                     onPress={() => setActiveTab('salary')} 
-                    style={[styles.tabButton, activeTab === 'salary' && styles.tabButtonActive]}
+                    className={`flex-1 py-3 items-center rounded-xl ${activeTab === 'salary' ? 'bg-white shadow-sm' : ''}`}
                 >
-                    <Text style={[styles.tabText, activeTab === 'salary' ? styles.tabTextActive : styles.tabTextInactive]}>
+                    <Text className={`text-xs font-bold ${activeTab === 'salary' ? 'text-indigo-600' : 'text-slate-500'}`}>
                         Run Salary
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                     onPress={() => setActiveTab('advance')} 
-                    style={[styles.tabButton, activeTab === 'advance' && styles.tabButtonActive]}
+                    className={`flex-1 py-3 items-center rounded-xl ${activeTab === 'advance' ? 'bg-white shadow-sm' : ''}`}
                 >
-                    <Text style={[styles.tabText, activeTab === 'advance' ? styles.tabTextActive : styles.tabTextInactive]}>
+                    <Text className={`text-xs font-bold ${activeTab === 'advance' ? 'text-indigo-600' : 'text-slate-500'}`}>
                         Cash Advance
                     </Text>
                 </TouchableOpacity>
             </View>
 
-            <View style={styles.formSection}>
-                <View style={styles.formGroup}>
-                    <Text style={styles.label}>Select Employee</Text>
-                    <View style={styles.pickerWrapper}>
-                        <Picker
-                            selectedValue={formData.employeeId}
-                            // Type assertion removed
-                            onValueChange={(itemValue) => handleInputChange('employeeId', itemValue)}
-                            style={styles.picker}
-                            enabled={!loading}
+            {/* EMPLOYEE SELECTOR */}
+            <Text className={labelStyle}>Select Employee</Text>
+            <View className="bg-white border border-slate-200 rounded-2xl overflow-hidden mb-5">
+                {members.length > 0 ? (
+                    members.map((m) => (
+                        <TouchableOpacity 
+                            key={m.id}
+                            onPress={() => handleInputChange('employeeId', m.id)}
+                            className={`p-4 border-b border-slate-50 flex-row justify-between items-center ${formData.employeeId === m.id ? 'bg-indigo-50' : ''}`}
                         >
-                            <Picker.Item label="-- Choose Employee --" value="" enabled={false} />
-                            {members.map(m => (
-                                <Picker.Item key={m.id} label={m.full_name} value={m.id} />
-                            ))}
-                        </Picker>
-                    </View>
-                </View>
-
-                <View style={styles.formGroup}>
-                    <Text style={styles.label}>
-                        {activeTab === 'salary' ? 'Net Salary Amount (₱)' : 'Advance Amount (₱)'}
-                    </Text>
-                    <TextInput 
-                        style={styles.textInput} 
-                        keyboardType="numeric"
-                        value={formData.amount} 
-                        // The 'required' and 'min' props were removed in a previous step's logic
-                        onChangeText={(text) => handleInputChange('amount', text.replace(/[^0-9.]/g, ''))} 
-                        editable={!loading}
-                    />
-                </View>
-
-                <View style={styles.formGroup}>
-                    <Text style={styles.label}>Notes / Period</Text>
-                    <TextInput 
-                        style={styles.textInput}
-                        value={formData.notes} 
-                        onChangeText={(text) => handleInputChange('notes', text)} 
-                        placeholder={activeTab === 'salary' ? "e.g., September 15-30" : "e.g., Emergency fund"} 
-                        editable={!loading}
-                    />
-                </View>
-
-                {activeTab === 'salary' && (
-                    <View style={styles.salaryInfoBox}>
-                        <Text style={styles.salaryInfoText}>
-                            This will generate a payroll expense in the company ledger and can be exported as a PDF invoice later.
-                        </Text>
-                    </View>
+                            <Text className={`font-semibold ${formData.employeeId === m.id ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                {m.full_name}
+                            </Text>
+                            {formData.employeeId === m.id && (
+                                <View className="bg-indigo-600 w-4 h-4 rounded-full items-center justify-center">
+                                    <Text className="text-white text-[10px]">✓</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    ))
+                ) : (
+                    <Text className="p-4 text-slate-400 italic">No employees onboarded.</Text>
                 )}
-                {activeTab === 'advance' && (
-                    <View style={styles.advanceInfoBox}>
-                        <Text style={styles.advanceInfoText}>
-                            This will be recorded as a company expense. Ensure you have an agreement for repayment.
-                        </Text>
-                    </View>
-                )}
-
-                {error && <Text style={styles.errorText}>{error}</Text>}
-
-                <TouchableOpacity 
-                    onPress={handleSubmit} 
-                    disabled={loading || !formData.employeeId || !formData.amount}
-                    style={[
-                        styles.submitButton, 
-                        (loading || !formData.employeeId || !formData.amount) && styles.disabledButton,
-                        activeTab === 'salary' ? styles.submitButtonSalary : styles.submitButtonAdvance,
-                    ]}
-                >
-                    {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitButtonText}>{activeTab === 'salary' ? 'Disburse Salary' : 'Grant Advance'}</Text>}
-                </TouchableOpacity>
             </View>
-        </View>
+
+            {/* AMOUNT INPUT */}
+            <View>
+                <Text className={labelStyle}>
+                    {activeTab === 'salary' ? 'Net Salary Amount (₱)' : 'Advance Amount (₱)'}
+                </Text>
+                <TextInput 
+                    value={formData.amount} 
+                    onChangeText={(val) => handleInputChange('amount', val)} 
+                    keyboardType="numeric"
+                    placeholder="0.00"
+                    editable={!loading}
+                    className={inputStyle}
+                />
+            </View>
+
+            {/* NOTES INPUT */}
+            <View>
+                <Text className={labelStyle}>Notes / Period</Text>
+                <TextInput 
+                    value={formData.notes} 
+                    onChangeText={(val) => handleInputChange('notes', val)} 
+                    placeholder={activeTab === 'salary' ? "e.g., Sept 15-30" : "e.g., Emergency fund"} 
+                    placeholderTextColor="#94a3b8"
+                    editable={!loading}
+                    className={inputStyle}
+                />
+            </View>
+
+            {/* CONTEXT CARDS */}
+            {activeTab === 'salary' ? (
+                <View className="bg-blue-50 p-4 rounded-2xl border border-blue-100 mb-6">
+                    <Text className="text-[10px] text-blue-700 leading-4 font-medium italic text-center">
+                        This records a payroll expense in the company ledger.
+                    </Text>
+                </View>
+            ) : (
+                <View className="bg-amber-50 p-4 rounded-2xl border border-amber-100 mb-6">
+                    <Text className="text-[10px] text-amber-700 leading-4 font-medium italic text-center">
+                        Recorded as a corporate expense. Ensure you have a repayment agreement.
+                    </Text>
+                </View>
+            )}
+
+            {error && (
+                <View className="bg-rose-50 p-3 rounded-xl mb-4">
+                    <Text className="text-rose-600 text-xs text-center font-bold">{error}</Text>
+                </View>
+            )}
+
+            {/* SUBMIT BUTTON */}
+            <TouchableOpacity 
+                onPress={handleSubmit} 
+                disabled={loading}
+                activeOpacity={0.8}
+                className={`w-full py-5 rounded-2xl shadow-lg items-center mb-10 ${
+                    loading ? 'bg-slate-300' : activeTab === 'salary' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-indigo-600 shadow-indigo-100'
+                }`}
+            >
+                {loading ? (
+                    <ActivityIndicator color="white" />
+                ) : (
+                    <Text className="text-white font-bold text-lg">
+                        {activeTab === 'salary' ? 'Disburse Salary' : 'Grant Advance'}
+                    </Text>
+                )}
+            </TouchableOpacity>
+
+            <View className="h-10" />
+        </ScrollView>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        gap: 16, // space-y-4
-        padding: 16,
-    },
-    
-    // Tabs
-    tabBar: {
-        flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderColor: '#E5E7EB', // border-gray-200
-        marginBottom: 8,
-    },
-    tabButton: {
-        flex: 1,
-        paddingVertical: 8, // py-2
-        borderBottomWidth: 2,
-        borderColor: 'transparent',
-    },
-    tabButtonActive: {
-        borderColor: '#4F46E5', // border-indigo-600
-    },
-    tabText: {
-        fontSize: 14, // text-sm
-        fontWeight: '500', // font-medium
-        textAlign: 'center',
-    },
-    tabTextActive: {
-        color: '#4F46E5', // text-indigo-600
-    },
-    tabTextInactive: {
-        color: '#6B7280', // text-gray-500
-    },
-
-    // Form
-    formSection: { gap: 16 }, // space-y-4 pt-2
-    formGroup: { marginBottom: 8 },
-    label: {
-        fontSize: 14, // text-sm
-        fontWeight: '500', // font-medium
-        color: '#374151', // text-gray-700
-        marginBottom: 4, // mb-1
-    },
-    textInput: {
-        width: '100%',
-        padding: 8, // p-2
-        borderWidth: 1,
-        borderColor: '#D1D5DB', // border-gray-300
-        borderRadius: 8, // rounded-lg
-        fontSize: 16,
-        color: '#1F2937',
-    },
-    pickerWrapper: {
-        borderWidth: 1,
-        borderColor: '#D1D5DB', 
-        borderRadius: 8,
-        overflow: 'hidden',
-        backgroundColor: 'white',
-    },
-    picker: {
-        width: '100%',
-        height: 44, // standard height for RN inputs
-    },
-
-    // Info Boxes
-    salaryInfoBox: {
-        backgroundColor: '#EFF6FF', // bg-blue-50
-        padding: 12, // p-3
-        borderRadius: 6, // rounded-md
-    },
-    salaryInfoText: {
-        fontSize: 12, // text-xs
-        color: '#1E40AF', // text-blue-700
-    },
-    advanceInfoBox: {
-        backgroundColor: '#FFFBEB', // bg-amber-50
-        padding: 12,
-        borderRadius: 6,
-    },
-    advanceInfoText: {
-        fontSize: 12,
-        color: '#92400E', // text-amber-700
-    },
-    
-    // Submit Button
-    errorText: {
-        color: '#EF4444', // text-red-500
-        fontSize: 14,
-        marginBottom: 8,
-    },
-    submitButton: {
-        width: '100%', // w-full
-        paddingVertical: 10, // py-2.5
-        borderRadius: 12, // rounded-xl
-        fontWeight: 'bold',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 3,
-        elevation: 4, // shadow-md
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    submitButtonSalary: {
-        backgroundColor: '#059669', // bg-emerald-600
-    },
-    submitButtonAdvance: {
-        backgroundColor: '#4F46E5', // bg-indigo-600
-    },
-    submitButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    disabledButton: {
-        opacity: 0.5,
-    }
-});

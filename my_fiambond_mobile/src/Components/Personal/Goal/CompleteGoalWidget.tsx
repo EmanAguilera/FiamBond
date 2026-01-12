@@ -1,17 +1,17 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { 
     View, 
     Text, 
     TouchableOpacity, 
-    StyleSheet, 
+    ActivityIndicator, 
     Alert, 
-    ActivityIndicator,
-    Platform 
+    Image,
+    ScrollView 
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { AppContext } from '../../../Context/AppContext.jsx';
 
-// --- INTERFACES FOR TYPE SAFETY ---
-// The Goal interface (Needs to be defined in RN/TSX file)
+// The Goal interface
 interface Goal {
     id: string; 
     name: string;
@@ -27,80 +27,64 @@ interface CompleteGoalWidgetProps {
     onSuccess: () => void;
 }
 
-// Placeholder for the native file/receipt object
-interface NativeFile {
-    uri: string;
-    name: string;
-    type: string; // e.g., 'image/jpeg', 'application/pdf'
-}
-
-// Interfaces for Context Fix (Error 2339)
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
-
-// Cloudinary constants (use process.env in RN/Expo)
-const CLOUDINARY_CLOUD_NAME = process.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
-const CLOUDINARY_UPLOAD_PRESET = process.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
+const CLOUDINARY_CLOUD_NAME = "dzcnbrgjy";
+const CLOUDINARY_UPLOAD_PRESET = "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidgetProps) {
-    // FIX: Assert context type with non-null assertion (!)
-    const { user } = useContext(AppContext)! as AppContextType; 
+    const { user } = useContext(AppContext) as any;
     
-    const API_URL = process.env.VITE_API_URL || 'http://localhost:3000/api';
+    // API URL for mobile testing (Replace localhost with your IP if testing on physical device)
+    const API_URL = 'http://localhost:3000';
 
-    const [attachmentFile, setAttachmentFile] = useState<NativeFile | null>(null);
+    const [imageUri, setImageUri] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>('Confirm & Complete Goal');
 
-    // Placeholder for native file picker
-    const handleNativeFileUpload = async () => {
-        Alert.alert("File Picker", "Native file picker integration required.");
-        
-        // Simulating file selection for development:
-        // setAttachmentFile({ uri: 'file:///temp/test.jpg', name: 'achievement.jpg', type: 'image/jpeg' });
+    // --- IMAGE PICKER LOGIC ---
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setImageUri(result.assets[0].uri);
+            setError(null);
+        }
     };
 
     const handleConfirmCompletion = async () => {
-        // Safe check for user object access (user is now User | null)
-        if (!user || !user.uid) {
-            Alert.alert("Error", "Login required");
-            return;
-        }
-        
+        if (!user) return;
         setLoading(true);
         setError(null);
 
         try {
             let achievementUrl: string | null = null;
 
-            // 1. Upload Image
-            if (attachmentFile) {
+            // 1. Upload Image to Cloudinary (Mobile FormData Format)
+            if (imageUri) {
                 setStatusMessage("Uploading photo...");
                 const uploadFormData = new FormData();
                 
-                // Append the native file object to FormData
-                uploadFormData.append('file', {
-                    uri: attachmentFile.uri,
-                    name: attachmentFile.name,
-                    type: attachmentFile.type,
-                } as any); // Cast to any to satisfy FormData requirements for file objects
+                const filename = imageUri.split('/').pop();
+                const match = /\.(\w+)$/.exec(filename || '');
+                const type = match ? `image/${match[1]}` : `image`;
 
+                uploadFormData.append('file', {
+                    uri: imageUri,
+                    name: filename || 'achievement.jpg',
+                    type: type,
+                } as any);
+                
                 uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
                 
                 const response = await fetch(CLOUDINARY_API_URL, { 
                     method: 'POST', 
                     body: uploadFormData,
-                    // RN handles Content-Type for multipart/form-data automatically
-                    headers: {}, 
+                    headers: { 'content-type': 'multipart/form-data' }
                 });
 
                 if (!response.ok) throw new Error('Failed to upload achievement photo.');
@@ -109,13 +93,13 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
                 achievementUrl = data.secure_url;
             }
 
-            // 2. Update Goal Status (Use API_URL)
+            // 2. Update Goal Status
             setStatusMessage("Updating Goal...");
             
             const goalUpdatePayload = {
                 status: "completed",
-                completed_at: new Date(), 
-                completed_by_user_id: user.uid, // SAFE access now
+                completed_at: new Date().toISOString(), 
+                completed_by_user_id: user.uid,
                 ...(achievementUrl && { achievement_url: achievementUrl }),
             };
 
@@ -127,18 +111,18 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
 
             if (!goalResponse.ok) throw new Error("Failed to update goal status on server.");
 
-            // 3. Create Transaction (Use API_URL)
+            // 3. Create Transaction
             setStatusMessage("Recording Transaction...");
 
             const transactionPayload = {
-                user_id: user.uid, // SAFE access now
+                user_id: user.uid,
                 family_id: goal.family_id || null, 
                 type: 'expense',
                 amount: goal.target_amount,
                 description: goal.family_id 
                     ? `Family Goal Achieved: ${goal.name}`
                     : `Goal Achieved: ${goal.name}`,
-                created_at: new Date(),
+                created_at: new Date().toISOString(),
                 attachment_url: achievementUrl,
             };
 
@@ -150,172 +134,88 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
 
             if (!transactionResponse.ok) throw new Error("Goal updated, but failed to record transaction.");
             
-            Alert.alert("Success", "Goal successfully completed and transaction recorded!");
+            Alert.alert("Success", "Goal completed and transaction recorded!");
             onSuccess();
 
         } catch (err: any) {
             console.error("Failed to complete goal:", err);
             setError(err.message || "Could not complete the goal.");
-            Alert.alert("Error", err.message || "Could not complete the goal.");
         } finally {
             setLoading(false);
             setStatusMessage('Confirm & Complete Goal');
         }
     };
 
-    const targetAmountFormatted = `₱${goal.target_amount.toLocaleString()}`;
-
     return (
-        <View style={styles.container}>
-            <View style={styles.section}>
-                <Text style={styles.subtitle}>You are about to complete the goal:</Text>
-                <Text style={styles.title}>{goal.name}</Text>
+        <ScrollView className="space-y-6 p-1">
+            <View>
+                <Text className="text-sm text-slate-500">You are about to complete the goal:</Text>
+                <Text className="font-bold text-xl text-slate-800 mt-1">{goal.name}</Text>
                 
-                <Text style={styles.infoText}>
-                    {goal.family_id 
-                        ? `An expense of ${targetAmountFormatted} will be recorded from the family's shared balance.`
-                        : `An expense of ${targetAmountFormatted} will be recorded from your personal balance.`
-                    }
-                </Text>
+                <View className="bg-indigo-50 p-4 rounded-2xl mt-4 border border-indigo-100">
+                    <Text className="text-xs text-indigo-700 leading-5">
+                        {goal.family_id 
+                            ? `An expense of ₱${goal.target_amount.toLocaleString()} will be recorded from the family's shared balance.`
+                            : `An expense of ₱${goal.target_amount.toLocaleString()} will be recorded from your personal balance.`
+                        }
+                    </Text>
+                </View>
             </View>
-            
-            <View style={styles.divider} />
-            
-            <View style={styles.section}>
-                <Text style={styles.label}>
+
+            <View className="h-[1px] bg-slate-100 w-full" />
+
+            <View>
+                <Text className="text-sm font-bold text-slate-700 mb-3">
                     Upload a Photo of Your Achievement (Optional)
                 </Text>
+                
                 <TouchableOpacity 
-                    onPress={handleNativeFileUpload} 
-                    disabled={loading} 
-                    style={styles.fileButton}
+                    onPress={pickImage}
+                    disabled={loading}
+                    className="border-2 border-dashed border-slate-200 rounded-2xl p-6 items-center justify-center bg-slate-50"
                 >
-                    <Text style={styles.fileButtonText}>
-                        {attachmentFile ? `File Selected: ${attachmentFile.name}` : "Tap to Select Photo/File"}
-                    </Text>
-                    {attachmentFile && (
-                         <TouchableOpacity onPress={() => setAttachmentFile(null)} style={styles.fileClearButton}>
-                            <Text style={styles.fileClearText}>✕</Text>
-                         </TouchableOpacity>
+                    {imageUri ? (
+                        <View className="items-center">
+                            <Image source={{ uri: imageUri }} className="w-24 h-24 rounded-xl mb-3" />
+                            <Text className="text-indigo-600 font-bold text-xs">Change Photo</Text>
+                        </View>
+                    ) : (
+                        <View className="items-center">
+                            <View className="bg-white p-3 rounded-full mb-2 shadow-sm">
+                                <Text className="text-xl">📸</Text>
+                            </View>
+                            <Text className="text-indigo-600 font-bold text-sm">Pick Image</Text>
+                            <Text className="text-slate-400 text-[10px] mt-1">Tap to open gallery</Text>
+                        </View>
                     )}
                 </TouchableOpacity>
-                {attachmentFile && <Text style={styles.fileNameText}>Selected: {attachmentFile.name}</Text>}
             </View>
             
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {error && (
+                <View className="bg-rose-50 p-3 rounded-xl">
+                    <Text className="text-rose-600 text-xs text-center font-medium">{error}</Text>
+                </View>
+            )}
             
             <TouchableOpacity 
                 onPress={handleConfirmCompletion} 
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
                 disabled={loading}
+                className={`w-full py-4 rounded-2xl shadow-lg items-center ${
+                    loading ? 'bg-indigo-300' : 'bg-indigo-600'
+                }`}
             >
-                {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitButtonText}>{statusMessage}</Text>}
+                {loading ? (
+                    <View className="flex-row items-center">
+                        <ActivityIndicator color="white" className="mr-2" />
+                        <Text className="text-white font-bold text-base">{statusMessage}</Text>
+                    </View>
+                ) : (
+                    <Text className="text-white font-bold text-base">Confirm & Complete Goal</Text>
+                )}
             </TouchableOpacity>
-        </View>
+            
+            {/* Keyboard spacing */}
+            <View className="h-10" />
+        </ScrollView>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        gap: 16, // space-y-4
-        padding: 16,
-    },
-    section: {
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 14,
-        color: '#4B5563', // text-gray-600
-    },
-    title: {
-        fontWeight: '600', // font-semibold
-        fontSize: 18, // text-lg
-        color: '#1F2937', // text-gray-800
-        marginTop: 4, // mt-1
-    },
-    infoText: {
-        fontSize: 14,
-        color: '#6B7280', // text-gray-500
-        marginTop: 8, // mt-2
-    },
-    divider: {
-        borderBottomWidth: 1,
-        borderColor: '#E5E7EB', // hr
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '500', // font-medium
-        color: '#374151', // text-gray-700
-        marginBottom: 8,
-    },
-
-    // File Upload Button Styles
-    fileButton: {
-        marginTop: 4, // mt-1
-        width: '100%',
-        paddingVertical: 10, // py-2
-        paddingHorizontal: 16, // px-4
-        borderRadius: 8, // rounded-md
-        borderWidth: 1,
-        borderColor: '#D1D5DB', // border-gray-300
-        backgroundColor: '#F9FAFB', // bg-gray-50
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    fileButtonText: {
-        fontSize: 14, // text-sm
-        fontWeight: '600', // font-semibold
-        color: '#4F46E5', // text-blue-700
-        flexShrink: 1,
-    },
-    fileClearButton: {
-        padding: 4,
-        borderRadius: 10,
-        backgroundColor: '#E5E7EB',
-        marginLeft: 8,
-    },
-    fileClearText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#4B5563',
-    },
-    fileNameText: {
-        fontSize: 12,
-        color: '#4F46E5',
-        marginTop: 4,
-        paddingHorizontal: 4,
-    },
-
-
-    // Submit Button Styles
-    submitButton: {
-        width: '100%',
-        paddingVertical: 12, // py-3
-        backgroundColor: '#4F46E5', // primary-btn / bg-indigo-600
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4, // shadow-md
-    },
-    submitButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    submitButtonDisabled: {
-        opacity: 0.5,
-    },
-    
-    // Error Text
-    errorText: {
-        color: '#EF4444', // error
-        textAlign: 'center',
-        fontSize: 14,
-    }
-});

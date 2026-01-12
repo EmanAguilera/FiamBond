@@ -1,23 +1,20 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useEffect, useContext } from 'react';
 import { 
     View, 
     Text, 
-    StyleSheet, 
-    ScrollView, 
-    ActivityIndicator, 
     TouchableOpacity, 
-    Alert,
-    Platform 
+    ActivityIndicator, 
+    ScrollView, 
+    Alert 
 } from 'react-native';
 import { AppContext } from '../../../../Context/AppContext.jsx';
-// FIX 1: Removed .tsx extension from import path
 import CreateLoanWidget from './CreateLoanWidget'; 
 
 // --- FIREBASE IMPORTS ---
-import { db } from '../../../../config/firebase-config';
+import { db } from '../../../../config/firebase-config.js';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
-// --- TypeScript Interfaces (Simplified) ---
+// --- TypeScript Interfaces ---
 interface Family {
     id: string;
     family_name: string;
@@ -34,21 +31,11 @@ interface RecordLoanFlowWidgetProps {
     onRequestCreateFamily: () => void;
 }
 
-// Interfaces for Context Fix (Error 2339)
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
-
 export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily }: RecordLoanFlowWidgetProps) {
-    // FIX 2: Assert context type with non-null assertion (!)
-    const { user } = useContext(AppContext)! as AppContextType; 
-    const API_URL = 'http://localhost:3000/api'; // Simplified URL
+    const { user } = useContext(AppContext) as any;
+    
+    // Replace with your local IP or production URL for mobile
+    const API_URL = 'http://localhost:3000';
     
     const [flowState, setFlowState] = useState<'loadingFamilies' | 'selecting' | 'loadingMembers' | 'lending'>('loadingFamilies');
     const [families, setFamilies] = useState<Family[]>([]);
@@ -56,12 +43,10 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
     const [familyMembers, setFamilyMembers] = useState<Member[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // 1. Fetch Families
+    // 1. Fetch Families from MongoDB API
     useEffect(() => {
         const fetchFamilies = async () => {
-            // Safe check for user object access (user is now User | null)
-            if (!user || !user.uid) return;
-            
+            if (!user?.uid) return;
             setFlowState('loadingFamilies');
             setError(null);
             try {
@@ -91,13 +76,10 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
                 setFlowState('selecting');
             }
         };
-        // Dependency on user.uid is safe due to the check inside the effect
-        if (user) { 
-            fetchFamilies();
-        }
+        fetchFamilies();
     }, [user]);
 
-    // 2. Fetch Members
+    // 2. Fetch Members from Firestore
     useEffect(() => {
         const fetchMembers = async () => {
             if (!selectedFamily) return;
@@ -115,15 +97,8 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
 
                 // --- DIRECT FIREBASE QUERY ---
                 const usersRef = collection(db, "users");
-                // Firebase 'in' limit is 10. Slice to prevent crash if family is huge.
+                // Firebase 'in' limit is 10.
                 const safeIds = memberIds.slice(0, 10); 
-                
-                // This will fail if safeIds is empty, but the check above handles it.
-                if (safeIds.length === 0) {
-                     setFamilyMembers([]);
-                     setFlowState('lending');
-                     return;
-                }
                 
                 const q = query(usersRef, where(documentId(), "in", safeIds));
                 const querySnapshot = await getDocs(q);
@@ -154,136 +129,80 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
         if (family) setSelectedFamily(family);
     };
 
-    // --- RENDER FLOW STATES ---
-    if (flowState === 'loadingFamilies') return (
-        <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#4F46E5" />
-            <Text style={styles.loadingText}>Loading your families...</Text>
-        </View>
-    );
-    if (flowState === 'loadingMembers') return (
-        <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#4F46E5" />
-            <Text style={styles.loadingText}>Loading members...</Text>
-        </View>
-    );
+    // --- RENDER STATES ---
+
+    if (flowState === 'loadingFamilies') {
+        return (
+            <View className="p-10 items-center justify-center">
+                <ActivityIndicator color="#4f46e5" />
+                <Text className="mt-4 text-slate-500 font-medium">Loading your families...</Text>
+            </View>
+        );
+    }
+
+    if (flowState === 'loadingMembers') {
+        return (
+            <View className="p-10 items-center justify-center">
+                <ActivityIndicator color="#4f46e5" />
+                <Text className="mt-4 text-slate-500 font-medium">Loading family members...</Text>
+            </View>
+        );
+    }
 
     if (flowState === 'lending' && selectedFamily) {
-        return <CreateLoanWidget family={selectedFamily} members={familyMembers} onSuccess={onSuccess} />;
+        return (
+            <CreateLoanWidget 
+                family={selectedFamily} 
+                members={familyMembers} 
+                onSuccess={onSuccess} 
+            />
+        );
     }
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Select a Family</Text>
-            <Text style={styles.infoText}>Choose which family this loan belongs to.</Text>
+        <ScrollView className="p-1 space-y-6">
+            <View className="items-center">
+                <Text className="text-xl font-bold text-slate-800">Select a Family</Text>
+                <Text className="text-sm text-slate-500 mt-2 text-center">
+                    Choose which family realm this loan belongs to.
+                </Text>
+            </View>
             
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {error && (
+                <View className="bg-rose-50 p-3 rounded-xl">
+                    <Text className="text-rose-500 text-center text-xs font-bold">{error}</Text>
+                </View>
+            )}
             
             {families.length > 0 ? (
-                <View style={styles.familyList}>
+                <View className="gap-y-3 mt-4">
                     {families.map(family => (
                         <TouchableOpacity
                             key={family.id}
                             onPress={() => handleFamilySelect(family.id)}
-                            style={styles.familyButton}
+                            activeOpacity={0.7}
+                            className="w-full flex-row justify-between items-center p-5 bg-white border border-slate-200 rounded-2xl shadow-sm"
                         >
-                            <Text style={styles.familyName}>{family.family_name}</Text>
-                            <Text style={styles.familyArrow}>→</Text>
+                            <Text className="font-bold text-slate-700 text-base">{family.family_name}</Text>
+                            <Text className="text-indigo-600 font-bold">Select →</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
             ) : (
-                <View style={styles.noFamilyBox}>
-                    <Text style={styles.noFamilyText}>You must be a member of a family to record a loan.</Text>
-                    <TouchableOpacity onPress={onRequestCreateFamily}>
-                        <Text style={styles.createFamilyLink}>Create a Family now</Text>
+                <View className="mt-6 items-center p-6 bg-amber-50 border border-amber-100 rounded-3xl">
+                    <Text className="text-amber-800 text-center text-sm font-medium leading-5">
+                        You must be a member of a family realm to record a family loan.
+                    </Text>
+                    <TouchableOpacity onPress={onRequestCreateFamily} className="mt-4">
+                        <Text className="text-indigo-600 font-bold text-sm underline">
+                            Create a Family Now
+                        </Text>
                     </TouchableOpacity>
                 </View>
             )}
-        </View>
+
+            {/* Bottom Spacing */}
+            <View className="h-10" />
+        </ScrollView>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        gap: 16, // space-y-4
-        padding: 8, // p-2
-    },
-    loadingContainer: {
-        padding: 16, // p-4
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    loadingText: {
-        textAlign: 'center',
-        color: '#4B5563', // text-slate-500
-        opacity: 0.8,
-    },
-    title: {
-        fontSize: 18, // text-lg
-        fontWeight: '500', // font-medium
-        textAlign: 'center',
-        color: '#1F2937', // text-gray-800
-    },
-    infoText: {
-        fontSize: 14, // text-sm
-        textAlign: 'center',
-        color: '#6B7280', // text-gray-500
-    },
-    errorText: {
-        color: '#EF4444', // text-red-500
-        textAlign: 'center',
-        fontSize: 14,
-    },
-    
-    // Family List Styles
-    familyList: {
-        gap: 8, // space-y-2
-    },
-    familyButton: {
-        width: '100%',
-        padding: 12, // p-3
-        backgroundColor: '#F8FAFC', // bg-slate-50
-        borderWidth: 1,
-        borderColor: '#E2E8F0', // border-slate-200
-        borderRadius: 6, // rounded-md
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    familyName: {
-        fontWeight: '600', // font-semibold
-        color: '#374151', // text-gray-700
-        fontSize: 16,
-    },
-    familyArrow: {
-        color: '#9CA3AF', // text-gray-400
-        fontSize: 18,
-    },
-    
-    // No Family Styles
-    noFamilyBox: {
-        textAlign: 'center',
-        padding: 16, // p-4
-        backgroundColor: '#FFFBEB', // bg-yellow-50
-        borderWidth: 1,
-        borderColor: '#FDE68A', // border-yellow-200
-        borderRadius: 6, // rounded-md
-        gap: 8,
-    },
-    noFamilyText: {
-        color: '#B45309', // text-yellow-800
-        fontSize: 14,
-        textAlign: 'center',
-    },
-    createFamilyLink: {
-        color: '#2563EB', // text-blue-600
-        textDecorationLine: 'underline',
-        fontSize: 14,
-        textAlign: 'center',
-        marginTop: 8,
-    },
-});

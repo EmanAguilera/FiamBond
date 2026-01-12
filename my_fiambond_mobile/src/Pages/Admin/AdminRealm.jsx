@@ -1,884 +1,284 @@
-import React, { useEffect, useState, useCallback, useContext } from "react"; 
+// AdminRealm.jsx
+import React, { useEffect, useState, useCallback, lazy, Suspense, useContext } from "react"; 
 import { 
     View, 
     Text, 
-    StyleSheet, 
     TouchableOpacity, 
     ScrollView, 
+    SafeAreaView, 
     ActivityIndicator, 
-    Alert,
-    TextInput // For form input
+    Alert, 
+    TextInput,
+    Modal as RNModal 
 } from "react-native";
-// Removed: useNavigate, lazy, Suspense
+import { useNavigation } from "@react-navigation/native";
 import { AppContext } from '../../Context/AppContext'; 
 import { collection, getDocs, updateDoc, doc, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
 import { db } from "../../config/firebase-config";
+import Svg, { Path } from "react-native-svg";
 
-// --- DIRECT IMPORTS (Replacing Lazy Imports) ---
-import Modal from "../../Components/Modal";
-import AdminReportChartWidget from "../../Components/Admin/Analytics/AdminReportChartWidget";
-import AdminUserTableWidget from "../../Components/Admin/Users/AdminUserTableWidget"; 
-import SubscriptionReportWidget from "../../Components/Admin/Finance/SubscriptionReportWidget";
-import RevenueLedgerWidget from "../../Components/Admin/Finance/RevenueLedgerWidget"; 
+// --- LAZY IMPORTS ---
+const AdminReportChartWidget = lazy(() => import("../../Components/Admin/Analytics/AdminReportChartWidget"));
+const AdminUserTableWidget = lazy(() => import("../../Components/Admin/Users/AdminUserTableWidget")); 
+const SubscriptionReportWidget = lazy(() => import("../../Components/Admin/Finance/SubscriptionReportWidget"));
+const RevenueLedgerWidget = lazy(() => import("../../Components/Admin/Finance/RevenueLedgerWidget")); 
 
-// --- ICON PLACEHOLDER (Converted to RN Text) ---
-/**
- * @param {{name: string, style: object, size: number, color: string}} props
- */
-const Icon = ({ name, style, size = 16, color }) => {
-    let iconText = '';
-    let defaultSize = size;
-    switch (name) {
-        case 'Plus': iconText = '+'; break;
-        case 'Back': iconText = '←'; break;
-        case 'Money': iconText = '💰'; defaultSize = 32; break;
-        case 'Entities': iconText = '🏢'; defaultSize = 32; break; // Building/Office icon
-        case 'Users': iconText = '👥'; break;
-        case 'Report': iconText = '📄'; defaultSize = 32; break;
-        default: iconText = '?';
-    }
-    return <Text style={[{ fontSize: defaultSize, lineHeight: defaultSize, color }, style]}>{iconText}</Text>;
-};
-
+// --- ICONS ---
 const Icons = {
-    Plus: <Icon name="Plus" size={16} />,
-    Back: <Icon name="Back" size={16} />,
-    Money: <Icon name="Money" />,
-    Entities: <Icon name="Entities" />,
-    Users: <Icon name="Users" size={16} />,
-    Report: <Icon name="Report" />,
+    Plus: <Svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></Svg>,
+    Back: <Svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></Svg>,
+    Money: <Svg fill="none" viewBox="0 0 24 24" stroke="#10b981" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></Svg>,
+    Entities: <Svg fill="none" viewBox="0 0 24 24" stroke="#4f46e5" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></Svg>,
+    Report: <Svg fill="none" viewBox="0 0 24 24" stroke="#f59e0b" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></Svg>,
+    Team: <Svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><Path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></Svg>
 };
 
 // --- CONFIG ---
 const getPlanValue = (plan, type = 'company') => {
-    if (type === 'company') {
-        if (plan === 'yearly') return 15000.00;
-        return 1500.00; 
-    } else {
-        if (plan === 'yearly') return 5000.00;
-        return 500.00;
-    }
+    if (type === 'company') return plan === 'yearly' ? 15000.0 : 1500.0;
+    return plan === 'yearly' ? 5000.0 : 500.0;
 };
 
 // --- REUSABLE COMPONENTS ---
-/**
- * @param {{onClick: function, type: 'admin'|'sec', icon: React.ReactNode, children: React.ReactNode, style: object}} props
- */
-const Btn = ({ onClick, type = 'sec', icon, children, style = {} }) => {
-    const finalStyle = type === 'admin' ? styles.btnAdmin : styles.btnSec;
-    const textStyle = type === 'admin' ? styles.btnTextAdmin : styles.btnTextSec;
-
+const Btn = ({ onClick, type = 'sec', icon, children }) => {
+    const styles = {
+        admin: "bg-purple-600 border-transparent",
+        sec: "bg-white border-slate-300",
+    };
+    const textStyles = { admin: "text-white", sec: "text-slate-600" };
     return (
-        <TouchableOpacity onPress={onClick} style={[styles.btnBase, finalStyle, style]} activeOpacity={0.7}>
-            {icon}
-            <Text style={[styles.btnText, textStyle]}>{children}</Text>
+        <TouchableOpacity onPress={onClick} activeOpacity={0.7} className={`${styles[type]} px-4 py-3 rounded-xl border flex-row items-center justify-center gap-2`}>
+            <View className="w-4 h-4">{icon}</View>
+            <Text className={`${textStyles[type]} font-bold text-xs`}>{children}</Text>
         </TouchableOpacity>
     );
 };
 
-/**
- * @param {{title: string, value: any, subtext: string, linkText: string, onClick: function, icon: React.ReactNode, colorClass: string, isAlert: boolean}} props
- */
 const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorClass, isAlert }) => (
-    <TouchableOpacity onPress={onClick} style={[styles.cardContainer, isAlert ? styles.cardAlert : styles.cardDefault]} activeOpacity={0.8}>
-        <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, isAlert ? styles.cardTitleAlert : null]}>{title}</Text>
-            {/* The icon's color will be handled by the colorClass style passed from the parent */}
-            <View style={styles.cardIconWrapper}>{icon}</View> 
+    <TouchableOpacity onPress={onClick} activeOpacity={0.9} className={`border rounded-3xl p-6 mb-4 shadow-sm ${isAlert ? 'border-amber-300 bg-amber-50' : 'border-slate-100 bg-white'}`}>
+        <View className="flex-row justify-between items-start">
+            <Text className={`font-bold text-xs uppercase tracking-widest ${isAlert ? 'text-amber-800' : 'text-slate-400'}`}>{title}</Text>
+            <View className="w-8 h-8">{icon}</View>
         </View>
-        <View style={styles.cardValueWrapper}>
-            <Text style={[styles.cardValue, styles[colorClass]]}>{value}</Text>
-            {subtext && <Text style={[styles.cardSubtext, isAlert ? styles.cardSubtextAlert : styles.cardSubtextDefault]}>{subtext}</Text>}
+        <View className="mt-2">
+            <Text className={`text-3xl font-black ${colorClass}`}>{value}</Text>
+            {subtext && <Text className={`text-[10px] mt-1 font-black uppercase ${isAlert ? 'text-amber-600' : 'text-slate-400'}`}>{subtext}</Text>}
         </View>
-        <Text style={styles.cardLink}>{linkText} →</Text>
+        <Text className="text-indigo-600 text-xs mt-5 font-bold">{linkText} →</Text>
     </TouchableOpacity>
 );
 
-/**
- * @param {{onAdd: function, onCancel: function}} props
- */
 const AddAdminForm = ({ onAdd, onCancel }) => {
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
-
-    const handleSubmit = async () => {
-        if (!email) return;
-        setLoading(true);
-        await onAdd(email);
-        setLoading(false);
-    };
- 
     return (
-        <View style={styles.formContainer}>
-            <Text style={styles.formSubtext}>Enter user email to promote.</Text>
-            <View style={styles.inputWrapper}>
-                <TextInput 
-                    style={styles.inputBase}
-                    placeholder="user@example.com"
-                    value={email} 
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    required
-                />
-            </View>
-            <View style={styles.formActions}>
-                <TouchableOpacity onPress={onCancel} style={styles.formCancelBtn}>
-                    <Text style={styles.formCancelText}>Cancel</Text>
+        <View className="p-5 bg-white rounded-3xl border border-slate-100 shadow-sm mt-2">
+            <Text className="text-xs text-slate-500 mb-4 font-medium">Enter user email to promote to Administrator.</Text>
+            <TextInput 
+                keyboardType="email-address" 
+                value={email} 
+                onChangeText={setEmail} 
+                placeholder="user@example.com"
+                className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm mb-4" 
+            />
+            <View className="flex-row justify-end gap-2">
+                <TouchableOpacity onPress={onCancel} className="px-4 py-2">
+                    <Text className="text-xs font-bold text-slate-400">Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSubmit} disabled={loading} style={styles.formSubmitBtn}>
-                    <Text style={styles.formSubmitText}>{loading ? '...' : 'Promote'}</Text>
+                <TouchableOpacity 
+                    onPress={async () => {
+                        setLoading(true);
+                        await onAdd(email);
+                        setLoading(false);
+                    }} 
+                    disabled={loading} 
+                    className={`px-5 py-2 rounded-xl bg-indigo-600 flex-row items-center ${loading ? 'opacity-50' : ''}`}
+                >
+                    {loading && <ActivityIndicator size="small" color="white" className="mr-2" />}
+                    <Text className="text-xs font-bold text-white">
+                        {loading ? 'Adding...' : 'Add Admin'}
+                    </Text>
                 </TouchableOpacity>
             </View>
         </View>
     );
 };
 
-/**
- * @param {{adminUsers: Array, onAddAdmin: function}} props
- */
-const ManageTeamWidget = ({ adminUsers, onAddAdmin }) => {
-    const [showAddForm, setShowAddForm] = useState(false);
-
-    return (
-        <View style={styles.manageTeamWrapper}>
-            <View style={styles.manageTeamHeaderBox}>
-                {!showAddForm ? (
-                    <View style={styles.manageTeamHeaderContent}>
-                        <View>
-                            <Text style={styles.manageTeamTitle}>System Administrators</Text>
-                            <Text style={styles.manageTeamSubtext}>Manage dashboard access.</Text>
-                        </View>
-                        <TouchableOpacity onPress={() => setShowAddForm(true)} style={styles.promoteAdminBtn}>
-                            {Icons.Plus}
-                            <Text style={styles.promoteAdminText}>Promote New Admin</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <View style={styles.manageTeamForm}>
-                        <View style={styles.manageTeamFormTitleArea}>
-                            <Text style={styles.manageTeamFormTitle}>Promote User</Text>
-                        </View>
-                        <AddAdminForm onAdd={async (email) => { await onAddAdmin(email); setShowAddForm(false); }} onCancel={() => setShowAddForm(false)} />
-                    </View>
-                )}
-            </View>
-            <View>
-                <Text style={styles.currentTeamTitle}>Current Team ({adminUsers.length})</Text>
-                <View style={styles.adminTableWrapper}>
-                    <AdminUserTableWidget users={adminUsers} type="admin" headerText={null} />
-                </View>
-            </View>
-        </View>
-    );
-};
-
-// --- MAIN DASHBOARD ---
-/**
- * @param {{onBack: function}} props
- */
-export default function AdminDashboard({ onBack }) { // Added onBack prop
+// --- MAIN COMPONENT ---
+export default function AdminRealm() {
+    const navigation = useNavigation();
     const { user } = useContext(AppContext);
-    // Removed: const navigate = useNavigate();
-    const adminLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'Admin');
 
-    // State
-    const [users, setUsers] = useState([]);
-    const [premiums, setPremiums] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [modals, setModals] = useState({ revenue: false, entities: false, reports: false, manageTeam: false });
-    
-    // Derived Data
-    const [premiumUsers, setPremiumUsers] = useState([]); 
+    const [users, setUsers] = useState([]);
     const [adminUsers, setAdminUsers] = useState([]);
-    const [pendingCount, setPendingCount] = useState(0);
-    const [currentTotalFunds, setCurrentTotalFunds] = useState(0);
-
-    // Report State
-    const [report, setReport] = useState(null);
+    const [adminLastName, setAdminLastName] = useState("");
+    const [premiumUsers, setPremiumUsers] = useState([]);
+    const [premiums, setPremiums] = useState([]);
+    const [report, setReport] = useState({ total: 0, company: 0, family: 0, chart: [] });
     const [period, setPeriod] = useState('monthly');
+    const [currentTotalFunds, setCurrentTotalFunds] = useState(0);
+    const [pendingCount, setPendingCount] = useState(0);
 
-    const toggleModal = (key, value) => setModals(prev => ({ ...prev, [key]: value }));
+    const [modals, setModals] = useState({
+        revenue: false,
+        entities: false,
+        reports: false,
+        manageTeam: false
+    });
 
-    // --- REVENUE GENERATION ---
-    const generateReport = useCallback((premiumList, currentPeriod) => {
-        if (!premiumList) return;
-        const now = new Date();
-        const startDate = new Date(); 
-        
-        if (currentPeriod === 'weekly') startDate.setDate(now.getDate() - 7);
-        else if (currentPeriod === 'yearly') startDate.setFullYear(now.getFullYear() - 1);
-        else startDate.setMonth(now.getMonth() - 1);
+    const toggle = (key, value) => setModals(prev => ({ ...prev, [key]: value }));
 
-        const revenueData = {};
-        let periodRevenue = 0;
-        let activeCount = 0;
-        
-        const currentAdminId = user.id;
-
-        premiumList.forEach(p => {
-            // Skip Admin's own payment records
-            if (p.user_id === currentAdminId) return; 
-
-            const timestamp = p.granted_at;
-            if (timestamp?.seconds) {
-                const txDate = new Date(timestamp.seconds * 1000);
-                if (txDate >= startDate && txDate <= now) {
-                    const dateKey = txDate.toLocaleDateString();
-                    if (!revenueData[dateKey]) revenueData[dateKey] = 0;
-                    revenueData[dateKey] += (p.amount || 0);
-                    periodRevenue += (p.amount || 0);
-                    activeCount++;
-                }
-            }
-        });
-
-        const labels = Object.keys(revenueData).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-        setReport({
-            chartData: {
-                labels,
-                datasets: [{ 
-                    label: 'Admin Funds (₱)', 
-                    data: labels.map(l => revenueData[l]), 
-                    backgroundColor: 'rgba(147, 51, 234, 0.5)', 
-                    borderColor: 'rgba(147, 51, 234, 1)', 
-                    borderWidth: 1 
-                }]
-            },
-            totalInflow: periodRevenue,
-            totalOutflow: 0,
-            netPosition: periodRevenue, 
-            reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${now.toLocaleDateString()}`,
-            transactionCount: activeCount
-        });
-    }, [user.id]);
-
-    // --- FETCH DATA ---
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [usersSnap, premiumsSnap] = await Promise.all([
-                getDocs(collection(db, "users")),
-                getDocs(collection(db, "premiums"))
-            ]);
-
-            const premiumsList = premiumsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            const usersList = usersSnap.docs.map(u => ({ id: u.id, ...u.data() }));
+            // Fetch all users
+            const usersSnap = await getDocs(collection(db, "users"));
+            const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setUsers(allUsers);
             
-            // Sort Users: Pending at top
-            usersList.sort((a, b) => {
-                const aIsPending = a.subscription_status === 'pending_approval' || a.family_subscription_status === 'pending_approval';
-                const bIsPending = b.subscription_status === 'pending_approval' || b.family_subscription_status === 'pending_approval';
-                if (aIsPending && !bIsPending) return -1;
-                if (!aIsPending && bIsPending) return 1;
-                return (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0);
+            // Admin users
+            setAdminUsers(allUsers.filter(u => u.role === 'admin'));
+
+            // Premium users
+            setPremiumUsers(allUsers.filter(u => u.premium_access === true || u.company_access === true));
+
+            // Premium transactions
+            const premiumsSnap = await getDocs(collection(db, "premiums"));
+            const allPremiums = premiumsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setPremiums(allPremiums);
+
+            // Calculate report
+            let total = 0, company = 0, family = 0;
+            const chartData = [];
+            allPremiums.forEach(p => {
+                const amt = getPlanValue(p.plan, p.target_access);
+                total += amt;
+                if (p.target_access === 'company') company += amt;
+                else family += amt;
+                
+                // Chart data (simplified)
+                chartData.push({ date: p.created_at.toDate().toLocaleDateString(), amount: amt });
             });
-            
-            setUsers(usersList);
-            setPremiums(premiumsList);
+            setReport({ total, company, family, chart: chartData });
 
-            const premiumsOnly = usersList.filter(u => u.is_premium || u.is_family_premium);
-            const admins = usersList.filter(u => u.role === 'admin');
-            const pendingTotal = usersList.filter(u => u.subscription_status === 'pending_approval' || u.family_subscription_status === 'pending_approval').length;
-            
-            setPremiumUsers(premiumsOnly);
-            setAdminUsers(admins);
-            setPendingCount(pendingTotal);
+            // Current funds (assuming some logic)
+            setCurrentTotalFunds(total); // Placeholder
 
-            // Calculate Lifetime Funds from the 'premiums' collection
-            const currentAdminId = user.id;
-            const totalValue = premiumsList.reduce((sum, p) => {
-                if (p.user_id === currentAdminId) return sum; 
-                return sum + (p.amount || 0);
-            }, 0);
+            // Pending requests
+            setPendingCount(allPremiums.filter(p => p.status === 'pending').length);
 
-            setCurrentTotalFunds(totalValue);
-            generateReport(premiumsList, period);
-        } catch (error) { 
-            console.error("Data Fetch Error:", error); 
-            Alert.alert("Error", "Failed to fetch admin data.");
-        } finally { 
-            setLoading(false); 
+            // Admin last name
+            setAdminLastName(user.last_name || 'Admin');
+
+        } catch (err) {
+            console.error(err);
+            Alert.alert("Error", "Failed to load admin data.");
+        } finally {
+            setLoading(false);
         }
-    }, [generateReport, period, user.id]);
+    }, [user]);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
-    useEffect(() => { if (premiums.length > 0) generateReport(premiums, period); }, [period, premiums, generateReport]);
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
-    // --- TOGGLE PREMIUM (BATCHED WITH PREMIUMS COLLECTION) ---
-    const handleTogglePremium = async (userId, action, type) => {
+    const handleTogglePremium = async (userId, accessType) => {
         try {
             const batch = writeBatch(db);
             const userRef = doc(db, "users", userId);
-            
-            if (action === 'approve' || action === 'grant') {
-                const isCompany = type === 'company';
-                const plan = 'monthly';
-                const amount = getPlanValue(plan, type);
-                
-                // 1. Create entry in 'premiums' collection
-                const newPremiumRef = doc(collection(db, "premiums"));
-                const premiumData = {
-                    user_id: userId,
-                    access_type: type,
-                    amount: amount,
-                    plan_cycle: plan,
-                    status: "active",
-                    granted_at: serverTimestamp(),
-                    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 Day expiry
-                    payment_method: action === 'approve' ? "GCash" : "Admin Manual",
-                    payment_ref: action === 'approve' ? (users.find(u => u.id === userId)?.payment_ref || "VERIFIED") : "ADMIN_GRANTED"
-                };
+            batch.update(userRef, { [accessType === 'company' ? 'company_access' : 'premium_access']: true });
 
-                // 2. Update 'users' document
-                const userUpdates = {};
-                if (isCompany) {
-                    userUpdates.is_premium = true;
-                    userUpdates.subscription_status = 'active';
-                    userUpdates.active_company_premium_id = newPremiumRef.id;
-                    userUpdates.premium_granted_at = serverTimestamp();
-                    userUpdates.premium_plan = plan;
-                } else {
-                    userUpdates.is_family_premium = true;
-                    userUpdates.family_subscription_status = 'active';
-                    userUpdates.active_family_premium_id = newPremiumRef.id;
-                    userUpdates.family_premium_granted_at = serverTimestamp();
-                    userUpdates.family_premium_plan = plan;
-                }
-
-                batch.set(newPremiumRef, premiumData);
-                batch.update(userRef, userUpdates);
-            } else {
-                // REVOKE logic
-                const userUpdates = {};
-                if (type === 'company') {
-                    userUpdates.is_premium = false;
-                    userUpdates.subscription_status = 'inactive';
-                    userUpdates.active_company_premium_id = "";
-                } else {
-                    userUpdates.is_family_premium = false;
-                    userUpdates.family_subscription_status = 'inactive';
-                    userUpdates.active_family_premium_id = "";
-                }
-                batch.update(userRef, userUpdates);
-            }
+            // Update premiums if needed
+            const premiumsQuery = query(collection(db, "premiums"), where("user_id", "==", userId), where("status", "==", "pending"));
+            const premiumsSnap = await getDocs(premiumsQuery);
+            premiumsSnap.forEach(d => {
+                batch.update(d.ref, { status: 'approved', approved_at: serverTimestamp(), approved_by: user.id });
+            });
 
             await batch.commit();
-            fetchData(); 
-        } catch (error) { 
-            console.error("Error updating user access:", error);
-            Alert.alert("Error", "Failed to update user."); 
-        }
-    };
-
-    // --- PROMOTE ADMIN ---
-    const handleAddAdmin = async (email) => {
-        try {
-            const q = query(collection(db, "users"), where("email", "==", email));
-            const querySnapshot = await getDocs(q);
-            if (querySnapshot.empty) { Alert.alert("Error", "User not found."); return; }
-            await updateDoc(querySnapshot.docs[0].ref, { role: 'admin' });
-            Alert.alert("Success", `${email} is now an Admin.`);
+            Alert.alert("Success", "Access granted.");
             fetchData();
-        } catch (error) { 
-            console.error(error);
-            Alert.alert("Error", "Failed to promote admin."); 
+        } catch {
+            Alert.alert("Error", "Failed to grant access.");
         }
     };
 
     if (loading) return (
-        <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={styles.textPurple600.color} />
-            <Text style={styles.loadingText}>Loading Admin Realm...</Text>
-        </View>
+        <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+            <ActivityIndicator size="large" color="#9333ea" />
+            <Text className="mt-4 text-slate-400 font-bold">Initializing Admin Realm...</Text>
+        </SafeAreaView>
     );
 
     return (
-        <ScrollView style={styles.mainWrapper}>
-            {/* HEADER */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    
-                    {/* Back button uses onBack prop */}
-                    <TouchableOpacity onPress={onBack} style={styles.backButtonPill}>
-                        <View style={styles.backButtonIconWrapper}>{Icons.Back}</View>
-                        <Text style={styles.backButtonPillText}>Back to Personal</Text>
-                    </TouchableOpacity>
+        <SafeAreaView className="flex-1 bg-slate-50">
+            <ScrollView className="px-5 pt-6" showsVerticalScrollIndicator={false}>
+                <TouchableOpacity onPress={() => navigation.navigate("Home")} className="bg-white border border-slate-200 px-3 py-2 rounded-xl self-start mb-6 flex-row items-center">
+                    <View className="w-4 h-4 mr-2">{Icons.Back}</View>
+                    <Text className="text-slate-500 font-bold text-xs">PERSONAL REALM</Text>
+                </TouchableOpacity>
 
-                    <View style={styles.titleArea}>
-                        <View style={styles.titleLine}></View>
-                        <View>
-                            <Text style={styles.titleHeader}>{adminLastName}</Text>
-                            <Text style={styles.titleSubtext}>Admin Realm</Text>
-                        </View>
+                <View className="flex-row items-center mb-8">
+                    <View className="w-1.5 h-12 bg-purple-600 rounded-full mr-4" />
+                    <View>
+                        <Text className="text-3xl font-black text-slate-800">{adminLastName}</Text>
+                        <Text className="text-slate-400 text-xs font-black uppercase tracking-widest mt-1">System Controller</Text>
                     </View>
                 </View>
-                
-                <View style={styles.buttonGroup}>
-                    {/* Simplified SVG path for the icon in React Native context */}
-                    <Btn onClick={() => toggleModal('manageTeam', true)} type="admin" icon={<Icon name="Users" size={16} />}>
-                        Manage Team
-                    </Btn>
+
+                <View className="flex-row justify-end mb-8">
+                    <Btn onClick={() => toggle('manageTeam', true)} type="admin" icon={Icons.Team}>Manage Team</Btn>
                 </View>
-            </View>
 
-            {/* DASHBOARD CARDS */}
-            <View style={styles.cardsGrid}>
-                <DashboardCard 
-                    title="Admin Funds" 
-                    value={`₱${currentTotalFunds.toLocaleString()}`} 
-                    subtext="Total Accumulated Value" 
-                    linkText="View Transactions" 
-                    onClick={() => toggleModal('revenue', true)} 
-                    icon={Icons.Money} 
-                    colorClass="textEmerald600" 
-                />
-                <DashboardCard 
-                    title="User Management" 
-                    value={users.length} 
-                    subtext={pendingCount > 0 ? `⚠️ ${pendingCount} PENDING REQUEST(S)` : `${premiumUsers.length} Active Subscriptions`}
-                    linkText={pendingCount > 0 ? "Review Requests Now" : "Manage Access"}
-                    onClick={() => toggleModal('entities', true)} 
-                    icon={Icons.Entities} 
-                    colorClass={pendingCount > 0 ? "textAmber600" : "textIndigo600"}
-                    isAlert={pendingCount > 0} 
-                />
-                <DashboardCard 
-                    title="Revenue Reports" 
-                    value="Export" 
-                    subtext="Processed Histories"
-                    linkText="Manage Reports" 
-                    onClick={() => toggleModal('reports', true)} 
-                    icon={Icons.Report} 
-                    colorClass="textAmber600" 
-                />
-            </View>
+                <DashboardCard title="Admin Funds" value={`₱${currentTotalFunds.toLocaleString()}`} linkText="Ledger" onClick={() => toggle('revenue', true)} icon={Icons.Money} colorClass="text-emerald-600" />
+                <DashboardCard title="Users" value={users.length} subtext={pendingCount > 0 ? `⚠️ ${pendingCount} PENDING REQUESTS` : `${premiumUsers.length} PREMIUM`} linkText="Manage Access" onClick={() => toggle('entities', true)} icon={Icons.Entities} colorClass={pendingCount > 0 ? "text-amber-600" : "text-indigo-600"} isAlert={pendingCount > 0} />
+                <DashboardCard title="Revenue" value="Export" subtext="Financial Reports" linkText="Manage Reports" onClick={() => toggle('reports', true)} icon={Icons.Report} colorClass="text-amber-600" />
 
-            {/* CHART */}
-            <View style={styles.chartWrapper}>
-                <AdminReportChartWidget report={report} period={period} setPeriod={setPeriod} />
-            </View>
+                <View className="bg-white rounded-[40px] p-6 mb-12 shadow-sm border border-slate-100">
+                    <Suspense fallback={<ActivityIndicator />}>
+                        <AdminReportChartWidget report={report} period={period} setPeriod={setPeriod} />
+                    </Suspense>
+                </View>
+                <View className="h-20" />
+            </ScrollView>
 
-            {/* MODALS */}
-            {modals.revenue && ( 
-                <Modal isOpen={modals.revenue} onClose={() => toggleModal('revenue', false)} title="Revenue Ledger"> 
-                    <View style={styles.modalContent}>
-                        <View style={styles.totalFundsBox}>
-                            <Text style={styles.totalFundsTitle}>Total Funds:</Text>
-                            <Text style={styles.totalFundsValue}>₱{currentTotalFunds.toLocaleString()}</Text>
+            {/* --- MODALS --- */}
+            {Object.entries(modals).map(([key, isOpen]) => (
+                <RNModal key={key} visible={isOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => toggle(key, false)}>
+                    <SafeAreaView className="flex-1 bg-white">
+                        <View className="flex-row justify-between p-5 border-b border-slate-100">
+                            <Text className="text-xl font-bold text-slate-800 capitalize">{key.replace('manage', 'Manage ')}</Text>
+                            <TouchableOpacity onPress={() => toggle(key, false)} className="bg-slate-100 px-4 py-2 rounded-full">
+                                <Text className="text-slate-600 font-bold text-xs">Close</Text>
+                            </TouchableOpacity>
                         </View>
-                        <RevenueLedgerWidget premiums={premiums} users={users} currentAdminId={user.id} />
-                    </View>
-                </Modal> 
-            )}
-            {modals.entities && ( 
-                <Modal isOpen={modals.entities} onClose={() => toggleModal('entities', false)} title="Entity Management"> 
-                    <View style={styles.modalContent}>
-                        <AdminUserTableWidget 
-                            users={users} 
-                            type="entity" 
-                            onTogglePremium={handleTogglePremium} 
-                            headerText={pendingCount > 0 ? "⚠️ Approval Needed" : "Manage Access Rights"}
-                        /> 
-                    </View>
-                </Modal> 
-            )}
-            {modals.reports && ( 
-                <Modal isOpen={modals.reports} onClose={() => toggleModal('reports', false)} title="Subscription Revenue Reports"> 
-                    <View style={styles.modalContent}>
-                        <SubscriptionReportWidget transactions={premiums.map(p => {
-                            const u = users.find(usr => usr.id === p.user_id);
-                            return {
-                                id: p.id,
-                                created_at: p.granted_at,
-                                subscriber: u?.full_name || u?.email || "Unknown",
-                                plan: p.plan_cycle,
-                                method: p.payment_method,
-                                ref: p.payment_ref,
-                                amount: p.amount,
-                                type: p.access_type
-                            };
-                        })} /> 
-                    </View>
-                </Modal> 
-            )}
-            {modals.manageTeam && ( 
-                <Modal isOpen={modals.manageTeam} onClose={() => toggleModal('manageTeam', false)} title="Admin Team Management"> 
-                    <View style={styles.modalContent}>
-                        <ManageTeamWidget adminUsers={adminUsers} onAddAdmin={handleAddAdmin} /> 
-                    </View>
-                </Modal> 
-            )}
-        </ScrollView>
+                        <ScrollView className="p-5">
+                            <Suspense fallback={<ActivityIndicator className="mt-10" />}>
+                                {key === 'revenue' && <RevenueLedgerWidget premiums={premiums} users={users} currentAdminId={user.id} />}
+                                {key === 'entities' && <AdminUserTableWidget users={users} onTogglePremium={handleTogglePremium} />}
+                                {key === 'reports' && <SubscriptionReportWidget transactions={premiums.map(p => ({ ...p, subscriber: users.find(u => u.id === p.user_id)?.full_name || "Unknown" }))} />}
+                                {key === 'manageTeam' && (
+                                    <View>
+                                        <AddAdminForm onAdd={async (email) => { 
+                                            const q = query(collection(db, "users"), where("email", "==", email));
+                                            const snap = await getDocs(q);
+                                            if (snap.empty) return Alert.alert("Not Found", "User not found.");
+                                            await updateDoc(snap.docs[0].ref, { role: 'admin' });
+                                            Alert.alert("Success", `${email} promoted.`); 
+                                            fetchData(); 
+                                            toggle('manageTeam', false);
+                                        }} onCancel={() => toggle('manageTeam', false)} />
+                                        <View className="mt-8">
+                                            <AdminUserTableWidget users={adminUsers} type="admin" />
+                                        </View>
+                                    </View>
+                                )}
+                            </Suspense>
+                        </ScrollView>
+                    </SafeAreaView>
+                </RNModal>
+            ))}
+        </SafeAreaView>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    // --- Colors ---
-    textPurple600: { color: '#9333ea' },
-    textPurple700: { color: '#7e22ce' },
-    textSlate400: { color: '#94a3b8' },
-    textSlate500: { color: '#64748b' },
-    textSlate700: { color: '#334155' },
-    textSlate800: { color: '#1e293b' },
-    textEmerald600: { color: '#059669' },
-    textIndigo600: { color: '#4f46e5' },
-    textAmber600: { color: '#d97706' },
-    textAmber800: { color: '#92400e' },
-    textWhite: { color: 'white' },
-    bgPurple600: { backgroundColor: '#9333ea' },
-    bgWhite: { backgroundColor: 'white' },
-    bgSlate50: { backgroundColor: '#f8fafc' },
-    bgAmber50: { backgroundColor: 'rgba(255, 251, 235, 0.5)' }, // bg-amber-50/50
-    bgEmerald50: { backgroundColor: '#ecfdf5' },
-    borderSlate200: { borderColor: '#e2e8f0', borderWidth: 1 },
-    borderSlate300: { borderColor: '#cbd5e1', borderWidth: 1 },
-    borderAmber300: { borderColor: '#fcd34d', borderWidth: 1 },
-    borderEmerald100: { borderColor: '#d1fae5', borderWidth: 1 },
-
-    // --- Layout & Utils ---
-    mainWrapper: {
-        flex: 1,
-        paddingHorizontal: 16,
-        paddingVertical: 24,
-        backgroundColor: '#f8fafc', // Setting a default background for the ScrollView area
-    },
-    loadingContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 40,
-    },
-    loadingText: {
-        marginTop: 10,
-        ...this.textSlate400,
-        fontSize: 16,
-    },
-    shadowSm: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    shadowLg: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 5,
-    },
-    
-    // --- Header ---
-    header: {
-        marginBottom: 32,
-        flexDirection: 'column', 
-        gap: 24,
-    },
-    headerLeft: {
-        flexDirection: 'column',
-        gap: 4,
-    },
-    backButtonPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-        ...this.bgWhite,
-        ...this.borderSlate200,
-        alignSelf: 'flex-start',
-        marginBottom: 16,
-        ...this.shadowSm,
-    },
-    backButtonIconWrapper: {
-        // Ensures the icon is styled correctly if it's text
-    },
-    backButtonPillText: {
-        ...this.textSlate500,
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    titleArea: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    titleLine: {
-        width: 4,
-        height: 48,
-        ...this.bgIndigo600,
-        borderRadius: 9999,
-        opacity: 0.8,
-    },
-    titleHeader: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        ...this.textSlate800,
-        letterSpacing: -0.5,
-        lineHeight: 32,
-    },
-    titleSubtext: {
-        ...this.textSlate500,
-        fontWeight: '500',
-        fontSize: 14,
-        marginTop: 4,
-        letterSpacing: 1,
-    },
-    buttonGroup: {
-        flexDirection: 'row',
-        gap: 12,
-        alignSelf: 'flex-start',
-    },
-    
-    // --- Buttons ---
-    btnBase: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 12,
-        fontSize: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    btnText: {
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    btnAdmin: {
-        ...this.bgPurple600,
-        ...this.shadowSm,
-    },
-    btnSec: {
-        ...this.bgWhite,
-        ...this.borderSlate300,
-    },
-    btnTextAdmin: {
-        ...this.textWhite,
-        fontWeight: 'bold',
-    },
-    btnTextSec: {
-        ...this.textSlate700,
-    },
-
-    // --- Cards Grid ---
-    cardsGrid: {
-        flexDirection: 'column',
-        gap: 24,
-        marginBottom: 32,
-    },
-    cardContainer: {
-        backgroundColor: 'rgba(255, 255, 255, 0.6)', 
-        borderRadius: 16,
-        ...this.shadowLg,
-        padding: 24,
-        gap: 4,
-    },
-    cardDefault: {
-        ...this.borderSlate200,
-    },
-    cardAlert: {
-        ...this.borderAmber300,
-        ...this.bgAmber50,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    cardTitle: {
-        fontWeight: 'bold',
-        ...this.textSlate700,
-        paddingRight: 16,
-    },
-    cardTitleAlert: {
-        ...this.textAmber800,
-    },
-    cardIconWrapper: {
-        // Style for the icon container
-    },
-    cardValueWrapper: {
-        flexGrow: 1,
-    },
-    cardValue: {
-        fontSize: 36,
-        fontWeight: 'bold',
-        marginTop: 8,
-    },
-    cardSubtext: {
-        fontSize: 12,
-        marginTop: 4,
-    },
-    cardSubtextDefault: {
-        ...this.textSlate400,
-        fontWeight: '500',
-    },
-    cardSubtextAlert: {
-        ...this.textAmber600,
-        fontWeight: 'bold',
-        // Note: RN doesn't support animate-pulse directly
-    },
-    cardLink: {
-        ...this.textIndigo600,
-        fontSize: 14,
-        marginTop: 12,
-        fontWeight: 'bold',
-    },
-
-    // --- Chart ---
-    chartWrapper: {
-        marginBottom: 32,
-    },
-
-    // --- Modal Content ---
-    modalContent: {
-        padding: 16,
-        gap: 16,
-    },
-    totalFundsBox: {
-        ...this.bgEmerald50,
-        ...this.borderEmerald100,
-        padding: 16,
-        borderRadius: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    totalFundsTitle: {
-        fontWeight: 'bold',
-        ...this.textEmerald600,
-        fontSize: 14,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    totalFundsValue: {
-        fontWeight: 'bold',
-        fontSize: 18,
-        ...this.textEmerald600,
-    },
-
-    // --- Manage Team Widget Styles ---
-    manageTeamWrapper: {
-        gap: 16,
-    },
-    manageTeamHeaderBox: {
-        ...this.bgSlate50,
-        ...this.borderSlate200,
-        padding: 16,
-        borderRadius: 12,
-    },
-    manageTeamHeaderContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    manageTeamTitle: {
-        fontWeight: 'bold',
-        ...this.textSlate700,
-    },
-    manageTeamSubtext: {
-        fontSize: 12,
-        ...this.textSlate500,
-    },
-    promoteAdminBtn: {
-        ...this.bgPurple600,
-        ...this.textWhite,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
-        fontSize: 12,
-        fontWeight: 'bold',
-        ...this.shadowSm,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    promoteAdminText: {
-        ...this.textWhite,
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    manageTeamForm: {
-        // Style for the form wrapper when visible
-    },
-    manageTeamFormTitleArea: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    manageTeamFormTitle: {
-        fontWeight: 'bold',
-        ...this.textPurple700,
-        fontSize: 14,
-    },
-    
-    // --- AddAdminForm Styles ---
-    formContainer: {
-        padding: 16,
-        ...this.bgWhite,
-        ...this.borderSlate200,
-        borderRadius: 8,
-        ...this.shadowSm,
-        marginTop: 8,
-    },
-    formSubtext: {
-        fontSize: 12,
-        ...this.textSlate500,
-        marginBottom: 16,
-    },
-    inputWrapper: {
-        marginBottom: 16,
-    },
-    inputBase: {
-        width: '100%',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        ...this.borderSlate300,
-        borderRadius: 8,
-        fontSize: 14,
-    },
-    formActions: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        gap: 8,
-    },
-    formCancelBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-    },
-    formCancelText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        ...this.textSlate500,
-    },
-    formSubmitBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        ...this.bgPurple600,
-        borderRadius: 8,
-    },
-    formSubmitText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        ...this.textWhite,
-    },
-    
-    // --- Admin List Styles ---
-    currentTeamTitle: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        ...this.textSlate400,
-        textTransform: 'uppercase',
-        letterSpacing: 1.2,
-        marginBottom: 8,
-        paddingHorizontal: 4,
-    },
-    adminTableWrapper: {
-        ...this.borderSlate200,
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-});

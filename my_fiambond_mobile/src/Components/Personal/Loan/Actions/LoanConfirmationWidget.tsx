@@ -3,53 +3,28 @@ import {
     View, 
     Text, 
     TouchableOpacity, 
-    StyleSheet, 
-    Alert, 
     ActivityIndicator, 
-    Platform 
-} from "react-native";
-import { AppContext } from "../../../../Context/AppContext.jsx";
+    Alert 
+} from 'react-native';
+import { AppContext } from '../../../../Context/AppContext.jsx';
 
-// Cloudinary constants (use process.env in RN/Expo)
-const CLOUD_URL = `https://api.cloudinary.com/v1_1/${process.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy"}/image/upload`;
-const API_URL = process.env.VITE_API_URL || 'http://localhost:3000/api'; // Simplified URL
-
-// --- INTERFACES FOR TYPE SAFETY ---
-interface Loan {
-    id: string;
-    amount: string | number;
-    description: string;
-    creditor: { full_name: string };
-    [key: string]: any;
-}
 interface LoanConfirmationWidgetProps {
-    loan: Loan; // Use the defined Loan interface
+    loan: any; 
     onSuccess: () => void;
 }
 
-// Interfaces for Context Fix (Error 2339)
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
-
 export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirmationWidgetProps) {
-    // FIX: Assert context type with non-null assertion (!)
-    const { user } = useContext(AppContext)! as AppContextType; 
+    const { user } = useContext(AppContext) as any;
+    
+    // Replace with your actual mobile-accessible IP or production URL
+    const API_URL = 'http://localhost:3000'; 
     
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleConfirmReceipt = async () => {
-        // Safe check for user object access (user is now User | null)
-        if (!user || !user.uid || !loan || !loan.id) {
+        if (!user || !loan || !loan.id) {
             setError("Cannot process confirmation. Critical data is missing.");
-            Alert.alert("Error", "Cannot process confirmation. Critical data is missing.");
             return;
         }
 
@@ -63,7 +38,7 @@ export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirma
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     status: "outstanding",
-                    confirmed_at: new Date() // JS Date
+                    confirmed_at: new Date().toISOString() 
                 })
             });
 
@@ -73,12 +48,12 @@ export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirma
             const creditorName = loan.creditor?.full_name || 'the lender';
             
             const transactionData = {
-                user_id: user.uid, // SAFE access now
+                user_id: user.uid, 
                 family_id: null, // Personal income
                 type: 'income',
                 amount: Number(loan.amount),
                 description: `Loan received from ${creditorName}: ${loan.description}`,
-                // created_at handled by backend
+                created_at: new Date().toISOString()
             };
 
             const txResponse = await fetch(`${API_URL}/transactions`, {
@@ -89,113 +64,68 @@ export default function LoanConfirmationWidget({ loan, onSuccess }: LoanConfirma
 
             if (!txResponse.ok) throw new Error("Loan confirmed, but failed to record income transaction.");
 
-            Alert.alert("Success", "Loan confirmed and funds recorded as income.");
+            Alert.alert("Success", "Funds confirmed and balance updated.");
             if (onSuccess) onSuccess();
 
         } catch (err: any) {
             console.error("Failed to confirm loan receipt:", err);
-            setError("Could not confirm receipt. Please check your connection and try again.");
-            Alert.alert("Error", "Could not confirm receipt. Please check your connection and try again.");
+            setError("Could not confirm receipt. Please check your connection.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <View style={styles.container}>
+        <View className="p-1 gap-y-4">
             <View>
-                <Text style={styles.promptText}>Please confirm you have received the funds for the following loan:</Text>
-                <View style={styles.loanDetailsBox}>
-                    <Text style={styles.loanDescription}>{loan.description}</Text>
-                    <Text style={styles.loanCreditor}>From: <Text style={styles.loanCreditorName}>{loan.creditor?.full_name || 'Lender'}</Text></Text>
-                    <Text style={styles.loanAmount}>
-                        Amount: ₱{Number(loan.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                <Text className="text-sm text-slate-600 leading-5">
+                    Please confirm you have received the funds for the following loan:
+                </Text>
+                
+                <View className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <Text className="font-bold text-slate-800 text-base">{loan.description}</Text>
+                    <Text className="text-xs text-slate-500 mt-1">
+                        From: <Text className="font-bold text-slate-700">{loan.creditor?.full_name || 'Lender'}</Text>
+                    </Text>
+                    <Text className="text-xl font-bold text-emerald-600 mt-3">
+                        ₱{Number(loan.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                 </View>
             </View>
-            <View style={styles.divider} />
-            {error && <Text style={styles.errorText}>{error}</Text>}
+
+            {/* Horizontal Rule */}
+            <View className="h-[1px] bg-slate-100 w-full my-2" />
+
+            {error && (
+                <View className="bg-rose-50 p-3 rounded-xl">
+                    <Text className="text-rose-600 text-xs text-center font-medium">{error}</Text>
+                </View>
+            )}
+
             <TouchableOpacity 
                 onPress={handleConfirmReceipt} 
-                style={[styles.primaryBtn, loading && styles.btnDisabled]} 
                 disabled={loading}
+                activeOpacity={0.7}
+                className={`w-full py-4 rounded-2xl shadow-lg items-center ${
+                    loading ? 'bg-indigo-300' : 'bg-indigo-600'
+                }`}
+                style={!loading && { shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }}
             >
-                {loading ? <ActivityIndicator color="white" /> : <Text style={styles.primaryBtnText}>Confirm Funds Received</Text>}
+                {loading ? (
+                    <View className="flex-row items-center">
+                        <ActivityIndicator color="white" className="mr-2" />
+                        <Text className="text-white font-bold text-base">Confirming...</Text>
+                    </View>
+                ) : (
+                    <Text className="text-white font-bold text-base">Confirm Funds Received</Text>
+                )}
             </TouchableOpacity>
-            <Text style={styles.infoText}>This will add the loan amount to your personal balance as income.</Text>
+
+            <View className="px-4">
+                <Text className="text-[10px] text-center text-slate-400 leading-4 italic">
+                    This will add the loan amount to your personal balance as income.
+                </Text>
+            </View>
         </View>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        gap: 16, // space-y-4
-        padding: 16,
-    },
-    promptText: {
-        fontSize: 14,
-        color: '#4B5563', // text-gray-600
-    },
-    loanDetailsBox: {
-        marginTop: 8, // mt-2
-        padding: 12, // p-3
-        backgroundColor: '#F9FAFB', // bg-gray-50
-        borderRadius: 6, // rounded-md
-        borderWidth: 1,
-        borderColor: '#E5E7EB', // border-gray-200
-    },
-    loanDescription: {
-        fontWeight: '600', // font-semibold
-        color: '#1F2937', // text-gray-800
-    },
-    loanCreditor: {
-        fontSize: 14, // text-sm
-        color: '#6B7280', // text-gray-500
-        marginTop: 4, // mt-1
-    },
-    loanCreditorName: {
-        fontWeight: '500', // font-medium
-    },
-    loanAmount: {
-        fontSize: 18, // text-lg
-        fontWeight: 'bold',
-        color: '#059669', // text-green-600
-        marginTop: 8, // mt-2
-    },
-    divider: {
-        borderBottomWidth: 1,
-        borderColor: '#E5E7EB', // hr
-    },
-    errorText: {
-        color: '#EF4444', // error
-        textAlign: 'center',
-        fontSize: 14,
-    },
-    primaryBtn: {
-        width: '100%', // w-full
-        paddingVertical: 12, // py-3
-        backgroundColor: '#4F46E5', // primary-btn / bg-indigo-600
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4, // shadow-md
-    },
-    primaryBtnText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    btnDisabled: {
-        opacity: 0.5,
-    },
-    infoText: {
-        fontSize: 12, // text-xs
-        textAlign: 'center',
-        color: '#6B7280', // text-gray-500
-    }
-});

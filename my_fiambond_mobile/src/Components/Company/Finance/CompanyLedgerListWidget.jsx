@@ -1,37 +1,51 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Linking } from 'react-native';
+import React, { memo, useMemo } from 'react';
+import { 
+    View, 
+    Text, 
+    ScrollView, 
+    TouchableOpacity, 
+    Linking, 
+    Alert 
+} from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
-// --- ICON PLACEHOLDER (Replicated from Personal/Family Widgets) ---
-const Icon = ({ name, isIncome, style }) => {
-    let iconText = '';
-    switch (name) {
-        case 'Plus': iconText = isIncome ? '▲' : '▼'; break;
-        case 'Receipt': iconText = '📄'; break;
-        default: iconText = '?';
-    }
-    const color = isIncome ? styles.iconGreen : styles.iconRed;
-    return <Text style={[styles.iconBase, color, style]}>{iconText}</Text>;
-};
+// --- ICONS ---
+const IncomeIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#16a34a" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+    </Svg>
+);
+
+const ExpenseIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#dc2626" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" />
+    </Svg>
+);
+
+const ReceiptIcon = () => (
+    <Svg className="w-4 h-4" fill="none" stroke="#64748b" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </Svg>
+);
 
 // --- STYLED SKELETON LOADER ---
 const TransactionListSkeleton = () => (
-    <View style={styles.skeletonContainer}>
-        <ActivityIndicator size="large" color="#94A3B8" style={{marginBottom: 16}} />
-        {[...Array(6)].map((_, i) => (
-            <View key={i} style={styles.skeletonItem}>
-                <View style={styles.skeletonCircle} />
-                <View style={styles.skeletonTextWrapper}>
-                    <View style={styles.skeletonTextMain} />
-                    <View style={styles.skeletonTextSub} />
+    <View className="animate-pulse">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+            <View key={i} className="flex-row items-center p-4 border-b border-slate-50">
+                <View className="h-10 w-10 rounded-full bg-slate-200" />
+                <View className="ml-4 flex-1">
+                    <View className="h-4 w-3/4 bg-slate-200 rounded mb-2" />
+                    <View className="h-3 w-1/4 bg-slate-200 rounded" />
                 </View>
-                <View style={styles.skeletonTextAmount} />
+                <View className="h-5 w-20 bg-slate-200 rounded" />
             </View>
         ))}
     </View>
 );
 
-// --- HELPER FUNCTION TO FORMAT DATE HEADERS ---
-const formatDateHeader = (dateString) => {
+// --- HELPER: FORMAT DATE HEADERS ---
+const formatDateHeader = (dateString) => { // Removed type annotation
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -47,64 +61,69 @@ const formatDateHeader = (dateString) => {
     });
 };
 
-// --- STYLED TRANSACTION ITEM COMPONENT ---
-const TransactionItem = ({ transaction }) => {
+// --- TRANSACTION ITEM ---
+const TransactionItem = ({ transaction }) => { // Removed type annotation
     const isIncome = transaction.type === 'income';
 
-    // Ensure we have a valid Date object
+    const handleOpenReceipt = async (url) => { // Removed type annotation
+        const supported = await Linking.canOpenURL(url);
+        if (supported) {
+            await Linking.openURL(url);
+        } else {
+            Alert.alert("Error", "Cannot open receipt URL");
+        }
+    };
+
+    // Date Shim
     const dateObj = transaction.created_at?.toDate 
         ? transaction.created_at.toDate() 
         : new Date(transaction.created_at || Date.now());
 
-    const transactionTypeStyle = isIncome ? styles.incomeText : styles.expenseText;
-    const backgroundStyle = isIncome ? styles.incomeBg : styles.expenseBg;
-
-    const handleReceiptPress = () => {
-        if (transaction.attachment_url) {
-            Linking.openURL(transaction.attachment_url).catch(err => 
-                Alert.alert("Error", "Failed to open receipt link: " + err.message)
-            );
-        }
-    };
-
     return (
-        <TouchableOpacity style={styles.itemContainer} activeOpacity={0.7}>
+        <View className="flex-row items-center p-4 border-b border-slate-50 bg-white">
             {/* Icon Circle */}
-            <View style={[styles.iconWrapper, backgroundStyle]}>
-                <Icon name={'Plus'} isIncome={isIncome} style={transactionTypeStyle} />
+            <View className={`w-10 h-10 rounded-full items-center justify-center ${isIncome ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+                {isIncome ? <IncomeIcon /> : <ExpenseIcon />}
             </View>
 
             {/* Description & Metadata */}
-            <View style={styles.detailsWrapper}>
-                <Text style={styles.descriptionText} numberOfLines={1}>{transaction.description}</Text>
-                <View style={styles.subDetails}>
-                    <Text style={styles.timeText}>
+            <View className="ml-4 flex-1">
+                <Text className="font-bold text-slate-800 text-sm" numberOfLines={1}>
+                    {transaction.description}
+                </Text>
+                <View className="flex-row items-center mt-1">
+                    <Text className="text-[10px] text-slate-400 mr-3">
                         {dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                     </Text>
                     {transaction.attachment_url && (
-                        <TouchableOpacity onPress={handleReceiptPress} style={styles.receiptButton}>
-                            <Icon name="Receipt" style={styles.receiptIcon} />
-                            <Text style={styles.receiptText}>Receipt</Text>
+                        <TouchableOpacity 
+                            onPress={() => handleOpenReceipt(transaction.attachment_url)}
+                            className="flex-row items-center"
+                        >
+                            <ReceiptIcon />
+                            <Text className="text-[10px] font-bold text-indigo-600 underline ml-1">Receipt</Text>
                         </TouchableOpacity>
                     )}
                 </View>
             </View>
 
             {/* Amount */}
-            <Text style={[styles.amountText, transactionTypeStyle]}>
-                {isIncome ? '+' : '-'} ₱{parseFloat(transaction.amount.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </Text>
-        </TouchableOpacity>
+            <View className="ml-2 items-end">
+                <Text className={`font-bold text-sm ${isIncome ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {isIncome ? '+' : '-'} ₱{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+            </View>
+        </View>
     );
 };
 
-const CompanyLedgerListWidget = ({ transactions, loading }) => {
+const CompanyLedgerListWidget = ({ transactions, loading }) => { // Removed type annotations
     
-    // Group transactions by Date
+    // Group transactions logic
     const groupedTransactions = useMemo(() => {
         if (!transactions) return {};
         
-        return transactions.reduce((acc, transaction) => {
+        return transactions.reduce((acc, transaction) => { // Removed type annotation
             const dateObj = transaction.created_at?.toDate 
                 ? transaction.created_at.toDate() 
                 : new Date(transaction.created_at || Date.now());
@@ -117,205 +136,48 @@ const CompanyLedgerListWidget = ({ transactions, loading }) => {
         }, {});
     }, [transactions]);
 
-    // Loading State
     if (loading) return <TransactionListSkeleton />;
 
-    // Empty State
     if (!transactions || transactions.length === 0) {
-        return <View style={styles.emptyListContainer}><Text style={styles.emptyListText}>No financial activity recorded.</Text></View>;
+        return (
+            <View className="p-20 items-center justify-center">
+                <Text className="text-slate-400 italic text-sm text-center">
+                    No financial activity recorded yet.
+                </Text>
+            </View>
+        );
     }
 
     return (
-        <View style={styles.widgetContainer}>
-            <ScrollView style={styles.listScrollView} contentContainerStyle={styles.listContent}>
+        <View className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
+            <ScrollView showsVerticalScrollIndicator={false} className="max-h-[500px]">
                 {Object.keys(groupedTransactions)
                     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
                     .map(dateKey => (
                         <View key={dateKey}>
-                            {/* Sticky Date Header */}
-                            <View style={styles.dateHeader}>
-                                <Text style={styles.dateHeaderText}>
+                            {/* Date Header Section */}
+                            <View className="bg-slate-50 px-5 py-2 border-y border-slate-100">
+                                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                     {formatDateHeader(dateKey)}
                                 </Text>
                             </View>
+                            
                             <View>
-                                {groupedTransactions[dateKey].map(transaction => (
-                                    <TransactionItem key={transaction.id || transaction._id} transaction={transaction} />
+                                {groupedTransactions[dateKey].map((transaction) => ( // Removed type annotation
+                                    <TransactionItem 
+                                        key={transaction.id || transaction._id} 
+                                        transaction={transaction} 
+                                    />
                                 ))}
                             </View>
                         </View>
                     ))}
+                
+                {/* Footer Spacing */}
+                <View className="h-10" />
             </ScrollView>
         </View>
     );
 };
 
-export default CompanyLedgerListWidget;
-
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    // Global & Utility
-    iconBase: { 
-        fontSize: 20, 
-        lineHeight: 20, 
-        fontWeight: 'bold' 
-    },
-    iconGreen: { color: '#059669' }, // text-green-600
-    iconRed: { color: '#DC2626' },   // text-red-600
-    incomeText: { color: '#059669' }, // text-green-600
-    expenseText: { color: '#EF4444' }, // text-red-500
-    incomeBg: { backgroundColor: '#D1FAE5' }, // bg-green-100
-    expenseBg: { backgroundColor: '#FEE2E2' }, // bg-red-100
-
-    // --- Widget Container ---
-    widgetContainer: {
-        flex: 1,
-        maxHeight: 400, // Reasonable max height for a list
-        backgroundColor: 'white',
-        borderRadius: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: '#E5E7EB', // border-gray-200
-        overflow: 'hidden',
-    },
-    listScrollView: {
-        // divide-y divide-gray-200 is handled by item border
-    },
-    listContent: {
-        // Ensures content fills the area
-    },
-    
-    // --- Date Header ---
-    dateHeader: {
-        backgroundColor: '#F9FAFB', // bg-gray-50
-        paddingHorizontal: 16, // px-4
-        paddingVertical: 8, // py-2
-        borderBottomWidth: 1,
-        borderColor: '#E5E7EB', // border-gray-200
-        // sticky top-0 z-10 simulation in RN ScrollView
-    },
-    dateHeaderText: {
-        fontSize: 14, // text-sm
-        fontWeight: 'bold',
-        color: '#374151', // text-gray-700
-    },
-    
-    // --- Transaction Item ---
-    itemContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16, // p-4
-        borderBottomWidth: 1,
-        borderColor: '#F3F4F6', // border-gray-100
-    },
-    iconWrapper: {
-        flexShrink: 0,
-        width: 40, // w-10 h-10
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    detailsWrapper: {
-        marginLeft: 16, // ml-4
-        flexGrow: 1,
-        minWidth: 0,
-    },
-    descriptionText: {
-        fontWeight: '600', // font-semibold
-        color: '#1F2937', // text-gray-800
-        fontSize: 16,
-    },
-    subDetails: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12, // gap-3
-        marginTop: 4, // mt-1
-    },
-    timeText: {
-        fontSize: 14, // text-sm
-        color: '#6B7280', // text-gray-500
-    },
-    receiptButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4, // gap-1
-    },
-    receiptIcon: {
-        color: '#3B82F6', // text-blue-600
-        fontSize: 14,
-    },
-    receiptText: {
-        fontSize: 12, // text-xs
-        color: '#3B82F6', // text-blue-600
-        textDecorationLine: 'underline',
-        fontWeight: '600',
-    },
-    amountText: {
-        marginLeft: 16, // ml-4
-        fontWeight: '600', // font-semibold
-        textAlign: 'right',
-        fontSize: 16,
-    },
-
-    // --- Empty List ---
-    emptyListContainer: {
-        padding: 24, // p-6
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyListText: {
-        color: '#6B7280', // text-gray-500
-        fontStyle: 'italic',
-        fontSize: 16,
-    },
-
-    // --- Skeleton Loader Styles ---
-    skeletonContainer: { 
-        padding: 16, 
-        backgroundColor: 'white',
-        borderRadius: 8,
-    },
-    skeletonItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderColor: '#F3F4F6', // border-gray-100
-    },
-    skeletonCircle: {
-        height: 40,
-        width: 40,
-        borderRadius: 20,
-        backgroundColor: '#E2E8F0', // bg-slate-200
-    },
-    skeletonTextWrapper: {
-        marginLeft: 16,
-        flexGrow: 1,
-    },
-    skeletonTextMain: {
-        height: 20, // h-5
-        width: '75%', // w-3/4
-        backgroundColor: '#E2E8F0',
-        borderRadius: 4,
-    },
-    skeletonTextSub: {
-        height: 16, // h-4
-        width: '25%', // w-1/4
-        backgroundColor: '#E2E8F0',
-        borderRadius: 4,
-        marginTop: 8, // mt-2
-    },
-    skeletonTextAmount: {
-        height: 24, // h-6
-        width: 112, // w-28
-        backgroundColor: '#E2E8F0',
-        borderRadius: 4,
-        marginLeft: 16,
-    },
-});
+export default memo(CompanyLedgerListWidget);

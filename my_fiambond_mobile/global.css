@@ -1,0 +1,8 @@
+/* global.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --css-interop-darkMode: class;
+}

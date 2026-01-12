@@ -1,184 +1,172 @@
 import React, { useState, useContext } from "react";
 import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Alert, 
-  ActivityIndicator, 
-  Platform 
+    View, 
+    Text, 
+    TextInput, 
+    TouchableOpacity, 
+    ActivityIndicator, 
+    Alert, 
+    Platform,
+    ScrollView
 } from "react-native";
-import { AppContext } from "../../../Context/AppContext.jsx";
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { AppContext } from "../../../Context/AppContext";
 
-// Cloudinary constants (these are unused but kept for context consistency)
-// const CLOUDINARY_CLOUD_NAME = process.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
-// const CLOUDINARY_UPLOAD_PRESET = process.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
-// const CLOUD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-const API_URL = 'http://localhost:3000/api'; // Simplified URL
-
-// --- INTERFACES FOR TYPE SAFETY ---
 interface Props {
     company: { id: string | number };
     onSuccess?: () => void;
 }
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
 
 export default function CreateCompanyGoalWidget({ company, onSuccess }: Props) {
-    // FIX 1: Assert context type with non-null assertion (!)
-    const { user } = useContext(AppContext)! as AppContextType; 
+    const { user } = useContext(AppContext) as any;
+    
+    // Replace with your actual local machine IP for physical device testing
+    const API_URL = 'http://localhost:3000';
 
-    const [formData, setFormData] = useState({ name: '', target_amount: '', target_date: '' });
+    const [formData, setFormData] = useState({ 
+        name: '', 
+        target_amount: '', 
+        target_date: new Date() 
+    });
+    
+    const [showDatePicker, setShowDatePicker] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async () => {
-        // FIX 1: Safe check for user object access
-        if (!user || !user.uid) return Alert.alert("Error", "Login required");
-        
-        if (!formData.name || !formData.target_amount || !formData.target_date) {
-            return Alert.alert("Error", "All fields are required.");
+        if (!user) return Alert.alert("Error", "Login required");
+        if (!formData.name || !formData.target_amount) {
+            return Alert.alert("Error", "Please fill in all required fields.");
         }
 
         setLoading(true);
-
         try {
             const res = await fetch(`${API_URL}/goals`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    user_id: user.uid, // SAFE access now
+                    user_id: user.uid,
                     company_id: company.id,
                     name: formData.name,
                     target_amount: parseFloat(formData.target_amount),
-                    target_date: new Date(formData.target_date).toISOString(),
+                    target_date: formData.target_date.toISOString(),
                     status: 'active'
                 })
             });
 
-            if (!res.ok) throw new Error("Failed");
+            if (!res.ok) throw new Error("Server communication failed");
 
             Alert.alert("Success", "Strategic Target Set!");
-            setFormData({ name: '', target_amount: '', target_date: '' });
-            onSuccess?.();
-        } catch (error: any) {
-            console.error(error);
-            Alert.alert("Error", "Error creating target");
+            
+            // Reset state
+            setFormData({ name: '', target_amount: '', target_date: new Date() });
+            
+            if (onSuccess) onSuccess();
+        } catch (error) {
+            Alert.alert("Error", "Could not create the corporate target.");
         } finally {
             setLoading(false);
         }
     };
 
+    const onChangeDate = (event: any, selectedDate?: Date) => {
+        setShowDatePicker(Platform.OS === 'ios'); // Keep picker open on iOS, auto-close on Android
+        if (selectedDate) {
+            setFormData({ ...formData, target_date: selectedDate });
+        }
+    };
+
+    const labelClass = "text-sm font-bold text-slate-700 mb-2";
+    const inputClass = "w-full p-4 border border-slate-200 rounded-2xl bg-white text-slate-800 text-base mb-5";
+
     return (
-        <View style={styles.container}>
-            {/* Name */}
-            <View style={styles.formGroup}>
-                <Text style={styles.label}>Target Name</Text>
+        <ScrollView className="flex-1 p-1" keyboardShouldPersistTaps="handled">
+            
+            {/* Target Name Input */}
+            <View>
+                <Text className={labelClass}>Target Name</Text>
                 <TextInput 
-                    style={styles.textInput}
-                    // FIX 2: Removed 'required' prop
-                    value={formData.name}
-                    onChangeText={text => setFormData({...formData, name: text})}
                     placeholder="e.g. Q4 Revenue"
+                    placeholderTextColor="#94a3b8"
+                    value={formData.name}
+                    onChangeText={(val) => setFormData({...formData, name: val})}
+                    className={inputClass}
                     editable={!loading}
                 />
             </View>
 
-            {/* Amount */}
-            <View style={styles.formGroup}>
-                <Text style={styles.label}>Target Amount (₱)</Text>
+            {/* Target Amount Input */}
+            <View>
+                <Text className={labelClass}>Target Amount (₱)</Text>
                 <TextInput 
-                    style={styles.textInput}
-                    keyboardType="numeric"
-                    // FIX 2: Removed 'required' prop
-                    value={formData.target_amount}
-                    onChangeText={text => setFormData({...formData, target_amount: text.replace(/[^0-9.]/g, '')})}
                     placeholder="0.00"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="numeric"
+                    value={formData.target_amount}
+                    onChangeText={(val) => setFormData({...formData, target_amount: val})}
+                    className={inputClass}
                     editable={!loading}
                 />
             </View>
 
-            {/* Date */}
-            <View style={styles.formGroup}>
-                <Text style={styles.label}>Deadline</Text>
-                {/* RN Date Input: Replaced with a simple text input. Use native picker in prod. */}
-                <TextInput 
-                    style={styles.textInput}
-                    placeholder="YYYY-MM-DD"
-                    keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-                    // FIX 2: Removed 'required' prop
-                    value={formData.target_date}
-                    onChangeText={text => setFormData({...formData, target_date: text})}
-                    editable={!loading}
-                />
+            {/* Deadline Date Picker */}
+            <View>
+                <Text className={labelClass}>Deadline</Text>
+                <TouchableOpacity 
+                    onPress={() => setShowDatePicker(true)}
+                    activeOpacity={0.7}
+                    className={inputClass}
+                    disabled={loading}
+                >
+                    <Text className="text-slate-800 font-medium">
+                        {formData.target_date.toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        })}
+                    </Text>
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                    <DateTimePicker
+                        value={formData.target_date}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={onChangeDate}
+                        minimumDate={new Date()}
+                    />
+                )}
             </View>
 
             {/* Submit Button */}
             <TouchableOpacity 
                 onPress={handleSubmit} 
-                disabled={loading || !formData.name || !formData.target_amount || !formData.target_date} 
-                style={[
-                    styles.submitButton, 
-                    (loading || !formData.name || !formData.target_amount || !formData.target_date) && styles.disabledButton
-                ]}
+                disabled={loading}
+                activeOpacity={0.8}
+                className={`w-full py-5 rounded-2xl shadow-lg items-center mt-2 ${
+                    loading ? 'bg-indigo-300' : 'bg-indigo-600'
+                }`}
+                style={!loading && { shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }}
             >
-                {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitButtonText}>Set Target</Text>}
+                {loading ? (
+                    <View className="flex-row items-center">
+                        <ActivityIndicator color="white" className="mr-2" />
+                        <Text className="text-white font-bold text-lg">Setting Target...</Text>
+                    </View>
+                ) : (
+                    <Text className="text-white font-bold text-lg">Set Strategic Target</Text>
+                )}
             </TouchableOpacity>
-        </View>
+
+            {/* Footer Hint */}
+            <View className="mt-8 px-4">
+                <Text className="text-[10px] text-center text-slate-400 italic leading-4">
+                    This target will be tracked by the <Text className="font-bold text-indigo-500">Corporate Realm</Text> and visible to all authorized administrators.
+                </Text>
+            </View>
+
+            {/* Bottom Padding for Keyboard Scroll */}
+            <View className="h-20" />
+
+        </ScrollView>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        padding: 16, 
-        gap: 16, 
-    },
-    formGroup: {
-        gap: 4, 
-    },
-    label: {
-        fontSize: 14, 
-        fontWeight: 'bold',
-        color: '#374151', 
-    },
-    textInput: {
-        width: '100%',
-        padding: 12, 
-        borderWidth: 1,
-        borderColor: '#E5E7EB', 
-        borderRadius: 8, 
-        backgroundColor: 'white',
-        color: '#334155', 
-        fontSize: 16,
-    },
-    submitButton: {
-        width: '100%',
-        paddingVertical: 12, 
-        backgroundColor: '#4F46E5', 
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#4F46E5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
-        elevation: 5, 
-        marginTop: 8, 
-    },
-    submitButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    disabledButton: {
-        opacity: 0.5,
-    }
-});

@@ -3,7 +3,8 @@
     "name": "my_fiambond_mobile",
     "slug": "my_fiambond_mobile",
     "version": "1.0.0",
-    "sdkVersion": "51.0.0", 
+    "sdkVersion": "51.0.0",
+    "scheme": "fiambond",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,16 +14,22 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fiambond.app"
     },
     "android": {
+      "package": "com.fiambond.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

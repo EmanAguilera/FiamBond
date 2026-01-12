@@ -1,23 +1,15 @@
-import React, { useState, useContext } from "react";
+import React, { useContext, useState } from "react";
 import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Alert, 
-  ActivityIndicator, 
-  Platform 
+    View, 
+    Text, 
+    TextInput, 
+    TouchableOpacity, 
+    ActivityIndicator, 
+    Alert 
 } from "react-native";
 import { AppContext } from "../../../Context/AppContext.jsx";
 
-// Cloudinary constants (these are unused but kept for context consistency)
-const CLOUDINARY_CLOUD_NAME = process.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
-const CLOUDINARY_UPLOAD_PRESET = process.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
-const CLOUD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-const API_URL = 'http://localhost:3000/api'; // Simplified URL
-
-// --- INTERFACES FOR TYPE SAFETY ---
+// --- TypeScript Interfaces ---
 interface NewFamily {
   id: string;
   family_name: string;
@@ -28,35 +20,25 @@ interface CreateFamilyWidgetProps {
   onSuccess?: (newFamily: NewFamily) => void;
 }
 
-// Interfaces for Context Fix (Error 2339)
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
-
 export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProps) {
-  // FIX 1: Assert context type with non-null assertion (!)
-  const { user } = useContext(AppContext)! as AppContextType; 
-  const API_URL = 'http://localhost:3000/api'; 
+  const context = useContext(AppContext) as any;
+  const user = context?.user;
+  
+  // Use local IP for physical device testing, or localhost for simulator
+  const API_URL = 'http://localhost:3000';
 
   const [familyName, setFamilyName] = useState<string>("");
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleCreateFamily = async () => {
-    // Safe check for user object access (user is now User | null)
-    if (!user || !user.uid) {
-      setGeneralError("You must be logged in to perform this action.");
-      Alert.alert("Error", "You must be logged in to perform this action.");
+    if (!user) {
+      Alert.alert("Authentication Required", "You must be logged in to perform this action.");
       return;
     }
+
     if (!familyName.trim()) {
-        setGeneralError("Please enter a family name.");
+        setGeneralError("Family name cannot be empty.");
         return;
     }
 
@@ -64,11 +46,11 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
     setLoading(true);
 
     try {
-      // 1. Prepare Payload for MongoDB
+      // 1. Prepare Payload
       const familyData = {
         family_name: familyName,
-        owner_id: user.uid, // SAFE access now
-        member_ids: [user.uid], // SAFE access now
+        owner_id: user.uid,
+        member_ids: [user.uid],
       };
 
       // 2. Send POST Request
@@ -89,9 +71,11 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
       setFamilyName("");
       
       // 3. Handle Success
+      Alert.alert("Success", "Family realm created successfully!");
+      
       if (onSuccess) {
         onSuccess({
-          id: newFamilyDoc._id, // Map MongoDB '_id' to 'id'
+          id: newFamilyDoc._id,
           family_name: newFamilyDoc.family_name,
           owner_id: newFamilyDoc.owner_id,
         });
@@ -99,80 +83,63 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
     } catch (error) {
       console.error('Failed to create family:', error);
       setGeneralError('A network error occurred. Please check your connection.');
-      Alert.alert("Error", "Failed to create family. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.formGroup}>
+    <View className="w-full p-1">
+      <View className="space-y-4">
+        {/* Label */}
+        <Text className="text-sm font-bold text-slate-700 mb-2">Family Name</Text>
+        
+        {/* Input Field */}
         <TextInput
-          style={styles.textInput}
-          placeholder="Family Name (e.g., Smith Household)"
+          placeholder="e.g., Smith Household"
+          placeholderTextColor="#94a3b8"
           value={familyName}
           onChangeText={setFamilyName}
-          // FIX 2: Replaced 'disabled={loading}' with 'editable={!loading}'
-          editable={!loading} 
-          // FIX 2: Removed 'required' prop
+          className="w-full p-4 border border-slate-200 rounded-2xl bg-white text-slate-800 text-base mb-4"
+          editable={!loading}
         />
+
+        {/* Error Message */}
+        {generalError && (
+          <View className="bg-rose-50 p-3 rounded-xl mb-4">
+            <Text className="text-rose-600 text-xs text-center font-medium">
+                {generalError}
+            </Text>
+          </View>
+        )}
+
+        {/* Submit Button */}
+        <TouchableOpacity 
+          onPress={handleCreateFamily} 
+          disabled={loading}
+          activeOpacity={0.7}
+          className={`w-full py-4 rounded-2xl shadow-lg items-center ${
+            loading ? 'bg-indigo-300' : 'bg-indigo-600'
+          }`}
+          style={!loading && { shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }}
+        >
+          {loading ? (
+            <View className="flex-row items-center">
+              <ActivityIndicator color="white" className="mr-2" />
+              <Text className="text-white font-bold text-lg">Creating...</Text>
+            </View>
+          ) : (
+            <Text className="text-white font-bold text-lg">Create Family Realm</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Info Text */}
+        <View className="mt-4 px-2">
+            <Text className="text-[10px] text-center text-slate-400 italic leading-4">
+                Creating a family realm allows you to share transactions, goals, and track loans with other users.
+            </Text>
+        </View>
       </View>
-      {generalError && <Text style={styles.errorText}>{generalError}</Text>}
-      <TouchableOpacity 
-        onPress={handleCreateFamily} 
-        style={[styles.primaryBtn, loading && styles.btnDisabled]}
-        disabled={loading}
-      >
-        {loading ? <ActivityIndicator color="white" /> : <Text style={styles.primaryBtnText}>Create Family</Text>}
-      </TouchableOpacity>
     </View>
   );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        width: '100%',
-        padding: 16, // Simulating widget padding
-        gap: 16, // space-y-4
-    },
-    formGroup: {
-        // Simple container for input
-    },
-    textInput: {
-        width: '100%', // w-full
-        padding: 10, // p-2
-        borderWidth: 1,
-        borderColor: '#D1D5DB', // border-gray-300
-        borderRadius: 6, // rounded-md
-        color: '#1F2937',
-        fontSize: 16,
-    },
-    errorText: {
-        color: '#EF4444', // error
-        textAlign: 'center',
-        fontSize: 14,
-    },
-    primaryBtn: {
-        width: '100%', // w-full
-        paddingVertical: 12, // py-3
-        backgroundColor: '#4F46E5', // primary-btn / bg-indigo-600
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4, // shadow-md
-    },
-    primaryBtnText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    btnDisabled: {
-        opacity: 0.5,
-    },
-});

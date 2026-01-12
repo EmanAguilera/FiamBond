@@ -1,359 +1,270 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext } from "react";
 import { 
     View, 
     Text, 
-    TouchableOpacity, 
     TextInput, 
-    StyleSheet, 
-    Alert, 
+    TouchableOpacity, 
+    ScrollView, 
     ActivityIndicator, 
-    Platform 
-} from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { AppContext } from '../../../../Context/AppContext.jsx';
+    Alert, 
+    Platform,
+    Image 
+} from "react-native";
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { AppContext } from "../../../../Context/AppContext";
 
-// Cloudinary constants (use process.env in RN/Expo)
-const CLOUDINARY_CLOUD_NAME = process.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
-const CLOUDINARY_UPLOAD_PRESET = process.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
-const CLOUD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-const API_URL = 'http://localhost:3000/api'; // Simplified URL
-
-// --- INTERFACES FOR TYPE SAFETY ---
-interface Member { id: string; full_name: string; [key: string]: any; }
-interface CreateLoanWidgetProps { family: { id: string }; members: Member[]; onSuccess?: () => void; }
-
-// Placeholder type for the native file/receipt object
-interface NativeFile {
-    uri: string;
-    name: string;
-    type: string; // e.g., 'image/jpeg', 'application/pdf'
+interface Member { id: string; full_name: string; }
+interface CreateLoanWidgetProps { 
+    family: { id: string }; 
+    members: Member[]; 
+    onSuccess?: () => void; 
 }
 
-// Interfaces for Context Fix (Error 2339)
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
-
+// --- CONFIGURATION ---
+const CLOUD_URL = `https://api.cloudinary.com/v1_1/dzcnbrgjy/image/upload`;
+const API_URL = 'http://localhost:3000'; 
 
 export default function CreateLoanWidget({ family, members, onSuccess }: CreateLoanWidgetProps) {
-  // FIX: Assert context type with non-null assertion (!)
-  const { user } = useContext(AppContext)! as AppContextType; 
-  const [form, setForm] = useState({ amount: "", interest: "", desc: "", debtorId: "", deadline: "" });
-  const [file, setFile] = useState<NativeFile | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  // Filter out current user
-  // Safe access to user is now guaranteed by the assertion above
-  const otherMembers = (members || []).filter(m => String(m.id) !== String(user?.uid)); 
-
-  // Placeholder for native file picker
-  const handleNativeFileUpload = async () => {
-    Alert.alert("File Picker", "Native file picker integration required.");
+    const { user } = useContext(AppContext) as any;
     
-    // Simulating file selection for development:
-    // setFile({ uri: 'file:///temp/receipt.jpg', name: 'receipt.jpg', type: 'image/jpeg' });
-  };
+    const [form, setForm] = useState({ 
+        amount: "", 
+        interest: "", 
+        desc: "", 
+        debtorId: "", 
+        deadline: new Date() 
+    });
+    
+    const [imageUri, setImageUri] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const submit = async () => {
-    // Safe check for user object access (user is now User | null)
-    if (!user || !user.uid) return Alert.alert("Error", "Login required");
-    if (!form.debtorId) return Alert.alert("Error", "Please select a member to lend to.");
-    if (!form.amount) return Alert.alert("Error", "Please enter an amount.");
+    // Filter out current user from potential debtors
+    const otherMembers = (members || []).filter(m => String(m.id) !== String(user?.uid));
 
-    setLoading(true);
-    try {
-      let attachment_url = null;
-      if (file) {
-        const fd = new FormData();
-        
-        // Append the native file object to FormData
-        fd.append('file', {
-            uri: file.uri,
-            name: file.name,
-            type: file.type,
-        } as any);
-
-        fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-        
-        const res = await fetch(CLOUD_URL, { 
-            method: 'POST', 
-            body: fd,
-            // RN handles Content-Type for multipart/form-data automatically
-            headers: {}, 
+    // --- IMAGE PICKER ---
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
         });
-        
-        if (res.ok) attachment_url = (await res.json()).secure_url;
-      }
 
-      const debtorName = members.find(m => String(m.id) === String(form.debtorId))?.full_name || 'Member';
-      const principal = parseFloat(form.amount) || 0;
-      const interest = parseFloat(form.interest || '0') || 0;
+        if (!result.canceled) {
+            setImageUri(result.assets[0].uri);
+        }
+    };
 
-      // 1. Create Loan Record
-      const loanRes = await fetch(`${API_URL}/loans`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          family_id: family.id,
-          creditor_id: user.uid, // SAFE access now
-          debtor_id: form.debtorId,
-          debtor_name: debtorName,
-          amount: principal,
-          interest_amount: interest,
-          total_owed: principal + interest,
-          repaid_amount: 0,
-          description: form.desc,
-          deadline: form.deadline ? new Date(form.deadline) : null,
-          status: "pending_confirmation",
-          attachment_url
-        })
-      });
+    // --- DATE PICKER HANDLER ---
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        setShowDatePicker(Platform.OS === 'ios');
+        if (selectedDate) {
+            setForm({ ...form, deadline: selectedDate });
+        }
+    };
 
-      if (!loanRes.ok) throw new Error("Loan creation failed");
+    // --- SUBMIT LOGIC ---
+    const submit = async () => {
+        if (!user) return Alert.alert("Error", "Login required");
+        if (!form.debtorId) return Alert.alert("Error", "Please select a family member");
+        if (!form.amount || !form.desc) return Alert.alert("Error", "Amount and Description are required");
 
-      // 2. Record Transaction (Expense)
-      await fetch(`${API_URL}/transactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.uid, // SAFE access now
-          family_id: null,
-          type: "expense",
-          amount: principal,
-          description: `Loan to ${debtorName}: ${form.desc}`,
-          attachment_url,
-          created_at: new Date().toISOString()
-        })
-      });
+        setLoading(true);
+        try {
+            let attachment_url = null;
 
-      Alert.alert("Success", "Loan Request Sent to Debtor");
-      setForm({ amount: "", interest: "", desc: "", debtorId: "", deadline: "" });
-      setFile(null);
-      onSuccess?.();
-    } catch (e: any) { 
-        console.error(e);
-        Alert.alert("Error", "Error processing loan."); 
-    }
-    setLoading(false);
-  };
+            // 1. Upload to Cloudinary if image exists
+            if (imageUri) {
+                const formData = new FormData();
+                const filename = imageUri.split('/').pop();
+                const match = /\.(\w+)$/.exec(filename || '');
+                const type = match ? `image/${match[1]}` : `image`;
 
-  return (
-    <View style={styles.container}>
-      {/* Lending To */}
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Lending To</Text>
-        <View style={styles.pickerWrapper}>
-            <Picker
-                selectedValue={form.debtorId}
-                onValueChange={itemValue => setForm({ ...form, debtorId: itemValue as string })}
-                style={styles.picker}
-                enabled={!loading}
+                formData.append('file', {
+                    uri: imageUri,
+                    name: filename || 'loan_receipt.jpg',
+                    type: type,
+                } as any);
+                formData.append('upload_preset', "ml_default");
+
+                const cloudRes = await fetch(CLOUD_URL, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'content-type': 'multipart/form-data' },
+                });
+
+                if (cloudRes.ok) {
+                    const cloudData = await cloudRes.json();
+                    attachment_url = cloudData.secure_url;
+                }
+            }
+
+            const debtorName = members.find(m => String(m.id) === String(form.debtorId))?.full_name || 'Member';
+            const principal = parseFloat(form.amount) || 0;
+            const interest = parseFloat(form.interest) || 0;
+
+            // 2. Create Loan Record
+            const loanRes = await fetch(`${API_URL}/loans`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    family_id: family.id,
+                    creditor_id: user.uid,
+                    debtor_id: form.debtorId,
+                    debtor_name: debtorName,
+                    amount: principal,
+                    interest_amount: interest,
+                    total_owed: principal + interest,
+                    repaid_amount: 0,
+                    description: form.desc,
+                    deadline: form.deadline.toISOString(),
+                    status: "pending_confirmation",
+                    attachment_url
+                })
+            });
+
+            if (!loanRes.ok) throw new Error("Loan creation failed");
+
+            // 3. Record Personal Transaction (Expense for Lender)
+            await fetch(`${API_URL}/transactions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.uid,
+                    family_id: null,
+                    type: "expense",
+                    amount: principal,
+                    description: `Loan to ${debtorName}: ${form.desc}`,
+                    attachment_url,
+                    created_at: new Date().toISOString()
+                })
+            });
+
+            Alert.alert("Success", "Loan Request Sent");
+            setForm({ amount: "", interest: "", desc: "", debtorId: "", deadline: new Date() });
+            setImageUri(null);
+            onSuccess?.();
+        } catch (e) {
+            Alert.alert("Error", "Error processing loan");
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const inputLabelStyle = "text-sm font-bold text-slate-700 mb-2";
+    const inputFieldStyle = "bg-white border border-slate-200 p-4 rounded-2xl text-slate-800 text-base mb-5";
+
+    return (
+        <ScrollView className="flex-1 p-1" keyboardShouldPersistTaps="handled">
+            
+            {/* DEBTOR SELECTOR */}
+            <Text className={inputLabelStyle}>Lending To</Text>
+            <View className="bg-white border border-slate-200 rounded-2xl overflow-hidden mb-5">
+                {otherMembers.length > 0 ? (
+                    otherMembers.map((m) => (
+                        <TouchableOpacity 
+                            key={m.id}
+                            onPress={() => setForm({ ...form, debtorId: m.id })}
+                            className={`p-4 border-b border-slate-50 ${form.debtorId === m.id ? 'bg-indigo-50' : ''}`}
+                        >
+                            <Text className={`font-semibold ${form.debtorId === m.id ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                {m.full_name} {form.debtorId === m.id ? '✓' : ''}
+                            </Text>
+                        </TouchableOpacity>
+                    ))
+                ) : (
+                    <Text className="p-4 text-slate-400 italic">No other members in family.</Text>
+                )}
+            </View>
+
+            {/* AMOUNT & INTEREST */}
+            <View className="flex-row gap-x-3">
+                <View className="flex-1">
+                    <Text className={inputLabelStyle}>Amount (₱)</Text>
+                    <TextInput 
+                        placeholder="0.00"
+                        keyboardType="numeric"
+                        value={form.amount}
+                        onChangeText={(val) => setForm({ ...form, amount: val })}
+                        className={inputFieldStyle}
+                    />
+                </View>
+                <View className="flex-1">
+                    <Text className={inputLabelStyle}>Interest (₱)</Text>
+                    <TextInput 
+                        placeholder="0.00"
+                        keyboardType="numeric"
+                        value={form.interest}
+                        onChangeText={(val) => setForm({ ...form, interest: val })}
+                        className={inputFieldStyle}
+                    />
+                </View>
+            </View>
+
+            {/* DESCRIPTION */}
+            <Text className={inputLabelStyle}>Description</Text>
+            <TextInput 
+                placeholder="e.g. Lunch money"
+                value={form.desc}
+                onChangeText={(val) => setForm({ ...form, desc: val })}
+                className={inputFieldStyle}
+            />
+
+            {/* DEADLINE PICKER */}
+            <Text className={inputLabelStyle}>Deadline <Text className="text-slate-400 font-normal">(Optional)</Text></Text>
+            <TouchableOpacity 
+                onPress={() => setShowDatePicker(true)}
+                className={inputFieldStyle}
             >
-                <Picker.Item label={otherMembers.length > 0 ? "Select Family Member" : "No other members"} value="" enabled={false} />
-                {otherMembers.map(m => (
-                    <Picker.Item key={m.id} label={m.full_name} value={m.id} />
-                ))}
-            </Picker>
-        </View>
-      </View>
+                <Text className="text-slate-700">{form.deadline.toLocaleDateString()}</Text>
+            </TouchableOpacity>
 
-      {/* Amount & Interest */}
-      <View style={styles.amountGroup}>
-        <View style={styles.amountInputWrapper}>
-          <Text style={styles.label}>Amount (₱)</Text>
-          <TextInput 
-            style={[styles.textInput, styles.amountInput]}
-            keyboardType="numeric"
-            placeholder="0.00"
-            value={form.amount}
-            onChangeText={text => setForm({ ...form, amount: text.replace(/[^0-9.]/g, '') })}
-            editable={!loading}
-          />
-        </View>
-        <View style={styles.amountInputWrapper}>
-          <Text style={styles.label}>Interest (Optional)</Text>
-          <TextInput 
-            style={[styles.textInput, styles.amountInput]}
-            keyboardType="numeric"
-            placeholder="0.00"
-            value={form.interest}
-            onChangeText={text => setForm({ ...form, interest: text.replace(/[^0-9.]/g, '') })}
-            editable={!loading}
-          />
-        </View>
-      </View>
-
-      {/* Description */}
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Description</Text>
-        <TextInput 
-          style={styles.textInput}
-          placeholder="e.g. Lunch money" 
-          value={form.desc}
-          onChangeText={text => setForm({ ...form, desc: text })}
-          editable={!loading}
-        />
-      </View>
-
-      {/* Deadline */}
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Deadline <Text style={styles.labelOptional}>(Optional)</Text></Text>
-        <TextInput 
-            style={styles.textInput}
-            placeholder="YYYY-MM-DD"
-            keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-            value={form.deadline} 
-            onChangeText={text => setForm({ ...form, deadline: text })}
-            editable={!loading}
-        />
-      </View>
-
-      {/* Receipt */}
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Receipt <Text style={styles.labelOptional}>(Optional)</Text></Text>
-        <TouchableOpacity 
-            onPress={handleNativeFileUpload} 
-            style={styles.fileButton}
-            disabled={loading}
-        >
-            <Text style={styles.fileButtonText}>
-                {file ? `File Selected: ${file.name}` : "Tap to Select Receipt/File"}
-            </Text>
-            {file && (
-                <TouchableOpacity onPress={() => setFile(null)} style={styles.fileClearButton}>
-                    <Text style={styles.fileClearText}>✕</Text>
-                </TouchableOpacity>
+            {showDatePicker && (
+                <DateTimePicker
+                    value={form.deadline}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onDateChange}
+                    minimumDate={new Date()}
+                />
             )}
-        </TouchableOpacity>
-        {file && <Text style={styles.fileNameText}>Selected: {file.name}</Text>}
-      </View>
 
-      <TouchableOpacity 
-        onPress={submit} 
-        disabled={loading || otherMembers.length === 0 || !form.debtorId || !form.amount} 
-        style={[
-            styles.submitButton, 
-            (loading || otherMembers.length === 0 || !form.debtorId || !form.amount) && styles.disabledButton
-        ]}
-      >
-        {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitButtonText}>Confirm & Lend</Text>}
-      </TouchableOpacity>
-    </View>
-  );
+            {/* RECEIPT PICKER */}
+            <Text className={inputLabelStyle}>Receipt <Text className="text-slate-400 font-normal">(Optional)</Text></Text>
+            <TouchableOpacity 
+                onPress={pickImage}
+                className="bg-white border-2 border-dashed border-slate-200 p-6 rounded-2xl items-center justify-center mb-8"
+            >
+                {imageUri ? (
+                    <View className="items-center">
+                        <Image source={{ uri: imageUri }} className="w-20 h-20 rounded-lg mb-2" />
+                        <Text className="text-indigo-600 font-bold text-xs">Change Photo</Text>
+                    </View>
+                ) : (
+                    <View className="items-center">
+                        <Text className="text-indigo-600 font-bold">Upload Photo</Text>
+                        <Text className="text-slate-400 text-[10px] mt-1">Select proof of transfer</Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+
+            {/* SUBMIT BUTTON */}
+            <TouchableOpacity 
+                onPress={submit}
+                disabled={loading || otherMembers.length === 0}
+                className={`w-full py-5 rounded-2xl shadow-lg items-center mb-10 ${
+                    loading || otherMembers.length === 0 ? 'bg-indigo-300' : 'bg-indigo-600 shadow-indigo-200'
+                }`}
+            >
+                {loading ? (
+                    <ActivityIndicator color="white" />
+                ) : (
+                    <Text className="text-white font-bold text-lg">Confirm & Lend</Text>
+                )}
+            </TouchableOpacity>
+
+        </ScrollView>
+    );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        gap: 16, // space-y-4
-        padding: 16, // Simulating widget padding
-    },
-    formGroup: {
-        gap: 4, // mb-1 spacing from label
-    },
-    label: {
-        fontSize: 14, // text-sm
-        fontWeight: 'bold',
-        color: '#374151', // text-gray-700
-    },
-    labelOptional: {
-        color: '#9CA3AF', // text-gray-400
-        fontWeight: 'normal',
-    },
-    textInput: {
-        width: '100%',
-        padding: 12, // p-3
-        borderWidth: 1,
-        borderColor: '#D1D5DB', // border-gray-300
-        borderRadius: 8, // rounded-lg
-        backgroundColor: 'white',
-        color: '#334155', // text-slate-700
-        fontSize: 16,
-    },
-    pickerWrapper: {
-        borderWidth: 1,
-        borderColor: '#D1D5DB', 
-        borderRadius: 8,
-        backgroundColor: 'white',
-        overflow: 'hidden', // Ensures border radius works on Android
-    },
-    picker: {
-        width: '100%',
-        height: 44, // standard height for RN inputs
-    },
-    amountGroup: {
-        flexDirection: 'row',
-        gap: 16, // grid grid-cols-2 gap-4
-    },
-    amountInputWrapper: {
-        flex: 1,
-        gap: 4,
-    },
-    amountInput: {
-        fontSize: 18,
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    },
-
-    // File Upload (Simulated)
-    fileButton: {
-        padding: 10,
-        borderWidth: 1,
-        borderColor: '#E5E7EB', 
-        borderRadius: 8,
-        backgroundColor: '#F9FAFB',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    fileButtonText: {
-        fontSize: 14,
-        color: '#64748B',
-        flexShrink: 1,
-    },
-    fileClearButton: {
-        padding: 4,
-        borderRadius: 10,
-        backgroundColor: '#E5E7EB',
-        marginLeft: 8,
-    },
-    fileClearText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#4B5563',
-    },
-    fileNameText: {
-        fontSize: 12,
-        color: '#4F46E5',
-        marginTop: 4,
-        paddingHorizontal: 4,
-    },
-
-    // Submit Button
-    submitButton: {
-        width: '100%',
-        paddingVertical: 12, // py-3
-        backgroundColor: '#4F46E5', // bg-indigo-600
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#4F46E5',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
-        elevation: 5, // shadow-lg shadow-indigo-200
-    },
-    submitButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    disabledButton: {
-        opacity: 0.5,
-    },
-});

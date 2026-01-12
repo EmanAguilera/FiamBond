@@ -1,98 +1,47 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 
 interface RecordLoanChoiceWidgetProps {
     onSelectFamilyLoan: () => void;
     onSelectPersonalLoan: () => void;
 }
 
-// Button Base Style (Defined OUTSIDE StyleSheet.create)
-const baseBtn = {
-    flex: 1, 
-    paddingVertical: 12, 
-    borderRadius: 8,
-    // REMOVE alignItems and justifyContent here to redefine them below
-    // fontWeight and fontSize are omitted as they belong to Text
-};
-
 export default function RecordLoanChoiceWidget({ onSelectFamilyLoan, onSelectPersonalLoan }: RecordLoanChoiceWidgetProps) {
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Record a New Loan</Text>
-            <Text style={styles.infoText}>
-                Is this loan for a member of an existing family in Fiambond, or is it a personal loan to an individual?
-            </Text>
-            <View style={styles.buttonContainer}>
+        <View className="p-4 space-y-6">
+            {/* --- HEADER --- */}
+            <View className="items-center">
+                <Text className="text-2xl font-bold text-center text-slate-900">Record a New Loan</Text>
+                <Text className="text-center text-slate-500 mt-4 leading-6 px-2">
+                    Is this loan for a member of an existing family in Fiambond, or is it a personal loan to an individual?
+                </Text>
+            </View>
+
+            {/* --- CHOICE BUTTONS --- */}
+            <View className="gap-y-4 pt-4">
                 <TouchableOpacity 
                     onPress={onSelectFamilyLoan}
-                    style={styles.primaryBtn}
+                    activeOpacity={0.7}
+                    className="w-full bg-indigo-600 py-5 rounded-2xl shadow-lg shadow-indigo-100 items-center"
                 >
-                    <Text style={styles.primaryBtnText}>For a Family Member</Text>
+                    <Text className="text-white font-bold text-base">For a Family Member</Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity 
                     onPress={onSelectPersonalLoan}
-                    style={styles.secondaryBtn}
+                    activeOpacity={0.7}
+                    className="w-full bg-white border border-slate-200 py-5 rounded-2xl items-center"
                 >
-                    <Text style={styles.secondaryBtnText}>To an Individual (Personal)</Text>
+                    <Text className="text-slate-700 font-bold text-base">To an Individual (Personal)</Text>
                 </TouchableOpacity>
+            </View>
+
+            {/* --- FOOTER INFO --- */}
+            <View className="mt-2">
+                <Text className="text-[10px] text-center text-slate-400 italic leading-4">
+                    Family loans require confirmation from the debtor, while personal loans are recorded immediately.
+                </Text>
             </View>
         </View>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        padding: 16, 
-        gap: 16, 
-    },
-    title: {
-        fontSize: 20, 
-        fontWeight: '600', 
-        textAlign: 'center',
-        color: '#1F2937', 
-    },
-    infoText: {
-        textAlign: 'center',
-        color: '#4B5563', 
-        fontSize: 14,
-    },
-    buttonContainer: {
-        flexDirection: Dimensions.get('window').width > 600 ? 'row' : 'column', 
-        gap: 16, 
-        paddingTop: 16, 
-    },
-
-    // Button Base Styles (Used for merging)
-    // primaryBtn and secondaryBtn now define alignItems/justifyContent explicitly
-    
-    primaryBtn: {
-        ...baseBtn, // FIX: Spread the base properties
-        backgroundColor: '#4F46E5', 
-        alignItems: 'center', // FIX: Explicitly set for ViewStyle
-        justifyContent: 'center', // FIX: Explicitly set for ViewStyle
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4, 
-    },
-    primaryBtnText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    secondaryBtn: {
-        ...baseBtn, // FIX: Spread the base properties
-        backgroundColor: 'white', 
-        alignItems: 'center', // FIX: Explicitly set for ViewStyle
-        justifyContent: 'center', // FIX: Explicitly set for ViewStyle
-        borderWidth: 1,
-        borderColor: '#D1D5DB', 
-    },
-    secondaryBtnText: {
-        color: '#4B5563', 
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-});
