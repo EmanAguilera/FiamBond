@@ -1,328 +1,204 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-// NOTE: react-chartjs-2 is a Web library. For React Native, you would need
-// a library like 'react-native-svg-charts' or 'victory-native'.
-// The Bar component is replaced with a placeholder/note.
+import { View, Text, Dimensions } from 'react-native';
+import { BarChart } from "react-native-gifted-charts";
+import Svg, { Path } from 'react-native-svg';
 
-// --- ICON PLACEHOLDER ---
-// In a real app, replace these with icons from 'react-native-vector-icons' or 'react-native-svg'
-const Icon = ({ name, style }) => {
-    let iconText = '';
-    switch (name) {
-        case 'ArrowUp': iconText = '⬆️'; break;
-        case 'ArrowDown': iconText = '⬇️'; break;
-        case 'Scale': iconText = '⚖️'; break;
-        case 'Chart': iconText = '📊'; break;
-        default: iconText = '?';
-    }
-    return <Text style={[{ fontSize: 20, lineHeight: 20 }, style]}>{iconText}</Text>;
-};
-const ArrowUpIcon = (colorStyle) => <Icon name="ArrowUp" style={colorStyle} />;
-const ArrowDownIcon = (colorStyle) => <Icon name="ArrowDown" style={colorStyle} />;
-const ScaleIcon = (colorStyle) => <Icon name="Scale" style={colorStyle} />;
-const ChartIcon = (colorStyle) => <Icon name="Chart" style={colorStyle} />;
+const { width } = Dimensions.get('window');
 
+// --- ICONS (Converted to React Native Svg) ---
+const ArrowUpIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#16a34a" strokeWidth="2.5" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+    </Svg>
+);
 
-// --- "AI ADVISOR" COMPONENT ---
+const ArrowDownIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#dc2626" strokeWidth="2.5" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+    </Svg>
+);
+
+const ScaleIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#2563eb" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+    </Svg>
+);
+
+const ChartIcon = () => (
+    <Svg className="w-12 h-12" fill="none" stroke="#d1d5db" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+    </Svg>
+);
+
+// --- FINANCIAL ANALYSIS SUB-COMPONENT ---
 const FinancialAnalysis = ({ report }) => {
     const { totalInflow, totalOutflow, netPosition, transactionCount } = report;
     const netFormatted = `₱${Math.abs(netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    
     let title, narrative, recommendation;
-
-    if (netPosition > 0 && totalInflow > totalOutflow * 1.2) { 
-        title = "Excellent Financial Discipline"; 
-        narrative = `You demonstrated outstanding control over your finances, generating a strong positive cash flow of ${netFormatted}.`; 
+    
+    if (netPosition > 0 && totalInflow > totalOutflow * 1.2) {
+        title = "Excellent Financial Discipline";
+        narrative = `You demonstrated outstanding control over your finances, generating a strong positive cash flow of ${netFormatted}.`;
         recommendation = "Consider allocating this surplus towards your goals. Maintain this great momentum!";
-    } else if (netPosition >= 0) { 
-        title = "Good Financial Management"; 
-        narrative = `You successfully kept your spending in check, resulting in a positive net position of ${netFormatted}.`; 
+    } else if (netPosition >= 0) {
+        title = "Good Financial Management";
+        narrative = `You successfully kept your spending in check, resulting in a positive net position of ${netFormatted}.`;
         recommendation = "Challenge yourself to find small areas to reduce spending and further increase your savings rate next period.";
-    } else { 
-        title = "Spending Review Recommended"; 
-        narrative = `Your expenses exceeded your income, resulting in a net outflow of ${netFormatted}. It's important to understand why.`; 
-        recommendation = `Review your ${transactionCount} transactions from this period to identify the cause. Focus on tracking your outflow to stay within your income going forward.`; 
+    } else {
+        title = "Spending Review Recommended";
+        narrative = `Your expenses exceeded your income, resulting in a net outflow of ${netFormatted}. It's important to understand why.`;
+        recommendation = `Review your ${transactionCount} transactions from this period to identify the cause. Focus on tracking your outflow to stay within your income going forward.`;
     }
 
     return (
-        <View style={styles.analysisContainer}>
-            <Text style={styles.analysisHeader}>Analyst's Summary</Text>
-            <View style={styles.analysisContentBox}>
-                <Text style={styles.analysisTitle}>{title}</Text>
-                <Text style={styles.analysisNarrative}>{narrative}</Text>
-                <Text style={styles.analysisStepsHeader}>Next Steps:</Text>
-                <Text style={styles.analysisRecommendation}>{recommendation}</Text>
+        <View className="mt-8">
+            <Text className="text-lg font-bold text-gray-800">Analyst's Summary</Text>
+            <View className="mt-2 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <Text className="font-bold text-gray-800 text-sm">{title}</Text>
+                <Text className="mt-1 text-xs text-gray-600 leading-4">{narrative}</Text>
+                <Text className="mt-3 text-xs font-bold text-gray-800">Next Steps:</Text>
+                <Text className="mt-1 text-xs text-gray-600 leading-4">{recommendation}</Text>
             </View>
         </View>
     );
 };
 
+// --- DATA TRANSFORMER FOR GIFTED CHARTS ---
+const transformData = (chartData) => {
+    if (!chartData || !chartData.labels) return [];
+    
+    const barData = [];
+    const labels = chartData.labels;
+    const inflowData = chartData.datasets[0]?.data || [];
+    const outflowData = chartData.datasets[1]?.data || [];
+
+    labels.forEach((label, index) => {
+        // Inflow Bar
+        barData.push({
+            value: inflowData[index] || 0,
+            label: label,
+            spacing: 2,
+            labelWidth: 30,
+            labelTextStyle: { color: 'gray', fontSize: 10 },
+            frontColor: '#10b981', // green-500
+        });
+        // Outflow Bar
+        barData.push({
+            value: outflowData[index] || 0,
+            frontColor: '#f43f5e', // rose-500
+        });
+    });
+    
+    return barData;
+};
 
 function PersonalReportChartWidget({ report }) {
-    
-    // ChartJS options are now irrelevant, but we keep the data check
-    if (!report) { 
+    if (!report) {
         return (
-            <View style={styles.noReportContainer}>
-                <Text style={styles.noReportText}>No report data available.</Text>
+            <View className="bg-white rounded-3xl p-10 items-center justify-center border border-gray-100">
+                <Text className="text-gray-400 italic text-sm">No report data available.</Text>
             </View>
-        ); 
+        );
     }
+
     const hasChartData = report.chartData?.datasets?.length > 0 && report.chartData?.labels?.length > 0;
+    const barData = transformData(report.chartData);
 
     return (
-        <View style={styles.widgetContainer}>
-            <View>
-                <Text style={styles.widgetTitle}>Financial Summary</Text>
-                <Text style={styles.widgetSubtitle}>{report.reportTitle}</Text>
+        <View className="bg-white rounded-3xl p-5 border border-gray-100">
+            <View className="mb-6">
+                <Text className="text-xl font-bold text-gray-800">Financial Summary</Text>
+                <Text className="text-xs text-gray-400 mt-1">{report.reportTitle}</Text>
             </View>
-            
+
             {/* --- STAT CARDS --- */}
-            <View style={styles.statCardsGrid}>
-                {/* Inflow Card - Light Green Theme */}
-                <View style={[styles.statCardBase, styles.inflowCard]}>
-                    <View style={styles.inflowIconWrapper}>
-                        {ArrowUpIcon(styles.inflowIconColor)}
+            <View className="gap-3 mb-8">
+                {/* Inflow Card */}
+                <View className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex-row items-center">
+                    <View className="bg-emerald-100 p-2 rounded-xl">
+                        <ArrowUpIcon />
                     </View>
-                    <View style={styles.statCardTextWrapper}>
-                        <Text style={styles.inflowTextSubtitle}>Total Inflow</Text>
-                        <Text style={styles.inflowTextTitle}>
-                            ₱{parseFloat(report.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    <View className="ml-3">
+                        <Text className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider">Total Inflow</Text>
+                        <Text className="text-lg font-bold text-emerald-600">
+                            ₱{Number(report.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </Text>
                     </View>
                 </View>
-                
-                {/* Outflow Card - Light Red Theme */}
-                <View style={[styles.statCardBase, styles.outflowCard]}>
-                    <View style={styles.outflowIconWrapper}>
-                        {ArrowDownIcon(styles.outflowIconColor)}
+
+                {/* Outflow Card */}
+                <View className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 flex-row items-center">
+                    <View className="bg-rose-100 p-2 rounded-xl">
+                        <ArrowDownIcon />
                     </View>
-                    <View style={styles.statCardTextWrapper}>
-                        <Text style={styles.outflowTextSubtitle}>Total Outflow</Text>
-                        <Text style={styles.outflowTextTitle}>
-                            ₱{parseFloat(report.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    <View className="ml-3">
+                        <Text className="text-[10px] text-rose-800 font-bold uppercase tracking-wider">Total Outflow</Text>
+                        <Text className="text-lg font-bold text-rose-600">
+                            ₱{Number(report.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </Text>
                     </View>
                 </View>
-                
-                {/* Net Position Card - Light Blue Theme */}
-                <View style={[styles.statCardBase, styles.netCard]}>
-                    <View style={styles.netIconWrapper}>
-                        {ScaleIcon(styles.netIconColor)}
+
+                {/* Net Position Card */}
+                <View className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 flex-row items-center">
+                    <View className="bg-blue-100 p-2 rounded-xl">
+                        <ScaleIcon />
                     </View>
-                    <View style={styles.statCardTextWrapper}>
-                        <Text style={styles.netTextSubtitle}>Net Position</Text>
-                        <Text style={[styles.netTextTitle, report.netPosition >= 0 ? styles.netTextPositive : styles.netTextNegative]}>
-                            ₱{parseFloat(report.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    <View className="ml-3">
+                        <Text className="text-[10px] text-blue-800 font-bold uppercase tracking-wider">Net Position</Text>
+                        <Text className={`text-lg font-bold ${report.netPosition >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
+                            ₱{Number(report.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </Text>
                     </View>
                 </View>
             </View>
 
             {/* --- CHART SECTION --- */}
-            <View style={styles.chartSectionContainer}>
-                <Text style={styles.chartHeader}>Inflow vs. Outflow Breakdown</Text>
-                <View style={styles.chartWrapper}>
-                    {hasChartData ? (
-                        <View style={styles.chartPlaceholder}>
-                            <Text style={styles.chartPlaceholderText}>Chart Implementation (Requires Native Library)</Text>
-                            {/* In a real app: <BarChart data={report.chartData} options={nativeChartOptions} /> */}
+            <View className="mt-4">
+                <Text className="text-sm font-bold text-gray-800 mb-6">Inflow vs. Outflow Breakdown</Text>
+                
+                {hasChartData ? (
+                    <View className="items-center">
+                        <BarChart
+                            data={barData}
+                            barWidth={18}
+                            initialSpacing={10}
+                            spacing={15}
+                            hideRules
+                            noOfSections={4}
+                            yAxisThickness={0}
+                            xAxisThickness={0}
+                            yAxisTextStyle={{ color: 'gray', fontSize: 10 }}
+                            isAnimated
+                            animationDuration={400}
+                        />
+                        {/* Legend */}
+                        <View className="flex-row justify-center mt-6 gap-6">
+                            <View className="flex-row items-center">
+                                <View className="w-3 h-3 rounded-full bg-emerald-500 mr-2" />
+                                <Text className="text-[10px] text-gray-500 font-bold">Inflow</Text>
+                            </View>
+                            <View className="flex-row items-center">
+                                <View className="w-3 h-3 rounded-full bg-rose-500 mr-2" />
+                                <Text className="text-[10px] text-gray-500 font-bold">Outflow</Text>
+                            </View>
                         </View>
-                    ) : (
-                        <View style={styles.noChartDataBox}>
-                            {ChartIcon(styles.noChartIconColor)}
-                            <Text style={styles.noChartDataText}>Not enough data to generate a chart</Text>
-                            <Text style={styles.noChartDataSubtext}>Add more transactions to see a breakdown.</Text>
-                        </View>
-                    )}
-                </View>
+                    </View>
+                ) : (
+                    <View className="h-48 items-center justify-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                        <ChartIcon />
+                        <Text className="text-gray-500 font-bold mt-3 text-xs">Not enough data</Text>
+                        <Text className="text-[10px] text-gray-400">Add more transactions to see trends.</Text>
+                    </View>
+                )}
             </View>
 
-            {/* --- GENERATED ESSAY --- */}
+            {/* --- AI ADVISOR SECTION --- */}
             <FinancialAnalysis report={report} />
-
         </View>
     );
 };
 
 export default memo(PersonalReportChartWidget);
-
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    // General Utilities
-    fontBold: { fontWeight: 'bold' },
-    fontSemibold: { fontWeight: '600' },
-    textSm: { fontSize: 14 },
-    textXs: { fontSize: 12 },
-    textLg: { fontSize: 18 },
-    textXl: { fontSize: 20 },
-    textGray300: { color: '#D1D5DB' },
-    textGray400: { color: '#9CA3AF' },
-    textGray500: { color: '#6B7280' },
-    textGray600: { color: '#4B5563' },
-    textGray800: { color: '#1F2937' },
-    mt2: { marginTop: 8 },
-    mt3: { marginTop: 12 },
-    mt6: { marginTop: 24 },
-    mt8: { marginTop: 32 },
-    mb2: { marginBottom: 8 },
-    p4: { padding: 16 },
-    // Shadow (simulating web's shadow-lg for the overall card)
-    shadowLg: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-
-    // Widget Container (dashboard-card p-4 sm:p-6)
-    widgetContainer: {
-        backgroundColor: 'rgba(255, 255, 255, 0.9)', // bg-white/60 + backdrop-blur-xl simulation
-        borderRadius: 16,
-        padding: 24, // Assuming p-6 is preferred over p-4
-    },
-    widgetTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#1F2937',
-    },
-    widgetSubtitle: {
-        fontSize: 14,
-        color: '#6B7280',
-        marginTop: 4,
-    },
-    noReportContainer: {
-        paddingVertical: 40,
-        alignItems: 'center',
-    },
-    noReportText: {
-        color: '#6B7280',
-        fontStyle: 'italic',
-    },
-
-    // Stat Cards (grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6)
-    statCardsGrid: {
-        marginTop: 24,
-        flexDirection: 'column', // Stack vertically for mobile-first
-        gap: 16,
-        // For tablet/desktop, use: flexDirection: 'row', flexWrap: 'wrap',
-    },
-    statCardBase: {
-        padding: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    statCardTextWrapper: {
-        marginLeft: 12,
-    },
-
-    // Inflow Card (Green)
-    inflowCard: { backgroundColor: 'rgba(236, 253, 245, 0.5)', borderColor: 'rgba(110, 231, 183, 0.8)' }, // bg-green-50/50, border-green-200/80
-    inflowIconWrapper: { backgroundColor: '#D1FAE5', color: '#059669', padding: 8, borderRadius: 8 }, // bg-green-100, text-green-600
-    inflowIconColor: { color: '#059669' },
-    inflowTextSubtitle: { fontSize: 14, color: '#065F46', fontWeight: '600' }, // text-green-800
-    inflowTextTitle: { fontSize: 20, fontWeight: 'bold', color: '#059669' }, // text-green-600
-
-    // Outflow Card (Red)
-    outflowCard: { backgroundColor: 'rgba(254, 242, 242, 0.5)', borderColor: 'rgba(252, 165, 165, 0.8)' }, // bg-red-50/50, border-red-200/80
-    outflowIconWrapper: { backgroundColor: '#FEE2E2', color: '#DC2626', padding: 8, borderRadius: 8 }, // bg-red-100, text-red-600
-    outflowIconColor: { color: '#DC2626' },
-    outflowTextSubtitle: { fontSize: 14, color: '#991B1B', fontWeight: '600' }, // text-red-800
-    outflowTextTitle: { fontSize: 20, fontWeight: 'bold', color: '#DC2626' }, // text-red-600
-
-    // Net Position Card (Blue/Red)
-    netCard: { backgroundColor: 'rgba(239, 246, 255, 0.5)', borderColor: 'rgba(147, 197, 253, 0.8)' }, // bg-blue-50/50, border-blue-200/80
-    netIconWrapper: { backgroundColor: '#DBEAFE', color: '#2563EB', padding: 8, borderRadius: 8 }, // bg-blue-100, text-blue-600
-    netIconColor: { color: '#2563EB' },
-    netTextSubtitle: { fontSize: 14, color: '#1E40AF', fontWeight: '600' }, // text-blue-800
-    netTextTitle: { fontSize: 20, fontWeight: 'bold' },
-    netTextPositive: { color: '#2563EB' }, // text-blue-600
-    netTextNegative: { color: '#DC2626' }, // text-red-600
-
-    // Chart Section
-    chartSectionContainer: {
-        marginTop: 32,
-    },
-    chartHeader: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#1F2937',
-        marginBottom: 8,
-    },
-    chartWrapper: {
-        position: 'relative',
-        height: 300, // style={{ height: '300px' }}
-    },
-    chartPlaceholder: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#F3F4F6', // bg-gray-100
-        borderRadius: 8,
-    },
-    chartPlaceholderText: {
-        color: '#6B7280',
-        fontSize: 16,
-        fontStyle: 'italic',
-    },
-    noChartDataBox: {
-        flex: 1,
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#F9FAFB', // bg-gray-50
-        borderRadius: 8,
-        padding: 20,
-    },
-    noChartIconColor: { color: '#D1D5DB' },
-    noChartDataText: {
-        color: '#6B7280',
-        fontWeight: '600',
-        marginTop: 8,
-    },
-    noChartDataSubtext: {
-        color: '#9CA3AF',
-        fontSize: 12,
-    },
-
-    // Financial Analysis
-    analysisContainer: {
-        marginTop: 32,
-    },
-    analysisHeader: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#1F2937',
-    },
-    analysisContentBox: {
-        marginTop: 8,
-        padding: 16,
-        backgroundColor: '#F9FAFB', // bg-gray-50
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    analysisTitle: {
-        fontWeight: '600',
-        color: '#1F2937',
-    },
-    analysisNarrative: {
-        marginTop: 4,
-        fontSize: 14,
-        color: '#4B5563',
-    },
-    analysisStepsHeader: {
-        marginTop: 12,
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1F2937',
-    },
-    analysisRecommendation: {
-        marginTop: 4,
-        fontSize: 14,
-        color: '#4B5563',
-    },
-});

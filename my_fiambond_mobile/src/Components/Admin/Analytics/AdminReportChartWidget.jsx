@@ -1,51 +1,37 @@
 import React, { memo } from 'react';
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    TouchableOpacity, 
-    Dimensions, 
-    ScrollView, 
-    ActivityIndicator 
-} from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { BarChart } from "react-native-gifted-charts";
 import Svg, { Path } from 'react-native-svg';
-import { BarChart } from 'react-native-chart-kit';
 
-// Get screen width for responsive chart sizing
-const screenWidth = Dimensions.get('window').width;
+const { width } = Dimensions.get('window');
 
-// --- ICONS (Converted to react-native-svg) ---
-
-const IconBase = ({ children, style }) => (
-    <Svg style={[styles.iconBase, style]} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        {children}
+// --- ICONS (Converted to React Native Svg) ---
+const ArrowUpIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#16a34a" strokeWidth="2.5" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
     </Svg>
 );
 
-const ArrowUpIcon = ({ style }) => (
-    <IconBase style={style}>
-        <Path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-    </IconBase>
+const ArrowDownIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#dc2626" strokeWidth="2.5" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+    </Svg>
 );
-const ArrowDownIcon = ({ style }) => (
-    <IconBase style={style}>
-        <Path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-    </IconBase>
+
+const ScaleIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#2563eb" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+    </Svg>
 );
-const ScaleIcon = ({ style }) => (
-    <IconBase style={style}>
-        <Path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-    </IconBase>
-);
+
 const ChartIcon = () => (
-    <Svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={styles.chartIcon}>
-        <Path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></Path>
-        <Path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></Path>
+    <Svg className="w-12 h-12" fill="none" stroke="#d1d5db" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
     </Svg>
 );
 
-
-// --- ANALYST SECTION (Converted to React Native) ---
+// --- ANALYST SECTION ---
 const AdminFinancialAnalysis = ({ report }) => {
     const { totalInflow, transactionCount } = report; 
     const revenueFormatted = `₱${totalInflow.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -62,113 +48,105 @@ const AdminFinancialAnalysis = ({ report }) => {
     }
 
     return (
-        <View style={styles.mt8}>
-            <Text style={styles.analystTitle}>System Analyst's Summary</Text>
-            <View style={styles.analystCard}>
-                <Text style={styles.analystCardTitle}>{title}</Text>
-                <Text style={styles.analystCardText}>{narrative}</Text>
-                <Text style={styles.analystCardRecommendationTitle}>Strategic Recommendation:</Text>
-                <Text style={styles.analystCardText}>{recommendation}</Text>
+        <View className="mt-8">
+            <Text className="text-lg font-bold text-gray-800">System Analyst's Summary</Text>
+            <View className="mt-2 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <Text className="font-bold text-gray-800 text-sm">{title}</Text>
+                <Text className="mt-1 text-xs text-gray-600 leading-4">{narrative}</Text>
+                <Text className="mt-3 text-xs font-bold text-gray-800 uppercase tracking-widest">Strategic Recommendation:</Text>
+                <Text className="mt-1 text-xs text-gray-600 leading-4 font-medium">{recommendation}</Text>
             </View>
         </View>
     );
 };
 
-// --- MAIN WIDGET (Converted to React Native) ---
-function AdminReportChartWidget({ report, period, setPeriod }) {
+// --- DATA TRANSFORMER ---
+const transformData = (chartData) => {
+    if (!chartData || !chartData.labels) return [];
     
-    // Configuration for react-native-chart-kit BarChart
-    const chartConfig = {
-        backgroundGradientFrom: '#ffffff',
-        backgroundGradientTo: '#ffffff',
-        decimalPlaces: 0, 
-        color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`, // Default bar color
-        labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-        barPercentage: 0.5,
-        fillShadowGradient: '#4f46e5',
-        fillShadowGradientOpacity: 0.8,
-    };
+    // Admin Chart usually has one dataset (Revenue)
+    const labels = chartData.labels;
+    const revenueData = chartData.datasets[0]?.data || [];
+
+    return labels.map((label, index) => ({
+        value: revenueData[index] || 0,
+        label: label,
+        labelTextStyle: { color: '#94a3b8', fontSize: 9 },
+        frontColor: '#9333ea', // purple-600
+    }));
+};
+
+// --- MAIN WIDGET ---
+function AdminReportChartWidget({ report, period, setPeriod }) {
     
     // Loading State
     if (!report) return (
-        <View style={styles.dashboardSection}>
-             <View style={styles.loadingTitle}></View>
-             <View style={styles.loadingChart}></View>
-             <ActivityIndicator style={styles.loadingIndicator} size="large" color="#475569" />
+        <View className="p-4 animate-pulse">
+             <View className="w-full h-10 bg-slate-100 rounded-2xl mb-6 self-center max-w-xs" />
+             <View className="h-64 bg-slate-50 rounded-[40px]" />
         </View>
     );
 
-    // NOTE: report.chartData must be in the { labels: [...], datasets: [{ data: [...] }] } format 
-    // expected by react-native-chart-kit.
     const hasData = report.chartData?.labels?.length > 0;
-    
-    // Width calculation: screenWidth - (2 * 24 padding from dashboardCard)
-    const chartWidth = screenWidth - (styles.dashboardCard.padding * 2);
+    const barData = transformData(report.chartData);
 
     return (
-        // Use ScrollView for safety on smaller screens
-        <ScrollView contentContainerStyle={styles.dashboardSection}>
-            
-            {/* 1. PERIOD BUTTONS */}
-            <View style={styles.periodButtonContainer}>
+        <View>
+            {/* 1. PERIOD SELECTOR (Pill Style) */}
+            <View className="flex-row justify-center bg-slate-100 p-1 rounded-2xl mb-6 self-center">
                 {['weekly', 'monthly', 'yearly'].map((p) => (
                     <TouchableOpacity
                         key={p}
                         onPress={() => setPeriod(p)}
-                        style={[
-                            styles.periodButtonBase,
-                            period === p ? styles.periodButtonActive : styles.periodButtonInactive
-                        ]}
+                        className={`px-5 py-2 rounded-xl ${
+                            period === p ? 'bg-white shadow-sm' : ''
+                        }`}
                     >
-                        <Text style={[
-                            styles.periodButtonText,
-                            period === p ? styles.periodButtonTextActive : styles.periodButtonTextInactive
-                        ]}>
-                            {p.charAt(0).toUpperCase() + p.slice(1)}
+                        <Text className={`capitalize text-xs font-bold ${
+                            period === p ? 'text-purple-600' : 'text-slate-400'
+                        }`}>
+                            {p}
                         </Text>
                     </TouchableOpacity>
                 ))}
             </View>
 
             {/* 2. MAIN CARD CONTAINER */}
-            <View style={styles.dashboardCard}>
+            <View className="bg-white rounded-[40px] p-5 border border-slate-100 shadow-sm">
                 
                 {/* Header */}
                 <View>
-                    <Text style={styles.headerTitle}>System Financial Summary</Text>
-                    <Text style={styles.headerSubtitle}>{report.reportTitle}</Text>
+                    <Text className="text-xl font-bold text-gray-800">System Financial Summary</Text>
+                    <Text className="text-xs text-gray-400 mt-1">{report.reportTitle}</Text>
                 </View>
                 
-                {/* 3. STAT CARDS GRID */}
-                <View style={styles.statCardsGrid}>
+                {/* 3. STAT CARDS (Vertical on Mobile) */}
+                <View className="gap-3 mt-6">
                     
                     {/* Revenue Card (Green) */}
-                    <View style={[styles.statCardBase, styles.statCardGreen]}>
-                        <View style={styles.statIconContainerGreen}><ArrowUpIcon style={styles.statIconGreen} /></View>
-                        <View style={styles.ml3}>
-                            <Text style={styles.statLabelGreen}>Total Revenue</Text>
-                            <Text style={styles.statValueGreen}>₱{parseFloat(report.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                    <View className="bg-emerald-50/50 p-4 rounded-3xl border border-emerald-100 flex-row items-center">
+                        <View className="bg-emerald-100 p-2 rounded-xl"><ArrowUpIcon /></View>
+                        <View className="ml-3">
+                            <Text className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider">Total Revenue</Text>
+                            <Text className="text-lg font-black text-emerald-600">₱{parseFloat(report.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                         </View>
                     </View>
 
                     {/* Operational Costs (Red) */}
-                    <View style={[styles.statCardBase, styles.statCardRed]}>
-                        <View style={styles.statIconContainerRed}><ArrowDownIcon style={styles.statIconRed} /></View>
-                        <View style={styles.ml3}>
-                            <Text style={styles.statLabelRed}>Operational Costs</Text>
-                            <Text style={styles.statValueRed}>₱{parseFloat(report.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                    <View className="bg-rose-50/50 p-4 rounded-3xl border border-rose-100 flex-row items-center">
+                        <View className="bg-rose-100 p-2 rounded-xl"><ArrowDownIcon /></View>
+                        <View className="ml-3">
+                            <Text className="text-[10px] text-rose-800 font-bold uppercase tracking-wider">Operational Costs</Text>
+                            <Text className="text-lg font-black text-rose-600">₱{parseFloat(report.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
                         </View>
                     </View>
 
                     {/* Net Income (Blue) */}
-                    <View style={[styles.statCardBase, styles.statCardBlue]}>
-                        <View style={styles.statIconContainerBlue}><ScaleIcon style={styles.statIconBlue} /></View>
-                        <View style={styles.ml3}>
-                            <Text style={styles.statLabelBlue}>Net Income</Text>
-                            <Text style={[
-                                styles.statValueBlue, 
-                                report.netPosition < 0 && styles.textRed600 
-                            ]}>
+                    <View className="bg-indigo-50/50 p-4 rounded-3xl border border-indigo-100 flex-row items-center">
+                        <View className="bg-indigo-100 p-2 rounded-xl"><ScaleIcon /></View>
+                        <View className="ml-3">
+                            <Text className="text-[10px] text-indigo-800 font-bold uppercase tracking-wider">Net Income</Text>
+                            <Text className={`text-lg font-black ${report.netPosition >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>
                                 ₱{parseFloat(report.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
                         </View>
@@ -176,216 +154,40 @@ function AdminReportChartWidget({ report, period, setPeriod }) {
                 </View>
 
                 {/* 4. CHART SECTION */}
-                <View style={styles.mt8}>
-                    <Text style={styles.breakdownTitle}>Breakdown of Revenue</Text>
-                    <View style={styles.chartWrapper}>
-                        {hasData ? (
+                <View className="mt-10">
+                    <Text className="text-sm font-bold text-gray-800 mb-6">Breakdown of Revenue</Text>
+                    
+                    {hasData ? (
+                        <View className="items-center">
                             <BarChart
-                                data={report.chartData}
-                                width={chartWidth}
-                                height={300}
-                                chartConfig={chartConfig}
-                                style={styles.barChartStyle}
-                                fromZero={true}
-                                showValuesOnTopOfBars={true}
-                                segments={1}
+                                data={barData}
+                                barWidth={22}
+                                initialSpacing={10}
+                                spacing={20}
+                                hideRules
+                                noOfSections={4}
+                                yAxisThickness={0}
+                                xAxisThickness={0}
+                                yAxisTextStyle={{ color: '#94a3b8', fontSize: 10 }}
+                                isAnimated
+                                animationDuration={600}
+                                frontColor="#9333ea"
                             />
-                        ) : (
-                            <View style={styles.noDataContainer}>
-                                <ChartIcon />
-                                <Text style={styles.noDataText}>No revenue data for this period</Text>
-                            </View>
-                        )}
-                    </View>
+                        </View>
+                    ) : (
+                        <View className="h-48 items-center justify-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                            <ChartIcon />
+                            <Text className="text-gray-400 font-bold mt-3 text-xs">No revenue data for this period</Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* 5. ANALYST SUMMARY */}
                 <AdminFinancialAnalysis report={report} />
 
             </View>
-        </ScrollView>
+        </View>
     );
 };
 
 export default memo(AdminReportChartWidget);
-
-
-// --- STYLESHEET (Mapping Tailwind to React Native) ---
-const styles = StyleSheet.create({
-    // General Spacing/Utility
-    mt8: { marginTop: 32 },
-    mt6: { marginTop: 24 },
-    mt3: { marginTop: 12 },
-    mt2: { marginTop: 8 },
-    ml3: { marginLeft: 12 },
-    mb6: { marginBottom: 24 },
-    iconBase: { width: 20, height: 20 },
-
-    // Layout
-    dashboardSection: { padding: 16 }, 
-    dashboardCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        padding: 24, // p-6
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-
-    // Loading State
-    loadingTitle: { width: '80%', height: 28, backgroundColor: '#e2e8f0', borderRadius: 8, marginBottom: 24, alignSelf: 'center' },
-    loadingChart: { height: 384, backgroundColor: '#e2e8f0', borderRadius: 12 },
-    loadingIndicator: { position: 'absolute', top: '50%', left: '50%', transform: [{ translateX: -20 }, { translateY: -20 }] },
-
-
-    // 1. Period Buttons
-    periodButtonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 8, 
-        marginBottom: 24,
-        backgroundColor: '#f1f5f9', 
-        padding: 4,
-        borderRadius: 12, 
-        alignSelf: 'center', 
-    },
-    periodButtonBase: {
-        paddingHorizontal: 16, 
-        paddingVertical: 4,    
-        borderRadius: 8,       
-    },
-    periodButtonActive: {
-        backgroundColor: '#FFFFFF',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 1,
-    },
-    periodButtonText: {
-        fontSize: 14, 
-        textTransform: 'capitalize',
-    },
-    periodButtonTextActive: {
-        fontWeight: '600', 
-        color: '#1e293b', 
-    },
-    periodButtonTextInactive: {
-        color: '#64748b', 
-    },
-    
-    // Header
-    headerTitle: {
-        fontSize: 20, 
-        fontWeight: 'bold',
-        color: '#1f2937', 
-    },
-    headerSubtitle: {
-        fontSize: 12, 
-        color: '#6b7280', 
-    },
-
-    // 3. Stat Cards Grid
-    statCardsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 16, 
-        marginTop: 24, 
-    },
-    statCardBase: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16, 
-        borderRadius: 8, 
-        flex: 1, 
-        minWidth: '30%', // Approx. 3 cards per row on wider screens
-    },
-
-    // Green Card (Revenue)
-    statCardGreen: { backgroundColor: 'rgba(239, 247, 239, 0.5)', borderColor: 'rgba(187, 247, 208, 0.8)', borderWidth: 1 },
-    statIconContainerGreen: { backgroundColor: '#dcfce7', color: '#16a34a', padding: 8, borderRadius: 8 },
-    statIconGreen: { color: '#16a34a' },
-    statLabelGreen: { fontSize: 14, color: '#065f46', fontWeight: '600' },
-    statValueGreen: { fontSize: 20, fontWeight: 'bold', color: '#16a34a' },
-
-    // Red Card (Outflow)
-    statCardRed: { backgroundColor: 'rgba(254, 243, 242, 0.5)', borderColor: 'rgba(254, 202, 202, 0.8)', borderWidth: 1 },
-    statIconContainerRed: { backgroundColor: '#fee2e2', color: '#dc2626', padding: 8, borderRadius: 8 },
-    statIconRed: { color: '#dc2626' },
-    statLabelRed: { fontSize: 14, color: '#991b1b', fontWeight: '600' },
-    statValueRed: { fontSize: 20, fontWeight: 'bold', color: '#dc2626' },
-
-    // Blue Card (Net Income)
-    statCardBlue: { backgroundColor: 'rgba(239, 246, 255, 0.5)', borderColor: 'rgba(191, 219, 254, 0.8)', borderWidth: 1 },
-    statIconContainerBlue: { backgroundColor: '#dbeafe', color: '#2563eb', padding: 8, borderRadius: 8 },
-    statIconBlue: { color: '#2563eb' },
-    statLabelBlue: { fontSize: 14, color: '#1e40af', fontWeight: '600' },
-    statValueBlue: { fontSize: 20, fontWeight: 'bold', color: '#2563eb' },
-
-    textRed600: { color: '#dc2626' }, 
-
-    // 4. Chart Section
-    breakdownTitle: {
-        fontSize: 18, 
-        fontWeight: 'bold',
-        color: '#1f2937', 
-        marginBottom: 8,
-    },
-    chartWrapper: {
-        borderRadius: 8,
-        overflow: 'hidden',
-        // The BarChart component handles its own background/padding
-    },
-    barChartStyle: {
-        marginVertical: 8,
-        borderRadius: 8,
-        // Small right padding to ensure axis labels are visible on the edge
-        paddingRight: 20, 
-    },
-    noDataContainer: {
-        height: 300,
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f9fafb', 
-        borderRadius: 8,
-    },
-    chartIcon: { color: '#d1d5db' }, 
-    noDataText: {
-        color: '#6b7280', 
-        fontWeight: '600',
-        marginTop: 8,
-    },
-
-    // Analyst Section
-    analystTitle: {
-        fontSize: 18, 
-        fontWeight: 'bold',
-        color: '#1f2937', 
-    },
-    analystCard: {
-        marginTop: 8, 
-        padding: 16, 
-        backgroundColor: '#f9fafb', 
-        borderRadius: 8, 
-        borderWidth: 1,
-        borderColor: '#e5e7eb', 
-    },
-    analystCardTitle: {
-        fontWeight: '600', 
-        color: '#1f2937', 
-    },
-    analystCardText: {
-        marginTop: 4, 
-        fontSize: 14, 
-        color: '#4b5563', 
-    },
-    analystCardRecommendationTitle: {
-        marginTop: 12, 
-        fontSize: 14, 
-        fontWeight: '600', 
-        color: '#1f2937', 
-    },
-});

@@ -10,7 +10,7 @@
   <img alt="Cloudinary" src="https://img.shields.io/badge/Cloudinary-%233448C5.svg?style=for-the-badge&logo=cloudinary&logoColor=white"/>
 </p>
 
-Fiamband is a complete full-stack finance tracking app that was designed to help individuals and families manage their income and expenses and financial goals in a systematic way. The Fiambond, which is based on a React front end and Firebase back end (previously based on the original Laravel API), provides an easy-to-understand, easy-to-read, and fully-responsive interface.  Depending on a mobile phone, tablet, and desktop computer, the user can easily track the financial well-being.  
+Fiambond is a complete full-stack finance tracking app that was designed to help individuals and families manage their income and expenses and financial goals in a systematic way. The Fiambond, which is based on a React front end and Firebase back end (previously based on the original Laravel API), provides an easy-to-understand, easy-to-read, and fully-responsive interface.  Depending on a mobile phone, tablet, and desktop computer, the user can easily track the financial well-being.  
 
 The app allows to have a safe space to handle personal finances, with the added option of creating a so-called Family Realm in which family members can use to track their finances jointly.
 

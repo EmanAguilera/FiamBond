@@ -2,60 +2,68 @@ import React, { useState } from 'react';
 import { 
     View, 
     Text, 
-    StyleSheet, 
-    TouchableOpacity, 
     TextInput, 
-    Alert, 
-    ActivityIndicator 
+    TouchableOpacity, 
+    ActivityIndicator, 
+    Alert 
 } from 'react-native';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-// NOTE: Ensure your Firebase config paths are correct
-import { db } from '../../../config/firebase-config'; 
-// NOTE: Assumed native version must exist and be imported correctly
-import CompanyEmployeeListWidget from './CompanyEmployeeListWidget'; 
+import { db } from '../../../config/firebase-config';
+import Svg, { Path } from 'react-native-svg';
+import CompanyEmployeeListWidget from './CompanyEmployeeListWidget';
 
-// --- ICON PLACEHOLDER ---
-const PlusIcon = (style) => <Text style={style}>+</Text>;
-
+// --- ICONS ---
+const Icons = {
+    Plus: (
+        <Svg className="w-4 h-4" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+            <Path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </Svg>
+    )
+};
 
 // --- INTERNAL COMPONENT: Add Employee Form ---
-// TypeScript interfaces are removed here
+// Type annotations removed from the function signature
 const AddEmployeeForm = ({ onAdd, onCancel }) => {
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async () => {
-        if (!email.trim()) return Alert.alert("Error", "Email cannot be empty.");
+        if (!email.trim() || !email.includes('@')) {
+            Alert.alert("Invalid Email", "Please enter a valid email address.");
+            return;
+        }
         setLoading(true);
         await onAdd(email);
         setLoading(false);
     };
 
     return (
-        <View style={styles.addFormContainer}>
-            <Text style={styles.addFormInfoText}>Enter user email to onboard.</Text>
-            <View style={styles.mb4}>
+        <View className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm mt-2">
+            <Text className="text-xs text-slate-500 mb-4 font-medium">Enter user email to onboard.</Text>
+            <View className="mb-4">
                 <TextInput 
-                    style={styles.addFormInput}
                     keyboardType="email-address"
                     autoCapitalize="none"
-                    required 
                     value={email} 
                     onChangeText={setEmail} 
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-800" 
                     placeholder="employee@example.com" 
-                    editable={!loading}
+                    placeholderTextColor="#94a3b8"
                 />
             </View>
-            <View style={styles.addFormActions}>
-                <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
+            <View className="flex-row justify-end gap-3">
+                <TouchableOpacity onPress={onCancel} className="px-4 py-2">
+                    <Text className="text-xs font-bold text-slate-400">Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                     onPress={handleSubmit} 
-                    disabled={loading || !email.trim()} 
-                    style={[styles.onboardButton, (loading || !email.trim()) && styles.disabledButton]}
+                    disabled={loading} 
+                    className={`px-5 py-2 rounded-xl bg-indigo-600 flex-row items-center ${loading ? 'opacity-50' : ''}`}
                 >
-                    {loading ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.onboardButtonText}>Onboard</Text>}
+                    {loading && <ActivityIndicator size="small" color="white" className="mr-2" />}
+                    <Text className="text-xs font-bold text-white">
+                        {loading ? 'Onboarding...' : 'Onboard'}
+                    </Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -63,70 +71,75 @@ const AddEmployeeForm = ({ onAdd, onCancel }) => {
 };
 
 // --- MAIN WIDGET ---
-// TypeScript type annotations removed from props:
+// Type annotations removed from the function signature
 export default function ManageEmployeesWidget({ company, members, onUpdate }) {
-    const API_URL = 'http://localhost:3000/api'; // Simplified URL
+    // API URL for mobile environments (use your local machine IP if testing on physical device)
+    const API_URL = 'http://localhost:3000'; 
     const [showAddForm, setShowAddForm] = useState(false);
 
+    // Type annotation removed from the parameter 'email'
     const handleAddEmployee = async (email) => {
         try {
             // 1. Find User in Firebase
-            const q = query(collection(db, "users"), where("email", "==", email));
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where("email", "==", email.toLowerCase().trim()));
             const snapshot = await getDocs(q);
 
             if (snapshot.empty) {
-                Alert.alert("Error", "User email not found in system.");
+                Alert.alert("Error", "User email not found in the FiamBond system.");
                 return;
             }
 
             const newUser = snapshot.docs[0].data();
             const newUserId = snapshot.docs[0].id;
 
-            // 2. Add to Company in MongoDB (assuming a server endpoint for this logic)
+            // 2. Add to Company in MongoDB
             const res = await fetch(`${API_URL}/companies/${company.id}/members`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ newMemberId: newUserId })
             });
 
-            if (res.status === 409) throw new Error("User is already an employee.");
-            // Explicit type annotation removed here:
+            if (res.status === 409) {
+                Alert.alert("Wait", "User is already an employee of this company.");
+                return;
+            }
+            
             if (!res.ok) throw new Error("Failed to add employee.");
 
             Alert.alert("Success", `${newUser.full_name || "User"} added successfully!`);
             if (onUpdate) onUpdate();
             setShowAddForm(false);
 
-        } catch (error) { // Explicit type annotation removed here: error: any
+        } catch (error) { // Removed ': any' type annotation
             console.error(error);
-            // Access message directly, as error type is inferred
-            Alert.alert("Error", error.message || "Failed to add employee."); 
+            // Accessing message from error object is safe even if 'any' is not used
+            Alert.alert("Error", error.message || "Failed to add employee.");
         }
     };
 
     return (
-        <View style={styles.container}>
+        <View className="space-y-6">
             {/* 1. TOP SECTION: ACTION BUTTON OR FORM */}
-            <View style={styles.topSection}>
+            <View className="bg-slate-50 p-5 rounded-3xl border border-slate-200">
                 {!showAddForm ? (
-                    <View style={styles.topSectionContent}>
+                    <View className="flex-row items-center justify-between">
                         <View>
-                            <Text style={styles.topSectionTitle}>Company Workforce</Text>
-                            <Text style={styles.topSectionSubtitle}>Manage employee access.</Text>
+                            <Text className="font-bold text-slate-700 text-base">Company Workforce</Text>
+                            <Text className="text-[10px] text-slate-500 font-medium">Manage employee access.</Text>
                         </View>
                         <TouchableOpacity 
                             onPress={() => setShowAddForm(true)}
-                            style={styles.onboardButtonAction} // Changed style name to avoid conflict
+                            activeOpacity={0.7}
+                            className="bg-indigo-600 px-4 py-2.5 rounded-xl shadow-sm flex-row items-center"
                         >
-                            {PlusIcon(styles.onboardIcon)}
-                            <Text style={styles.onboardButtonActionText}>Onboard Employee</Text>
+                            <View className="mr-2">{Icons.Plus}</View>
+                            <Text className="text-white text-xs font-bold">Onboard</Text>
                         </TouchableOpacity>
                     </View>
                 ) : (
-                    <View style={styles.addFormWrapper}>
-                        <View style={styles.addFormHeader}>
-                            <Text style={styles.addFormHeaderTitle}>Onboard New Employee</Text>
-                        </View>
+                    <View>
+                        <Text className="font-bold text-indigo-700 text-sm mb-2">Onboard New Employee</Text>
                         <AddEmployeeForm onAdd={handleAddEmployee} onCancel={() => setShowAddForm(false)} />
                     </View>
                 )}
@@ -134,128 +147,13 @@ export default function ManageEmployeesWidget({ company, members, onUpdate }) {
 
             {/* 2. BOTTOM SECTION: LIST OF EMPLOYEES */}
             <View>
-                <Text style={styles.listHeader}>Active Team ({members.length})</Text>
-                <View style={styles.listContainer}>
+                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">
+                    Active Team ({members.length})
+                </Text>
+                <View className="border border-slate-200 rounded-3xl overflow-hidden bg-white">
                     <CompanyEmployeeListWidget members={members} />
                 </View>
             </View>
         </View>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    // Utility Styles
-    mb4: { marginBottom: 16 },
-
-    // Main Widget Styles
-    container: { gap: 16 }, // space-y-4
-
-    // 1. Top Section Styles
-    topSection: {
-        backgroundColor: '#F8FAFC', // bg-slate-50
-        padding: 16, // p-4
-        borderRadius: 12, // rounded-xl
-        borderWidth: 1,
-        borderColor: '#E2E8F0', // border-slate-200
-    },
-    topSectionContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    topSectionTitle: { fontWeight: 'bold', color: '#334155' }, // text-slate-700
-    topSectionSubtitle: { fontSize: 12, color: '#64748B' }, // text-xs text-slate-500
-    
-    // Onboard Button (Top Section) - Renamed style to onboardButtonAction to avoid conflict with AddForm's onboardButton
-    onboardButtonAction: {
-        backgroundColor: '#4F46E5', // bg-indigo-600
-        paddingHorizontal: 16, // px-4
-        paddingVertical: 8, // py-2
-        borderRadius: 8, // rounded-lg
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 1.41,
-        elevation: 2, // shadow
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4, // gap-2
-    },
-    onboardIcon: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-    onboardButtonActionText: { color: 'white', fontSize: 14, fontWeight: 'bold' }, // text-sm
-
-    // Add Employee Form Styles
-    addFormWrapper: { 
-        // Simulating animate-in fade-in slide-in-from-top-2
-    },
-    addFormHeader: { 
-        flexDirection: 'row',
-        justifyContent: 'flex-start', // Adjusted to start as only title is present
-        alignItems: 'center',
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
-        marginBottom: 8,
-    },
-    addFormHeaderTitle: { fontWeight: 'bold', color: '#4F46E5', fontSize: 14 },
-    addFormContainer: {
-        padding: 16,
-        backgroundColor: 'white',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#F1F5F9', // border-slate-100
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 1,
-        elevation: 1, // shadow-sm
-        marginTop: 8, // mt-2
-    },
-    addFormInfoText: { fontSize: 12, color: '#64748B', marginBottom: 16 },
-    addFormInput: {
-        width: '100%',
-        paddingHorizontal: 16,
-        paddingVertical: 10, // Increased padding for better touch area
-        borderWidth: 1,
-        borderColor: '#CBD5E1', // border-slate-300
-        borderRadius: 8,
-        fontSize: 14,
-    },
-    addFormActions: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        gap: 8, // gap-2
-    },
-    cancelButton: { paddingHorizontal: 12, paddingVertical: 6 }, // Added touch padding
-    cancelButtonText: { fontSize: 12, fontWeight: 'bold', color: '#64748B' },
-    
-    // Onboard Button (Form Submit)
-    onboardButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-        backgroundColor: '#4F46E5',
-    },
-    onboardButtonText: { fontSize: 12, fontWeight: 'bold', color: 'white' },
-    
-    // Member List Styles
-    listHeader: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#94A3B8', // text-slate-400
-        textTransform: 'uppercase',
-        letterSpacing: 0.5, // tracking-wider
-        marginBottom: 8,
-        paddingHorizontal: 4,
-    },
-    listContainer: {
-        borderWidth: 1,
-        borderColor: '#E2E8F0', // border-slate-200
-        borderRadius: 12, // rounded-xl
-        overflow: 'hidden',
-    },
-    
-    // Disabled Button
-    disabledButton: { opacity: 0.5 },
-});

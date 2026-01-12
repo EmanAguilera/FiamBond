@@ -1,24 +1,35 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-// NOTE: react-chartjs-2 is a Web library. Use 'react-native-svg-charts' or 'victory-native' in a real app.
+import { View, Text, Dimensions } from 'react-native';
+import { BarChart } from "react-native-gifted-charts";
+import Svg, { Path } from 'react-native-svg';
 
-// --- ICON PLACEHOLDER ---
-const Icon = ({ name, style, size = 20 }) => {
-    let iconText = '';
-    switch (name) {
-        case 'ArrowUp': iconText = '⬆️'; break;
-        case 'ArrowDown': iconText = '⬇️'; break;
-        case 'Scale': iconText = '⚖️'; break;
-        case 'Chart': iconText = '📊'; break;
-        default: iconText = '?';
-    }
-    return <Text style={[{ fontSize: size, lineHeight: size }, style]}>{iconText}</Text>;
-};
-const ArrowUpIcon = (colorStyle) => <Icon name="ArrowUp" style={colorStyle} />;
-const ArrowDownIcon = (colorStyle) => <Icon name="ArrowDown" style={colorStyle} />;
-const ScaleIcon = (colorStyle) => <Icon name="Scale" style={colorStyle} />;
-const ChartIcon = (colorStyle) => <Icon name="Chart" style={[colorStyle, styles.chartIconLarge]} size={48} />;
+const { width } = Dimensions.get('window');
 
+// --- ICONS (Converted to React Native Svg) ---
+const ArrowUpIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#10b981" strokeWidth="2.5" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+    </Svg>
+);
+
+const ArrowDownIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#f43f5e" strokeWidth="2.5" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+    </Svg>
+);
+
+const ScaleIcon = () => (
+    <Svg className="w-5 h-5" fill="none" stroke="#475569" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+    </Svg>
+);
+
+const ChartIcon = () => (
+    <Svg className="w-12 h-12" fill="none" stroke="#d1d5db" strokeWidth="2" viewBox="0 0 24 24">
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+        <Path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+    </Svg>
+);
 
 // --- BUSINESS ANALYST COMPONENT ---
 const CompanyFinancialAnalysis = ({ report }) => {
@@ -37,75 +48,103 @@ const CompanyFinancialAnalysis = ({ report }) => {
     }
 
     return (
-        <View style={styles.analysisContainer}>
-            <Text style={styles.analysisHeader}>Financial Analysis</Text>
-            <View style={styles.analysisContentBox}>
-                <Text style={styles.analysisTitle}>{title}</Text>
-                <Text style={styles.analysisNarrative}>{narrative}</Text>
-                <Text style={styles.analysisStepsHeader}>Strategic Advice:</Text>
-                <Text style={styles.analysisRecommendation}>{recommendation}</Text>
+        <View className="mt-8 border-t border-slate-100 pt-6">
+            <Text className="text-lg font-bold text-gray-800">Financial Analysis</Text>
+            <View className="mt-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <Text className="font-bold text-slate-800 text-sm">{title}</Text>
+                <Text className="mt-1 text-xs text-gray-600 leading-4">{narrative}</Text>
+                <Text className="mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Strategic Advice:</Text>
+                <Text className="mt-1 text-xs text-gray-700 leading-4 font-medium">{recommendation}</Text>
             </View>
         </View>
     );
 };
 
+// --- DATA TRANSFORMER FOR GIFTED CHARTS ---
+const transformCompanyData = (chartData) => {
+    if (!chartData || !chartData.labels) return [];
+    
+    const barData = [];
+    const labels = chartData.labels;
+    const revenueData = chartData.datasets[0]?.data || [];
+    const expenseData = chartData.datasets[1]?.data || [];
+
+    labels.forEach((label, index) => {
+        // Revenue Bar (Indigo)
+        barData.push({
+            value: revenueData[index] || 0,
+            label: label,
+            spacing: 2,
+            labelWidth: 30,
+            labelTextStyle: { color: '#94a3b8', fontSize: 9 },
+            frontColor: '#6366f1', // indigo-500
+        });
+        // Expense Bar (Rose)
+        barData.push({
+            value: expenseData[index] || 0,
+            frontColor: '#f43f5e', // rose-500
+        });
+    });
+    
+    return barData;
+};
+
 // --- MAIN CHART WIDGET ---
 function CompanyReportChartWidget({ report }) {
-    
-    if (!report) { 
+    if (!report) {
         return (
-            <View style={styles.noReportContainer}>
-                <Text style={styles.noReportText}>No financial data available.</Text>
+            <View className="bg-white rounded-3xl p-10 items-center justify-center border border-slate-200 shadow-sm">
+                <Text className="text-gray-500 italic text-sm">No financial data available.</Text>
             </View>
-        ); 
+        );
     }
 
     const hasChartData = report.chartData?.datasets?.length > 0 && report.chartData?.labels?.length > 0;
+    const barData = transformCompanyData(report.chartData);
 
     return (
-        <View style={styles.widgetContainer}>
+        <View className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
             <View>
-                <Text style={styles.widgetTitle}>Company Financial Overview</Text>
-                <Text style={styles.widgetSubtitle}>{report.reportTitle}</Text>
+                <Text className="text-xl font-bold text-gray-800">Company Financial Overview</Text>
+                <Text className="text-xs text-gray-400 mt-1">{report.reportTitle}</Text>
             </View>
             
             {/* --- STAT CARDS --- */}
-            <View style={styles.statCardsGrid}>
-                
-                {/* Revenue - Green */}
-                <View style={[styles.statCardBase, styles.inflowCard]}>
-                    <View style={styles.inflowIconWrapper}>
-                        {ArrowUpIcon(styles.inflowIconColor)}
+            <View className="gap-3 mt-6">
+                {/* Revenue Card */}
+                <View className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex-row items-center">
+                    <View className="bg-emerald-100 p-2 rounded-xl">
+                        <ArrowUpIcon />
                     </View>
-                    <View style={styles.statCardTextWrapper}>
-                        <Text style={styles.inflowTextSubtitle}>Total Revenue</Text>
-                        <Text style={styles.inflowTextTitle}>
+                    <View className="ml-3">
+                        <Text className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider">Total Revenue</Text>
+                        <Text className="text-lg font-bold text-emerald-600">
                             ₱{parseFloat(report.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </Text>
                     </View>
                 </View>
-                
-                {/* Expenses - Red */}
-                <View style={[styles.statCardBase, styles.outflowCard]}>
-                    <View style={styles.outflowIconWrapper}>
-                        {ArrowDownIcon(styles.outflowIconColor)}
+
+                {/* Expenses Card */}
+                <View className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 flex-row items-center">
+                    <View className="bg-rose-100 p-2 rounded-xl">
+                        <ArrowDownIcon />
                     </View>
-                    <View style={styles.statCardTextWrapper}>
-                        <Text style={styles.outflowTextSubtitle}>Total Expenses</Text>
-                        <Text style={styles.outflowTextTitle}>
+                    <View className="ml-3">
+                        <Text className="text-[10px] text-rose-800 font-bold uppercase tracking-wider">Total Expenses</Text>
+                        <Text className="text-lg font-bold text-rose-600">
                             ₱{parseFloat(report.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </Text>
                     </View>
                 </View>
-                
-                {/* Profit/Loss - Blue/Red */}
-                <View style={[styles.statCardBase, styles.netCard]}>
-                    <View style={styles.netIconWrapper}>
-                        {ScaleIcon(styles.netIconColor)}
+
+                {/* Profit/Loss Card */}
+                <View className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200 flex-row items-center">
+                    <View className="bg-slate-100 p-2 rounded-xl">
+                        <ScaleIcon />
                     </View>
-                    <View style={styles.statCardTextWrapper}>
-                        <Text style={styles.netTextSubtitle}>Net Profit/Loss</Text>
-                        <Text style={[styles.netTextTitle, report.netPosition >= 0 ? styles.netTextPositive : styles.netTextNegative]}>
+                    <View className="ml-3">
+                        <Text className="text-[10px] text-slate-800 font-bold uppercase tracking-wider">Net Profit/Loss</Text>
+                        <Text className={`text-lg font-bold ${report.netPosition >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>
                             ₱{parseFloat(report.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </Text>
                     </View>
@@ -113,212 +152,49 @@ function CompanyReportChartWidget({ report }) {
             </View>
 
             {/* --- CHART SECTION --- */}
-            <View style={styles.chartSectionContainer}>
-                <Text style={styles.chartHeader}>Revenue vs. Expenses</Text>
-                <View style={styles.chartWrapper}>
-                    {hasChartData ? (
-                        <View style={styles.chartPlaceholder}>
-                            <Text style={styles.chartPlaceholderText}>Chart Implementation (Requires Native Library)</Text>
+            <View className="mt-8">
+                <Text className="text-sm font-bold text-gray-800 mb-6">Revenue vs. Expenses Breakdown</Text>
+                
+                {hasChartData ? (
+                    <View className="items-center">
+                        <BarChart
+                            data={barData}
+                            barWidth={16}
+                            initialSpacing={10}
+                            spacing={14}
+                            hideRules
+                            noOfSections={4}
+                            yAxisThickness={0}
+                            xAxisThickness={0}
+                            yAxisTextStyle={{ color: '#94a3b8', fontSize: 10 }}
+                            isAnimated
+                            animationDuration={600}
+                        />
+                        {/* Legend */}
+                        <View className="flex-row justify-center mt-6 gap-6">
+                            <View className="flex-row items-center">
+                                <View className="w-3 h-3 rounded-full bg-indigo-500 mr-2" />
+                                <Text className="text-[10px] text-gray-500 font-bold uppercase">Revenue</Text>
+                            </View>
+                            <View className="flex-row items-center">
+                                <View className="w-3 h-3 rounded-full bg-rose-500 mr-2" />
+                                <Text className="text-[10px] text-gray-500 font-bold uppercase">Expenses</Text>
+                            </View>
                         </View>
-                    ) : (
-                        <View style={styles.noChartDataBox}>
-                            {ChartIcon(styles.noChartIconColor)}
-                            <Text style={styles.noChartDataText}>Insufficient Data</Text>
-                            <Text style={styles.noChartDataSubtext}>Record transactions to visualize performance.</Text>
-                        </View>
-                    )}
-                </View>
+                    </View>
+                ) : (
+                    <View className="h-48 items-center justify-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                        <ChartIcon />
+                        <Text className="text-gray-500 font-bold mt-3 text-xs">Insufficient Data</Text>
+                        <Text className="text-[10px] text-gray-400">Record transactions to visualize performance.</Text>
+                    </View>
+                )}
             </View>
 
             {/* --- ANALYSIS --- */}
             <CompanyFinancialAnalysis report={report} />
-
         </View>
     );
 };
 
-export default CompanyReportChartWidget;
-
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    // General Utilities
-    fontBold: { fontWeight: 'bold' },
-    fontSemibold: { fontWeight: '600' },
-    textSm: { fontSize: 14 },
-    textXs: { fontSize: 12 },
-
-    // Widget Container (Simulating Tailwind's card styles)
-    widgetContainer: {
-        backgroundColor: 'rgba(255, 255, 255, 0.9)', // bg-white/60
-        borderWidth: 1,
-        borderColor: 'rgba(226, 232, 240, 0.5)', // border-slate-200/50
-        borderRadius: 16, // rounded-2xl
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 5, // shadow-lg
-        padding: 24, // p-6
-    },
-    widgetTitle: {
-        fontSize: 20, // text-xl
-        fontWeight: 'bold',
-        color: '#1F2937', // text-gray-800
-    },
-    widgetSubtitle: {
-        fontSize: 14, // text-sm
-        color: '#6B7280', // text-gray-500
-        marginTop: 4,
-    },
-    noReportContainer: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(226, 232, 240, 0.5)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 5,
-        padding: 24,
-    },
-    noReportText: {
-        color: '#6B7280',
-        fontStyle: 'italic',
-    },
-
-    // Stat Cards (grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6)
-    statCardsGrid: {
-        marginTop: 24, // mt-6
-        flexDirection: 'column',
-        gap: 16, // gap-4
-    },
-    statCardBase: {
-        padding: 16, // p-4
-        borderRadius: 8,
-        borderWidth: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    statCardTextWrapper: {
-        marginLeft: 12, // ml-3
-    },
-
-    // Revenue Card (Green)
-    inflowCard: { backgroundColor: 'rgba(236, 253, 245, 0.5)', borderColor: 'rgba(110, 231, 183, 0.8)' }, // bg-emerald-50/50, border-emerald-200/80
-    inflowIconWrapper: { backgroundColor: '#D1FAE5', color: '#059669', padding: 8, borderRadius: 8 }, // bg-emerald-100, text-emerald-600
-    inflowIconColor: { color: '#059669' },
-    inflowTextSubtitle: { fontSize: 14, color: '#065F46', fontWeight: '600' }, // text-emerald-800
-    inflowTextTitle: { fontSize: 20, fontWeight: 'bold', color: '#059669' }, // text-xl font-bold text-emerald-600
-
-    // Expenses Card (Red)
-    outflowCard: { backgroundColor: 'rgba(254, 242, 242, 0.5)', borderColor: 'rgba(252, 165, 165, 0.8)' }, // bg-rose-50/50, border-rose-200/80
-    outflowIconWrapper: { backgroundColor: '#FEE2E2', color: '#DC2626', padding: 8, borderRadius: 8 }, // bg-rose-100, text-rose-600
-    outflowIconColor: { color: '#DC2626' },
-    outflowTextSubtitle: { fontSize: 14, color: '#991B1B', fontWeight: '600' }, // text-rose-800
-    outflowTextTitle: { fontSize: 20, fontWeight: 'bold', color: '#DC2626' }, // text-xl font-bold text-rose-600
-
-    // Profit/Loss Card (Slate/Blue/Red)
-    netCard: { backgroundColor: 'rgba(248, 250, 252, 0.5)', borderColor: 'rgba(226, 232, 240, 0.8)' }, // bg-slate-50/50, border-slate-200/80
-    netIconWrapper: { backgroundColor: '#F1F5F9', color: '#475569', padding: 8, borderRadius: 8 }, // bg-slate-100, text-slate-600
-    netIconColor: { color: '#475569' },
-    netTextSubtitle: { fontSize: 14, color: '#1E293B', fontWeight: '600' }, // text-slate-800
-    netTextTitle: { fontSize: 20, fontWeight: 'bold' }, // text-xl font-bold
-    netTextPositive: { color: '#4F46E5' }, // text-indigo-600
-    netTextNegative: { color: '#DC2626' }, // text-rose-600
-
-    // Chart Section
-    chartSectionContainer: {
-        marginTop: 32, // mt-8
-    },
-    chartHeader: {
-        fontSize: 18, // text-lg
-        fontWeight: 'bold',
-        color: '#1F2937', // text-gray-800
-        marginBottom: 8, // mb-2
-    },
-    chartWrapper: {
-        position: 'relative',
-        height: 300, // style={{ height: '300px' }}
-    },
-    chartPlaceholder: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#F3F4F6', // bg-gray-100
-        borderRadius: 8,
-    },
-    chartPlaceholderText: {
-        color: '#6B7280',
-        fontSize: 16,
-        fontStyle: 'italic',
-    },
-    noChartDataBox: {
-        flex: 1,
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#F9FAFB', // bg-gray-50
-        borderRadius: 8,
-        padding: 20,
-    },
-    chartIconLarge: {
-        color: '#D1D5DB', // text-gray-300
-    },
-    noChartIconColor: { color: '#D1D5DB' },
-    noChartDataText: {
-        color: '#6B7280',
-        fontWeight: '600',
-        marginTop: 8, // mt-2
-    },
-    noChartDataSubtext: {
-        color: '#9CA3AF',
-        fontSize: 12, // text-xs
-    },
-
-    // Financial Analysis
-    analysisContainer: {
-        marginTop: 32, // mt-8
-        borderTopWidth: 1,
-        borderColor: '#F1F5F9', // border-t border-slate-100
-        paddingTop: 24, // pt-6
-    },
-    analysisHeader: {
-        fontSize: 18, // text-lg
-        fontWeight: 'bold',
-        color: '#1F2937', // text-gray-800
-    },
-    analysisContentBox: {
-        marginTop: 12, // mt-3
-        padding: 16, // p-4
-        backgroundColor: '#F8FAFC', // bg-slate-50
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#E2E8F0', // border border-slate-200
-    },
-    analysisTitle: {
-        fontWeight: '600', // font-semibold
-        color: '#1E293B', // text-slate-800
-    },
-    analysisNarrative: {
-        marginTop: 4, // mt-1
-        fontSize: 14, // text-sm
-        color: '#475569', // text-slate-600
-    },
-    analysisStepsHeader: {
-        marginTop: 12, // mt-3
-        fontSize: 12, // text-xs
-        fontWeight: 'bold',
-        color: '#9CA3AF', // text-slate-400
-        textTransform: 'uppercase',
-        letterSpacing: 0.5, // tracking-wide
-    },
-    analysisRecommendation: {
-        marginTop: 4, // mt-1
-        fontSize: 14, // text-sm
-        color: '#334155', // text-slate-700
-    },
-});
+export default memo(CompanyReportChartWidget);

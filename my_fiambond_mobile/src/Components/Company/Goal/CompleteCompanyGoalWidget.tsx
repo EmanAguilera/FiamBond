@@ -1,22 +1,20 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext } from 'react';
 import { 
     View, 
     Text, 
     TouchableOpacity, 
-    StyleSheet, 
-    Alert, 
     ActivityIndicator, 
-    Platform 
-} from "react-native";
-import { AppContext } from "../../../Context/AppContext.jsx";
+    Alert, 
+    Image,
+    ScrollView 
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { AppContext } from '../../../Context/AppContext';
 
-// Cloudinary constants (use process.env in RN/Expo)
-const CLOUDINARY_CLOUD_NAME = process.env.VITE_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
-const CLOUDINARY_UPLOAD_PRESET = process.env.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default";
-const CLOUD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-const API_URL = 'http://localhost:3000/api'; // Simplified URL
+// --- CONFIGURATION ---
+const CLOUD_URL = `https://api.cloudinary.com/v1_1/dzcnbrgjy/image/upload`;
+const API_URL = 'http://localhost:3000'; // Replace with your local IP if testing on a physical device
 
-// --- INTERFACES FOR TYPE SAFETY ---
 interface Goal {
     id?: string;
     _id?: string;
@@ -30,43 +28,30 @@ interface Props {
     onSuccess: () => void;
 }
 
-interface NativeFile {
-    uri: string;
-    name: string;
-    type: string; // e.g., 'image/jpeg', 'application/pdf'
-}
-
-// Define the expected structure of the user object retrieved from context
-interface User { 
-    uid: string; 
-    [key: string]: any; 
-}
-// Define the structure of the context itself (assuming it provides a nullable user)
-interface AppContextType { 
-    user: User | null; 
-    [key: string]: any; 
-}
-// ------------------------------------
-
 export default function CompleteCompanyGoalWidget({ goal, onSuccess }: Props) {
-    // FIX: Assert the context type with non-null assertion (!)
-    // This resolves the error 2339 by guaranteeing to the compiler that 
-    // the value returned by useContext is not null.
-    const { user } = useContext(AppContext)! as AppContextType; 
+    const { user } = useContext(AppContext) as any;
     
-    const [file, setFile] = useState<NativeFile | null>(null);
+    const [imageUri, setImageUri] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [statusBtn, setStatusBtn] = useState('Confirm & Complete Goal');
 
-    // Placeholder for native file picker
-    const handleNativeFileUpload = async () => {
-        Alert.alert("File Picker", "Native file picker integration required.");
+    // --- IMAGE PICKER LOGIC ---
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setImageUri(result.assets[0].uri);
+            setError(null);
+        }
     };
 
     const submit = async () => {
-        // Safe check for user object access (user is now User | null)
-        if (!user || !user.uid) return Alert.alert("Error", "Login required");
+        if (!user) return;
 
         const goalId = goal.id || goal._id;
         if (!goalId) {
@@ -80,28 +65,32 @@ export default function CompleteCompanyGoalWidget({ goal, onSuccess }: Props) {
         try {
             let achievementUrl = null;
 
-            // 1. Upload Proof
-            if (file) {
+            // 1. Upload Proof to Cloudinary (Native FormData Format)
+            if (imageUri) {
                 setStatusBtn("Uploading proof...");
                 const fd = new FormData();
                 
-                // Append the native file object to FormData
-                fd.append('file', {
-                    uri: file.uri,
-                    name: file.name,
-                    type: file.type,
-                } as any);
+                const filename = imageUri.split('/').pop();
+                const match = /\.(\w+)$/.exec(filename || '');
+                const type = match ? `image/${match[1]}` : `image`;
 
-                fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                fd.append('file', {
+                    uri: imageUri,
+                    name: filename || 'achievement.jpg',
+                    type: type,
+                } as any);
                 
-                const res = await fetch(CLOUD_URL, { 
+                fd.append('upload_preset', "ml_default");
+                
+                const cloudRes = await fetch(CLOUD_URL, { 
                     method: 'POST', 
                     body: fd,
-                    // RN handles Content-Type for multipart/form-data automatically
-                    headers: {}, 
+                    headers: { 'content-type': 'multipart/form-data' }
                 });
-                if (!res.ok) throw new Error('Upload failed');
-                achievementUrl = (await res.json()).secure_url;
+
+                if (!cloudRes.ok) throw new Error('Upload failed');
+                const cloudData = await cloudRes.json();
+                achievementUrl = cloudData.secure_url;
             }
 
             // 2. Update Goal Status
@@ -112,7 +101,7 @@ export default function CompleteCompanyGoalWidget({ goal, onSuccess }: Props) {
                 body: JSON.stringify({
                     status: "completed",
                     completed_at: new Date().toISOString(),
-                    completed_by_user_id: user.uid, // SAFE access now
+                    completed_by_user_id: user.uid,
                     achievement_url: achievementUrl
                 })
             });
@@ -125,7 +114,7 @@ export default function CompleteCompanyGoalWidget({ goal, onSuccess }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    user_id: user.uid, // SAFE access now
+                    user_id: user.uid,
                     company_id: goal.company_id, 
                     type: 'expense', 
                     amount: Number(goal.target_amount),
@@ -145,90 +134,88 @@ export default function CompleteCompanyGoalWidget({ goal, onSuccess }: Props) {
         } catch (err: any) {
             console.error("Completion Error:", err);
             setError(err.message || "Error completing target");
-            Alert.alert("Error", err.message || "Failed to complete target");
+            Alert.alert("Error", "Failed to complete target");
         } finally {
             setLoading(false);
             setStatusBtn('Confirm & Complete Goal');
         }
     };
 
-    const targetAmountFormatted = `₱${parseFloat(goal.target_amount.toString()).toLocaleString()}`;
-
     return (
-        <View style={styles.container}>
+        <ScrollView className="space-y-6 p-1" keyboardShouldPersistTaps="handled">
             {/* Header Section */}
             <View>
-                <Text style={styles.subtitle}>You are about to complete the goal:</Text>
-                <Text style={styles.title}>{goal.name}</Text>
+                <Text className="text-sm text-slate-500">You are about to complete the goal:</Text>
+                <Text className="font-bold text-xl text-slate-800 mt-1">{goal.name}</Text>
                 
-                <Text style={styles.infoText}>
-                    An expense of {targetAmountFormatted} will be recorded from the Company Ledger.
-                </Text>
+                <View className="bg-indigo-50 p-4 rounded-2xl mt-4 border border-indigo-100">
+                    <Text className="text-xs text-indigo-700 leading-5">
+                        An expense of <Text className="font-bold">₱{parseFloat(goal.target_amount.toString()).toLocaleString()}</Text> will be recorded from the Company Ledger.
+                    </Text>
+                </View>
             </View>
 
-            <View style={styles.divider} />
+            {/* Separator */}
+            <View className="h-[1px] bg-slate-100 w-full" />
 
-            {/* File Input */}
+            {/* Image Picker */}
             <View>
-                <Text style={styles.label}>
-                    Upload a Photo of Your Achievement <Text style={styles.labelOptional}>(Optional)</Text>
+                <Text className="text-sm font-bold text-slate-700 mb-3">
+                    Upload a Photo of Your Achievement (Optional)
                 </Text>
+                
                 <TouchableOpacity 
-                    onPress={handleNativeFileUpload} 
+                    onPress={pickImage}
                     disabled={loading}
-                    style={styles.fileButton}
+                    activeOpacity={0.7}
+                    className="border-2 border-dashed border-slate-200 rounded-3xl p-8 items-center justify-center bg-slate-50"
                 >
-                    <Text style={styles.fileButtonText}>
-                        {file ? `File Selected: ${file.name}` : "Tap to Select Photo/File"}
-                    </Text>
-                    {file && (
-                         <TouchableOpacity onPress={() => setFile(null)} style={styles.fileClearButton}>
-                            <Text style={styles.fileClearText}>✕</Text>
-                         </TouchableOpacity>
+                    {imageUri ? (
+                        <View className="items-center">
+                            <Image source={{ uri: imageUri }} className="w-32 h-32 rounded-2xl mb-3" />
+                            <Text className="text-indigo-600 font-bold text-xs">Change Photo</Text>
+                        </View>
+                    ) : (
+                        <View className="items-center">
+                            <View className="bg-white p-4 rounded-full mb-3 shadow-sm">
+                                <Text className="text-2xl">🏆</Text>
+                            </View>
+                            <Text className="text-indigo-600 font-bold text-sm">Pick Proof Image</Text>
+                            <Text className="text-slate-400 text-[10px] mt-1">Tap to browse gallery</Text>
+                        </View>
                     )}
                 </TouchableOpacity>
-                {file && <Text style={styles.fileNameText}>Selected: {file.name}</Text>}
             </View>
 
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {/* Error Message */}
+            {error && (
+                <View className="bg-rose-50 p-3 rounded-xl">
+                    <Text className="text-rose-600 text-xs text-center font-bold">{error}</Text>
+                </View>
+            )}
 
             {/* Submit Button */}
             <TouchableOpacity 
-                onPress={submit}
-                disabled={loading} 
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                onPress={submit} 
+                disabled={loading}
+                activeOpacity={0.8}
+                className={`w-full py-5 rounded-2xl shadow-lg items-center ${
+                    loading ? 'bg-indigo-300' : 'bg-indigo-600 shadow-indigo-200'
+                }`}
+                style={!loading && { shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }}
             >
-                {loading ? <ActivityIndicator color="white" /> : <Text style={styles.submitButtonText}>{statusBtn}</Text>}
+                {loading ? (
+                    <View className="flex-row items-center">
+                        <ActivityIndicator color="white" className="mr-2" />
+                        <Text className="text-white font-bold text-base">{statusBtn}</Text>
+                    </View>
+                ) : (
+                    <Text className="text-white font-bold text-base">Confirm & Complete Goal</Text>
+                )}
             </TouchableOpacity>
-        </View>
+
+            {/* Spacing for keyboard/scroll */}
+            <View className="h-10" />
+        </ScrollView>
     );
 }
-
-// --- REACT NATIVE STYLESHEET ---
-const styles = StyleSheet.create({
-    container: {
-        padding: 16, // p-4
-        gap: 16, // space-y-4
-    },
-    subtitle: { fontSize: 14, color: '#4B5563' },
-    title: { fontWeight: '600', fontSize: 18, color: '#1F2937', marginTop: 4 },
-    infoText: { fontSize: 14, color: '#6B7280', marginTop: 8 },
-    divider: { borderBottomWidth: 1, borderColor: '#E5E7EB' },
-    label: { fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 4 },
-    labelOptional: { color: '#9CA3AF', fontWeight: 'normal' },
-    fileButton: {
-        marginTop: 4, width: '100%', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 6, borderWidth: 1,
-        borderColor: '#E5E7EB', backgroundColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    },
-    fileButtonText: { fontSize: 14, fontWeight: '600', color: '#2563EB', flexShrink: 1 },
-    fileClearButton: { padding: 4, borderRadius: 10, backgroundColor: '#D1D5DB', marginLeft: 8 },
-    fileClearText: { fontSize: 12, fontWeight: 'bold', color: '#4B5563' },
-    fileNameText: { fontSize: 12, color: '#4F46E5', marginTop: 4, paddingHorizontal: 4 },
-    errorText: { textAlign: 'center', fontSize: 14, fontWeight: 'bold', color: '#F43F5E' },
-    submitButton: {
-        width: '100%', paddingVertical: 12, backgroundColor: '#4F46E5', borderRadius: 8, alignItems: 'center', justifyContent: 'center',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 3,
-    },
-    submitButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-    submitButtonDisabled: { opacity: 0.5 },
-});

@@ -8,7 +8,7 @@ export type RootStackParamList = {
   Login: { message?: string } | undefined;
   Register: undefined;
   Welcome: undefined;
-  HomeStack: undefined; // Assuming HomeStack is a stack navigator itself
+  UserRealm: undefined; // Assuming HomeStack is a stack navigator itself
   AdminRealm: undefined;
   Terms: undefined;
   Privacy: undefined;

@@ -20,7 +20,7 @@ app.options(/.*/, cors());
 app.use(express.json());
 
 // 3. DATABASE CONNECTION (Vercel Optimized)
-const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/fiambond_v3';
+const mongoURI = 'mongodb://localhost:27017/fiambond_v3';
 
 if (!process.env.MONGO_URI) {
     console.warn("⚠️  Warning: MONGO_URI not found. Falling back to Localhost.");
@@ -406,21 +406,8 @@ app.post('/api/families/:id/members', async (req, res) => {
 });
 
 
-// --- USERS (DUPLICATE PRESERVED) ---
+// --- USERS ---
 
-// Version 1
-app.get('/api/users', async (req, res) => {
-    try {
-        const { ids } = req.query;
-        if (!ids) return res.status(400).json({ error: "IDs required" });
-        const users = await User.find({ _id: { $in: ids.split(',') } });
-        res.json(users);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Version 2 (Matches your request)
 app.get('/api/users', async (req, res) => {
     try {
         const { ids } = req.query;
@@ -444,25 +431,24 @@ app.patch('/api/users/:id', async (req, res) => {
 });
 
 
-// --- COMPANIES (DUPLICATES PRESERVED) ---
+// --- COMPANIES ---
 
-// Logic 1
-app.get('/api/companies/:id', async (req, res) => {
+// NEW ROUTE: To handle requests like /api/companies?user_id=... (REQUIRED FIX)
+app.get('/api/companies', async (req, res) => {
     try {
-        const company = await Company.findOne({ 
-            $or: [
-                { _id: (mongoose.Types.ObjectId.isValid(req.params.id) ? req.params.id : null) },
-                { owner_id: req.params.id }
-            ]
-        });
-        if (!company) return res.status(404).json({ error: "Company not found" });
-        res.json(company);
+        const { user_id } = req.query;
+        if (!user_id) {
+            return res.status(400).json({ error: "User ID query parameter required." });
+        }
+        
+        // Find all companies where the user is a member
+        const companies = await Company.find({ member_ids: user_id });
+        res.json(companies);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Logic 2 (Matches your provided logic)
 app.get('/api/companies/:id', async (req, res) => {
     try {
         const companyIdentifier = req.params.id;
@@ -497,6 +483,60 @@ app.post('/api/companies/:id/members', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// --- REPORTS (FIX FOR MISSING ROUTE) ---
+app.get('/api/reports/personal/:user_id', async (req, res) => {
+    try {
+        const { user_id } = req.params;
+        const { period } = req.query; // 'weekly', 'monthly', 'yearly'
+
+        // 1. Define Date Range based on 'period'
+        const now = new Date();
+        let startDate;
+
+        if (period === 'weekly') {
+            startDate = new Date(now.setDate(now.getDate() - 7));
+        } else if (period === 'yearly') {
+            startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+        } else { // 'monthly' or default
+            startDate = new Date(now.setMonth(now.getMonth() - 1));
+        }
+        
+        // 2. Fetch Transactions for the period
+        const periodTxs = await Transaction.find({ 
+            user_id, 
+            family_id: null, 
+            company_id: null,
+            created_at: { $gte: startDate } 
+        });
+
+        // 3. Calculate Period Metrics
+        const periodIncome = periodTxs.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
+        const periodExpense = periodTxs.filter(tx => tx.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
+        
+        // 4. Calculate Total Balance (across all time)
+        const totalAllTimeTxs = await Transaction.find({ user_id, family_id: null, company_id: null });
+        const totalIncome = totalAllTimeTxs.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
+        const totalExpense = totalAllTimeTxs.filter(tx => tx.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
+        const balance = totalIncome - totalExpense;
+
+
+        // 5. Prepare Report Object
+        const report = {
+            period: period,
+            balance: balance,       
+            periodIncome: periodIncome,   
+            periodExpense: periodExpense, 
+            transactions: periodTxs.length
+        };
+        
+        res.json(report);
+    } catch (err) {
+        console.error("Report generation failed:", err);
+        res.status(500).json({ error: err.message || "Failed to generate report." });
+    }
+});
+
 
 // ==========================================
 // 7. EXPORT & LISTEN
