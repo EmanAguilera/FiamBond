@@ -41,14 +41,25 @@ export default function Layout({ children }) {
         return (
             <SafeAreaView className="flex-1 bg-white">
                 <View className="h-20 border-b border-gray-100 px-5 flex-row items-center justify-between bg-white">
-                    <TouchableOpacity onPress={() => navigation.navigate("Welcome")} className="flex-row items-center gap-2">
-                        <Image source={require("../../assets/FiamBond_Logo.png")} className="h-8 w-8" resizeMode="contain" />
-                        <Text className="text-xl font-bold text-indigo-600">FiamBond</Text>
+                    <TouchableOpacity 
+                        onPress={() => navigation.navigate("Welcome")} 
+                        className="flex-row items-center gap-2"
+                    >
+                        {/* ICON: Fixed size so it doesn't get "big" */}
+                        <Image 
+                            source={require("../../assets/FiamBond_Logo.png")} 
+                            style={{ width: 40, height: 40 }} 
+                            resizeMode="contain" 
+                        />
+                        {/* TEXT: Explicitly kept here */}
+                        <Text className="text-2xl font-bold text-indigo-600">FiamBond</Text>
                     </TouchableOpacity>
+                    
                     <TouchableOpacity onPress={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
                         {isMobileMenuOpen ? <X size={24} color="#4b5563" /> : <MenuIcon size={24} color="#4b5563" />}
                     </TouchableOpacity>
                 </View>
+
                 {isMobileMenuOpen && (
                     <View className="absolute top-20 left-0 w-full bg-white z-50 border-b border-gray-200 p-5">
                         <TouchableOpacity onPress={() => { setIsMobileMenuOpen(false); navigation.navigate("Login"); }} className="py-4 border-b border-gray-50">
@@ -67,13 +78,27 @@ export default function Layout({ children }) {
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
             <View className="h-20 border-b border-gray-200 bg-white px-5 flex-row items-center justify-between">
-                <TouchableOpacity onPress={() => navigation.navigate("Home")} className="flex-row items-center gap-2">
-                    <Image source={require("../../assets/FiamBond_Logo.png")} className="h-8 w-8" resizeMode="contain" />
-                    <Text className="text-lg font-bold text-indigo-600">FiamBond</Text>
+                <TouchableOpacity 
+                    onPress={() => navigation.navigate("Home")} 
+                    className="flex-row items-center gap-2"
+                >
+                    {/* ICON: Fixed size for authenticated view */}
+                    <Image 
+                        source={require("../../assets/FiamBond_Logo.png")} 
+                        style={{ width: 35, height: 35 }} 
+                        resizeMode="contain" 
+                    />
+                    <Text className="text-xl font-bold text-indigo-600">FiamBond</Text>
                 </TouchableOpacity>
+
                 <View className="flex-row items-center gap-3">
-                    <TouchableOpacity onPress={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="h-10 w-10 bg-indigo-100 rounded-full items-center justify-center border border-indigo-200">
-                        <Text className="text-indigo-700 font-bold">{(user?.full_name || 'U')[0].toUpperCase()}</Text>
+                    <TouchableOpacity 
+                        onPress={() => setIsProfileMenuOpen(!isProfileMenuOpen)} 
+                        className="h-10 w-10 bg-indigo-100 rounded-full items-center justify-center border border-indigo-200"
+                    >
+                        <Text className="text-indigo-700 font-bold">
+                            {(user?.full_name || 'U')[0].toUpperCase()}
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
                         <MenuIcon size={24} color="#9ca3af" />
@@ -102,18 +127,22 @@ export default function Layout({ children }) {
                     <Pressable className="absolute inset-0 bg-black/20 z-40" onPress={() => setIsMobileMenuOpen(false)} />
                     <View className="absolute right-0 top-0 h-full w-3/4 bg-white z-50 p-6">
                         <Text className="text-xs font-bold text-gray-400 uppercase mb-4">Subscriptions</Text>
-                        {(premiumDetails.company || premiumDetails.family) ? (
+                        {(premiumDetails && (premiumDetails.company || premiumDetails.family)) ? (
                             <View>
                                 {premiumDetails.company && (
                                     <View className="bg-emerald-50 p-4 rounded-2xl mb-3">
                                         <Text className="font-bold text-emerald-800 text-sm">Company Premium</Text>
-                                        <Text className="text-[10px] text-emerald-600">Expires: {formatExpirationDate(premiumDetails.company.granted_at, premiumDetails.company.plan_cycle)}</Text>
+                                        <Text className="text-[10px] text-emerald-600">
+                                            Expires: {formatExpirationDate(premiumDetails.company.granted_at, premiumDetails.company.plan_cycle)}
+                                        </Text>
                                     </View>
                                 )}
                                 {premiumDetails.family && (
                                     <View className="bg-blue-50 p-4 rounded-2xl">
                                         <Text className="font-bold text-blue-800 text-sm">Family Premium</Text>
-                                        <Text className="text-[10px] text-blue-600">Expires: {formatExpirationDate(premiumDetails.family.granted_at, premiumDetails.family.plan_cycle)}</Text>
+                                        <Text className="text-[10px] text-blue-600">
+                                            Expires: {formatExpirationDate(premiumDetails.family.granted_at, premiumDetails.family.plan_cycle)}
+                                        </Text>
                                     </View>
                                 )}
                             </View>

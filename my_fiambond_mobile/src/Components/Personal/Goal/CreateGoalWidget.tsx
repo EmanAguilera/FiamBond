@@ -21,7 +21,7 @@ export default function CreateGoalWidget({ onSuccess }: CreateGoalWidgetProps) {
     const user = context?.user;
     
     // Replace with your local IP if testing on a physical device
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api';
 
     const [formData, setFormData] = useState({ 
         name: "", 

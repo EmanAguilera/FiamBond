@@ -1,5 +1,5 @@
 // GoalListsWidget.jsx
-import React, { useContext, useEffect, useState, useCallback, lazy, Suspense } from "react";
+import React, { useContext, useEffect, useState, useCallback } from "react";
 import { 
     View, 
     Text, 
@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore';
 
 // Lazy-loaded complete goal widget
-const CompleteGoalWidget = lazy(() => import('./CompleteGoalWidget'));
+import CompleteGoalWidget from './CompleteGoalWidget';
 
 // Skeleton loader
 const GoalListsSkeleton = () => (
@@ -52,7 +52,7 @@ export default function GoalListsWidget({ family, onDataChange }) {
     const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
     const [goalToComplete, setGoalToComplete] = useState(null);
     
-    const API_URL = 'http://localhost:3000'; // ← Change for physical device / production
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; // ← Change for physical device / production
 
     const getGoals = useCallback(async () => {
         if (!user) return;
@@ -266,13 +266,11 @@ export default function GoalListsWidget({ family, onDataChange }) {
                 animationType="fade"
                 onRequestClose={() => setIsCompleteModalOpen(false)}
             >
-                <Suspense fallback={<ActivityIndicator />}>
-                    <CompleteGoalWidget
-                        goal={goalToComplete}
-                        onSuccess={handleCompletionSuccess}
-                        onClose={() => setIsCompleteModalOpen(false)}
-                    />
-                </Suspense>
+                <CompleteGoalWidget
+                    goal={goalToComplete}
+                    onSuccess={handleCompletionSuccess}
+                    onClose={() => setIsCompleteModalOpen(false)}
+                />
             </RNModal>
         </View>
     );

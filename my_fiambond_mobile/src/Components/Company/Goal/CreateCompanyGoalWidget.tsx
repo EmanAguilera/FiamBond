@@ -21,7 +21,7 @@ export default function CreateCompanyGoalWidget({ company, onSuccess }: Props) {
     const { user } = useContext(AppContext) as any;
     
     // Replace with your actual local machine IP for physical device testing
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api';
 
     const [formData, setFormData] = useState({ 
         name: '', 

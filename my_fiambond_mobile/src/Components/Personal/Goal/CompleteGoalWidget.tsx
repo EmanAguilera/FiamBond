@@ -9,6 +9,7 @@ import {
     ScrollView 
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { AppContext } from '../../../Context/AppContext.jsx';
 
 // The Goal interface
@@ -35,7 +36,7 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
     const { user } = useContext(AppContext) as any;
     
     // API URL for mobile testing (Replace localhost with your IP if testing on physical device)
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api';
 
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -69,25 +70,31 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
                 setStatusMessage("Uploading photo...");
                 const uploadFormData = new FormData();
                 
+                // Read file as base64 and create blob for proper upload
+                const fileData = await FileSystem.readAsStringAsync(imageUri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+                
                 const filename = imageUri.split('/').pop();
                 const match = /\.(\w+)$/.exec(filename || '');
-                const type = match ? `image/${match[1]}` : `image`;
-
-                uploadFormData.append('file', {
-                    uri: imageUri,
-                    name: filename || 'achievement.jpg',
-                    type: type,
-                } as any);
+                const type = match ? `image/${match[1]}` : `image/jpeg`;
+                
+                // Create blob from base64 data
+                const blob = new Blob([Uint8Array.from(atob(fileData), c => c.charCodeAt(0))], { type });
+                uploadFormData.append('file', blob, filename || 'achievement.jpg');
                 
                 uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
                 
                 const response = await fetch(CLOUDINARY_API_URL, { 
                     method: 'POST', 
-                    body: uploadFormData,
-                    headers: { 'content-type': 'multipart/form-data' }
+                    body: uploadFormData
                 });
 
-                if (!response.ok) throw new Error('Failed to upload achievement photo.');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Cloudinary error:', errorText);
+                    throw new Error('Failed to upload achievement photo.');
+                }
                 
                 const data = await response.json();
                 achievementUrl = data.secure_url;

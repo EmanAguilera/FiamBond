@@ -13,7 +13,7 @@ import { AppContext } from '../../../Context/AppContext';
 
 // --- CONFIGURATION ---
 const CLOUD_URL = `https://api.cloudinary.com/v1_1/dzcnbrgjy/image/upload`;
-const API_URL = 'http://localhost:3000'; // Replace with your local IP if testing on a physical device
+const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev'; // Replace with your local IP if testing on a physical device
 
 interface Goal {
     id?: string;

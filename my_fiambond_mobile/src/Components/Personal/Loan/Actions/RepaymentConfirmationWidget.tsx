@@ -19,7 +19,7 @@ export default function RepaymentConfirmationWidget({ loan, onSuccess }: Repayme
     const { user } = useContext(AppContext) as any;
     
     // API URL for mobile environment
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api';
 
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);

@@ -17,7 +17,7 @@ import { AppContext } from "../../../Context/AppContext";
 // --- CONFIGURATION ---
 // Replace localhost with your machine's local IP when testing on physical device
 const CLOUD_URL = `https://api.cloudinary.com/v1_1/dzcnbrgjy/image/upload`;
-const API_URL = 'http://localhost:3000'; 
+const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; 
 
 export default function CreateTransactionWidget({ onSuccess }) {
     const { user } = useContext(AppContext);

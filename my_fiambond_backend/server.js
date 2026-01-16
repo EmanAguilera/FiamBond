@@ -8,45 +8,56 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 2. CORS CONFIGURATION
+// 2. DYNAMIC CORS CONFIGURATION FOR CODESPACES
 app.use(cors({
-    origin: true, 
+    origin: function (origin, callback) {
+        // Automatically allow any origin from your specific github workspace or localhost
+        if (!origin || origin.includes('github.dev') || origin.includes('localhost')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
 
-app.options(/.*/, cors()); 
+/**
+ * MANUAL PRE-FLIGHT HANDLER
+ * Required for some browser environments in Codespaces to ensure 
+ * the 'OPTIONS' handshake succeeds.
+ */
+app.options(/(.*)/, (req, res) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
+});
+
 app.use(express.json());
 
-// 3. DATABASE CONNECTION (Vercel Optimized)
-const mongoURI = 'mongodb://localhost:27017/fiambond_v3';
-
-if (!process.env.MONGO_URI) {
-    console.warn("⚠️  Warning: MONGO_URI not found. Falling back to Localhost.");
-}
+// 3. DATABASE CONNECTION
+const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/fiambond_v3';
 
 let cached = global.mongoose;
-
 if (!cached) {
     cached = global.mongoose = { conn: null, promise: null };
 }
 
 async function connectToDatabase() {
     if (cached.conn) return cached.conn;
-
     if (!cached.promise) {
         const opts = {
             bufferCommands: false, 
             serverSelectionTimeoutMS: 5000,
         };
-
         cached.promise = mongoose.connect(mongoURI, opts).then((mongoose) => {
             console.log('✅ MongoDB Connected Successfully!');
             return mongoose;
         });
     }
-
     try {
         cached.conn = await cached.promise;
     } catch (e) {
@@ -54,12 +65,19 @@ async function connectToDatabase() {
         console.error('❌ MongoDB Connection Failed:', e);
         throw e;
     }
-
     return cached.conn;
 }
 
 // 4. MIDDLEWARE
 app.use(async (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (origin.includes('github.dev') || origin.includes('localhost'))) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+
     try {
         await connectToDatabase();
         next();
@@ -70,7 +88,7 @@ app.use(async (req, res, next) => {
 });
 
 // ==========================================
-// 5. SCHEMAS (Updated for Revenue Ledger)
+// 5. SCHEMAS
 // ==========================================
 
 const UserSchema = new mongoose.Schema({ 
@@ -80,7 +98,6 @@ const UserSchema = new mongoose.Schema({
     last_name: String,
     email: String, 
     role: { type: String, default: 'user' },
-    // Subscription States
     is_premium: { type: Boolean, default: false },
     subscription_status: { type: String, default: 'inactive' },
     active_company_premium_id: { type: String, default: "" },
@@ -92,7 +109,6 @@ const UserSchema = new mongoose.Schema({
 }, { _id: false });
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 
-// NEW: Premiums Schema (The Ledger)
 const PremiumSchema = new mongoose.Schema({
     user_id: { type: String, required: true },
     access_type: { type: String, enum: ['company', 'family'], required: true },
@@ -169,7 +185,6 @@ const CompanySchema = new mongoose.Schema({
 });
 const Company = mongoose.models.Company || mongoose.model('Company', CompanySchema);
 
-
 // ==========================================
 // 6. ROUTES
 // ==========================================
@@ -178,7 +193,6 @@ app.get('/', (req, res) => {
     res.status(200).send(`FiamBond V3 API Online 🚀`);
 });
 
-// --- PREMIUMS (The fix for the Ledger) ---
 app.get('/api/premiums', async (req, res) => {
     try {
         const premiums = await Premium.find().sort({ granted_at: -1 });
@@ -188,7 +202,6 @@ app.get('/api/premiums', async (req, res) => {
     }
 });
 
-// Admin Toggle logic for MongoDB (Similar to Firestore Batch)
 app.post('/api/admin/toggle-premium', async (req, res) => {
     try {
         const { userId, action, type, amount, plan, paymentRef } = req.body;
@@ -223,7 +236,6 @@ app.post('/api/admin/toggle-premium', async (req, res) => {
     }
 });
 
-// --- TRANSACTIONS ---
 app.get('/api/transactions', async (req, res) => {
     try {
         const { user_id, family_id, company_id, startDate } = req.query;
@@ -254,7 +266,6 @@ app.post('/api/transactions', async (req, res) => {
     }
 });
 
-// --- LOANS ---
 app.get('/api/loans', async (req, res) => {
     try {
         const { user_id, family_id } = req.query;
@@ -292,7 +303,6 @@ app.patch('/api/loans/:id', async (req, res) => {
     }
 });
 
-// --- GOALS ---
 app.get('/api/goals', async (req, res) => {
     try {
         const { user_id, family_id, company_id } = req.query;
@@ -337,7 +347,6 @@ app.delete('/api/goals/:id', async (req, res) => {
     }
 });
 
-// --- FAMILIES ---
 app.get('/api/families', async (req, res) => {
     try {
         const { user_id } = req.query;
@@ -405,9 +414,6 @@ app.post('/api/families/:id/members', async (req, res) => {
     }
 });
 
-
-// --- USERS ---
-
 app.get('/api/users', async (req, res) => {
     try {
         const { ids } = req.query;
@@ -420,7 +426,6 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// User Update route
 app.patch('/api/users/:id', async (req, res) => {
     try {
         const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -430,18 +435,10 @@ app.patch('/api/users/:id', async (req, res) => {
     }
 });
 
-
-// --- COMPANIES ---
-
-// NEW ROUTE: To handle requests like /api/companies?user_id=... (REQUIRED FIX)
 app.get('/api/companies', async (req, res) => {
     try {
         const { user_id } = req.query;
-        if (!user_id) {
-            return res.status(400).json({ error: "User ID query parameter required." });
-        }
-        
-        // Find all companies where the user is a member
+        if (!user_id) return res.status(400).json({ error: "User ID query parameter required." });
         const companies = await Company.find({ member_ids: user_id });
         res.json(companies);
     } catch (err) {
@@ -484,13 +481,10 @@ app.post('/api/companies/:id/members', async (req, res) => {
     }
 });
 
-// --- REPORTS (FIX FOR MISSING ROUTE) ---
 app.get('/api/reports/personal/:user_id', async (req, res) => {
     try {
         const { user_id } = req.params;
-        const { period } = req.query; // 'weekly', 'monthly', 'yearly'
-
-        // 1. Define Date Range based on 'period'
+        const { period } = req.query;
         const now = new Date();
         let startDate;
 
@@ -498,11 +492,10 @@ app.get('/api/reports/personal/:user_id', async (req, res) => {
             startDate = new Date(now.setDate(now.getDate() - 7));
         } else if (period === 'yearly') {
             startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-        } else { // 'monthly' or default
+        } else {
             startDate = new Date(now.setMonth(now.getMonth() - 1));
         }
         
-        // 2. Fetch Transactions for the period
         const periodTxs = await Transaction.find({ 
             user_id, 
             family_id: null, 
@@ -510,42 +503,27 @@ app.get('/api/reports/personal/:user_id', async (req, res) => {
             created_at: { $gte: startDate } 
         });
 
-        // 3. Calculate Period Metrics
         const periodIncome = periodTxs.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
         const periodExpense = periodTxs.filter(tx => tx.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
         
-        // 4. Calculate Total Balance (across all time)
         const totalAllTimeTxs = await Transaction.find({ user_id, family_id: null, company_id: null });
         const totalIncome = totalAllTimeTxs.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
         const totalExpense = totalAllTimeTxs.filter(tx => tx.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
         const balance = totalIncome - totalExpense;
 
-
-        // 5. Prepare Report Object
-        const report = {
+        res.json({
             period: period,
             balance: balance,       
             periodIncome: periodIncome,   
             periodExpense: periodExpense, 
             transactions: periodTxs.length
-        };
-        
-        res.json(report);
+        });
     } catch (err) {
         console.error("Report generation failed:", err);
         res.status(500).json({ error: err.message || "Failed to generate report." });
     }
 });
 
-
-// ==========================================
-// 7. EXPORT & LISTEN
-// ==========================================
-
-if (process.env.NODE_ENV !== 'production') {
-    app.listen(port, () => {
-        console.log(`🚀 Server running on port ${port}`);
-    });
-}
-
-module.exports = app;
+app.listen(port, () => {
+    console.log(`🚀 Server running on port ${port}`);
+});

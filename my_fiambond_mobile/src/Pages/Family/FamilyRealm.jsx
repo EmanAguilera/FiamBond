@@ -102,7 +102,7 @@ const formatDataForChart = (transactions) => {
 
 export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpdate }) {
     const { user } = useContext(AppContext);
-    const API_URL = 'http://localhost:3000/api'; // Replace with mobile IP for physical devices
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; // Replace with mobile IP for physical devices
 
     const [modals, setModals] = useState({
         loan: false,

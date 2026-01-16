@@ -23,7 +23,7 @@ interface CreateLoanWidgetProps {
 
 // --- CONFIGURATION ---
 const CLOUD_URL = `https://api.cloudinary.com/v1_1/dzcnbrgjy/image/upload`;
-const API_URL = 'http://localhost:3000'; 
+const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; 
 
 export default function CreateLoanWidget({ family, members, onSuccess }: CreateLoanWidgetProps) {
     const { user } = useContext(AppContext) as any;
@@ -90,8 +90,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
 
                 const cloudRes = await fetch(CLOUD_URL, {
                     method: 'POST',
-                    body: formData,
-                    headers: { 'content-type': 'multipart/form-data' },
+                    body: formData
                 });
 
                 if (cloudRes.ok) {

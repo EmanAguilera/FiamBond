@@ -26,7 +26,7 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
     const { user } = useContext(AppContext) as any;
     
     // API URL for mobile testing
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api';
     
     const totalOwed = loan.total_owed || loan.amount;
     const outstanding = totalOwed - (loan.repaid_amount || 0);
@@ -83,8 +83,7 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
                 
                 const response = await fetch(CLOUDINARY_API_URL, {
                     method: 'POST',
-                    body: uploadFormData,
-                    headers: { 'content-type': 'multipart/form-data' }
+                    body: uploadFormData
                 });
 
                 if (!response.ok) throw new Error('Failed to upload receipt.');

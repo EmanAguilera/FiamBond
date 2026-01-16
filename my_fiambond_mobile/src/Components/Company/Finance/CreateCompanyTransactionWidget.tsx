@@ -15,7 +15,7 @@ import { AppContext } from "../../../Context/AppContext";
 
 // --- CONFIGURATION ---
 const CLOUD_URL = `https://api.cloudinary.com/v1_1/dzcnbrgjy/image/upload`;
-const API_URL = 'http://localhost:3000'; // Replace with local IP for physical devices
+const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; // Replace with local IP for physical devices
 
 interface Props { 
     company: { id: string | number }; 
@@ -67,10 +67,7 @@ export default function CreateCompanyTransactionWidget({ company, onSuccess }: P
 
                 const cloudRes = await fetch(CLOUD_URL, {
                     method: 'POST',
-                    body: formData,
-                    headers: {
-                        'content-type': 'multipart/form-data',
-                    },
+                    body: formData
                 });
 
                 if (cloudRes.ok) {

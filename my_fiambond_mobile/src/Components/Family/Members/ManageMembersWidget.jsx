@@ -93,7 +93,7 @@ const MemberRow = ({ member }) => {
 
 // --- MAIN COMPONENT ---
 const ManageMembersWidget = ({ family, members = [], onUpdate }) => {
-    const API_URL = 'http://localhost:3000'; // ← Change for real device testing
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev'; // ← Change for real device testing
 
     const [showAddForm, setShowAddForm] = useState(false);
 
