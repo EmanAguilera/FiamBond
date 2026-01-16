@@ -104,6 +104,7 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
 
     const toggle = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
 
+    // ⭐️ FIX APPLIED HERE: Added res.ok check and graceful array fallback
     const fetchData = useCallback(async () => {
         if (!company || !user) return;
         setLoading(true);
@@ -114,14 +115,26 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                 fetch(`${API_URL}/companies/${company.id}`)
             ]);
 
-            const txData = await txRes.json();
-            // Map created_at to proper Date objects immediately
+            // --- Transaction Handling ---
+            let txData = [];
+            if (txRes.ok) {
+                // If the response is successful, try to parse JSON
+                const rawTxData = await txRes.json();
+                // Ensure the parsed data is an array before setting
+                txData = Array.isArray(rawTxData) ? rawTxData : [];
+            } else {
+                // Log the API failure and ensure txData is an empty array
+                console.error('Transactions API failed:', txRes.status, await txRes.text());
+            }
+
+            // Map created_at to proper Date objects
             const formattedTx = txData.map(tx => ({ ...tx, id: tx._id, created_at: { toDate: () => new Date(tx.created_at) }}));
             setTransactions(formattedTx);
 
             let net = 0;
             let pCount = 0;
             
+            // This .forEach now safely operates on formattedTx (which is an array)
             formattedTx.forEach(tx => {
                 tx.type === 'income' ? net += tx.amount : net -= tx.amount;
                 if(tx.category === 'Payroll' || tx.description?.toLowerCase().includes('salary')) {
@@ -130,21 +143,44 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
             });
 
             setSummaryData({ netPosition: net, payrollCount: pCount });
-            setGoals(await goalRes.json());
+            
+            // --- Goals Handling ---
+            let goalData = [];
+            if (goalRes.ok) {
+                const rawGoalData = await goalRes.json();
+                goalData = Array.isArray(rawGoalData) ? rawGoalData : [];
+            } else {
+                console.error('Goals API failed:', goalRes.status, await goalRes.text());
+            }
+            setGoals(goalData);
 
+            // --- Company/Member Handling ---
             if (compRes.ok) {
-                const memberIds = (await compRes.json()).member_ids || [];
+                const companyData = await compRes.json();
+                const memberIds = companyData.member_ids || [];
                 if (memberIds.length) {
                     const snap = await getDocs(query(collection(db, "users"), where(documentId(), "in", memberIds.slice(0, 10))));
                     setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 }
+            } else {
+                console.error('Company API failed:', compRes.status, await compRes.text());
+                setMembers([]);
             }
-        } catch (e) { console.error(e); } finally { setLoading(false); }
+        } catch (e) { 
+            console.error(e); 
+            // In case of a catastrophic network failure
+            setTransactions([]); 
+            setGoals([]);
+            setMembers([]);
+        } finally { 
+            setLoading(false); 
+        }
     }, [company, user, API_URL]);
 
     // Enhanced Report Logic matching UserRealm
     const generateReport = useCallback(() => {
-        if (!transactions) return;
+        // Safe check for transactions state
+        if (!transactions || !Array.isArray(transactions)) return;
         
         const endDate = new Date();
         const startDate = new Date();
@@ -161,6 +197,9 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
 
         // Filter Transactions
         const filtered = transactions.filter(tx => {
+            // Ensure tx.created_at is present and has toDate function before calling it
+            if (!tx.created_at || typeof tx.created_at.toDate !== 'function') return false; 
+            
             const txDate = tx.created_at.toDate();
             return txDate >= startDate && txDate <= endDate;
         });

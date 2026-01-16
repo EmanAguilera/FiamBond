@@ -277,7 +277,7 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
 
 export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackingWidgetProps) {
     const { user } = useContext(AppContext) as any;
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api';
 
     const [activeTab, setActiveTab] = useState<'outstanding' | 'history'>('outstanding');
     const [openSection, setOpenSection] = useState<string | null>('actionRequired');

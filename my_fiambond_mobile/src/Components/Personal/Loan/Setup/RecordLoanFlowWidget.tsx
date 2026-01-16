@@ -11,7 +11,7 @@ import { AppContext } from '../../../../Context/AppContext.jsx';
 import CreateLoanWidget from './CreateLoanWidget'; 
 
 // --- FIREBASE IMPORTS ---
-import { db } from '../../../../config/firebase-config.js';
+import { db } from '../../../../config/firebase-config';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 
 // --- TypeScript Interfaces ---
@@ -35,7 +35,7 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
     const { user } = useContext(AppContext) as any;
     
     // Replace with your local IP or production URL for mobile
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev';
     
     const [flowState, setFlowState] = useState<'loadingFamilies' | 'selecting' | 'loadingMembers' | 'lending'>('loadingFamilies');
     const [families, setFamilies] = useState<Family[]>([]);

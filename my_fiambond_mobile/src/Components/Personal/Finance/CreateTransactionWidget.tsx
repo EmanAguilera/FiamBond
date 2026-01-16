@@ -16,7 +16,7 @@ import { AppContext } from "../../../Context/AppContext";
 // --- CONFIGURATION ---
 // Replace localhost with your machine's local IP (e.g., 192.168.1.XX) to test on a physical device
 const CLOUD_URL = `https://api.cloudinary.com/v1_1/dzcnbrgjy/image/upload`;
-const API_URL = 'http://localhost:3000'; 
+const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; 
 
 interface CreateTransactionProps {
     onSuccess?: () => void;
@@ -68,10 +68,7 @@ export default function CreateTransactionWidget({ onSuccess }: CreateTransaction
 
                 const cloudRes = await fetch(CLOUD_URL, {
                     method: 'POST',
-                    body: formData,
-                    headers: {
-                        'content-type': 'multipart/form-data',
-                    },
+                    body: formData
                 });
 
                 if (cloudRes.ok) {

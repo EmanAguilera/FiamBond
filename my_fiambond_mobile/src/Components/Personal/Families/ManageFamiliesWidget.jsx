@@ -169,7 +169,7 @@ const FamilyRow = ({ family, onEnter, onRename, onDelete }) => {
 // --- MAIN WIDGET ---
 const ManageFamiliesWidget = ({ onEnterRealm }) => {
     const { user } = useContext(AppContext);
-    const API_URL = 'http://localhost:3000'; // Use your mobile-accessible IP
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev'; // Use your mobile-accessible IP
     
     const [families, setFamilies] = useState([]);
     const [showCreateForm, setShowCreateForm] = useState(false);

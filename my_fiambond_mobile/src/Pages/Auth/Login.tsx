@@ -17,10 +17,13 @@ import {
   signInWithEmailAndPassword, 
   sendPasswordResetEmail, 
   GoogleAuthProvider, 
-  signInWithCredential 
+  signInWithCredential,
+  signInWithPopup
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
+
+// Conditionally require GoogleSignin for native platforms only
+const GoogleSignin = Platform.OS !== 'web' ? require("@react-native-google-signin/google-signin").GoogleSignin : null;
 
 interface LoginFormData {
   email: string;
@@ -36,10 +39,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    GoogleSignin.configure({
-      webClientId: "818608486797-pujgl59qscfvqpek8o4m6vebnb7cbfs2.apps.googleusercontent.com",
-      iosClientId: "818608486797-c2rrbocuvhu54jiiu3lnp28hn6hdlade.apps.googleusercontent.com",
-    });
+    // Only configure for native mobile platforms
+    if (Platform.OS !== 'web' && GoogleSignin) {
+      GoogleSignin.configure({
+        webClientId: "818608486797-pujgl59qscfvqpek8o4m6vebnb7cbfs2.apps.googleusercontent.com",
+        iosClientId: "818608486797-c2rrbocuvhu54jiiu3lnp28hn6hdlade.apps.googleusercontent.com",
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -47,11 +53,27 @@ export default function Login() {
       Alert.alert("Account Created", route.params.message);
       navigation.setParams({ message: undefined });
     }
-  }, [route.params?.message]);
+  }, [route.params?.message, navigation]);
 
   const handleInputChange = (id: keyof LoginFormData, value: string) => {
     setFormData(prev => ({ ...prev, [id]: value }));
     setGeneralError(null);
+  };
+
+  const saveUserToFirestore = async (user: any) => {
+    const userDocRef = doc(db, "users", user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (!userDocSnap.exists()) {
+      const nameParts = user.displayName?.split(" ") || ["", ""];
+      await setDoc(userDocRef, {
+        first_name: nameParts[0],
+        last_name: nameParts.slice(1).join(" ") || "",
+        full_name: user.displayName,
+        email: user.email,
+        created_at: serverTimestamp(),
+      });
+    }
   };
 
   const handleLoginSubmit = async () => {
@@ -72,38 +94,29 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     setGeneralError(null);
+    setLoading(true);
     try {
-      setLoading(true);
-      await GoogleSignin.hasPlayServices();
-      const response = await GoogleSignin.signIn();
-      
-      // In newer versions of the library, idToken is inside response.data
-      const idToken = response.data?.idToken;
+      if (Platform.OS === 'web') {
+        // FLOW FOR CODESPACES (Web)
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        await saveUserToFirestore(result.user);
+      } else {
+        // FLOW FOR NATIVE (Android/iOS)
+        if (!GoogleSignin) throw new Error("Google Sign-In is not available on this platform.");
+        await GoogleSignin.hasPlayServices();
+        const response = await GoogleSignin.signIn();
+        
+        const idToken = response.data?.idToken || response.idToken;
+        if (!idToken) throw new Error("No ID Token found");
 
-      if (!idToken) {
-        throw new Error("No ID Token found");
+        const credential = GoogleAuthProvider.credential(idToken);
+        const result = await signInWithCredential(auth, credential);
+        await saveUserToFirestore(result.user);
       }
-
-      const credential = GoogleAuthProvider.credential(idToken);
-      const result = await signInWithCredential(auth, credential);
-      const user = result.user;
-
-      const userDocRef = doc(db, "users", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (!userDocSnap.exists()) {
-        const nameParts = user.displayName?.split(" ") || ["", ""];
-        await setDoc(userDocRef, {
-          first_name: nameParts[0],
-          last_name: nameParts.slice(1).join(" ") || "",
-          full_name: user.displayName,
-          email: user.email,
-          created_at: serverTimestamp(),
-        });
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to sign in with Google. Please try again.");
+    } catch (error: any) {
       console.error('Google sign-in error:', error);
+      Alert.alert("Sign In Error", error.message || "Failed to sign in with Google.");
     } finally {
       setLoading(false);
     }
@@ -133,33 +146,76 @@ export default function Login() {
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
           <View className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
             <Text className="text-3xl font-extrabold text-gray-900 mb-8 text-center">Sign in</Text>
-            <TouchableOpacity onPress={handleGoogleSignIn} disabled={loading} className="flex-row items-center justify-center bg-white border border-gray-300 py-4 rounded-xl mb-6">
-              <Text className="text-gray-700 font-bold text-base">Sign In With Google</Text>
+            
+            <TouchableOpacity 
+              onPress={handleGoogleSignIn} 
+              disabled={loading} 
+              className="flex-row items-center justify-center bg-white border border-gray-300 py-4 rounded-xl mb-6"
+            >
+              {loading ? (
+                <ActivityIndicator color="#4f46e5" />
+              ) : (
+                <Text className="text-gray-700 font-bold text-base">Sign In With Google</Text>
+              )}
             </TouchableOpacity>
+
             <View className="flex-row items-center mb-8">
               <View className="flex-1 h-[1px] bg-gray-200" />
               <Text className="mx-4 text-xs text-gray-400 font-bold">OR CONTINUE WITH</Text>
               <View className="flex-1 h-[1px] bg-gray-200" />
             </View>
+
             <View>
               <View className="mb-4">
                 <Text className="text-sm font-semibold text-gray-700 mb-2">Email address</Text>
-                <TextInput className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900" placeholder="john.doe@example.com" keyboardType="email-address" autoCapitalize="none" value={formData.email} onChangeText={(val) => handleInputChange("email", val)} />
+                <TextInput 
+                  className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900" 
+                  placeholder="john.doe@example.com" 
+                  keyboardType="email-address" 
+                  autoCapitalize="none" 
+                  value={formData.email} 
+                  onChangeText={(val) => handleInputChange("email", val)} 
+                />
               </View>
+              
               <View className="mb-2">
                 <Text className="text-sm font-semibold text-gray-700 mb-2">Password</Text>
-                <TextInput className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900" placeholder="••••••••" secureTextEntry value={formData.password} onChangeText={(val) => handleInputChange("password", val)} />
+                <TextInput 
+                  className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900" 
+                  placeholder="••••••••" 
+                  secureTextEntry 
+                  value={formData.password} 
+                  onChangeText={(val) => handleInputChange("password", val)} 
+                />
               </View>
+
               <TouchableOpacity onPress={handlePasswordReset} className="items-end mb-6">
                 <Text className="text-sm text-indigo-600 font-semibold">Forgot Password?</Text>
               </TouchableOpacity>
-              {generalError && <Text className="text-red-500 text-sm mb-4 text-center font-medium">{generalError}</Text>}
-              <TouchableOpacity onPress={handleLoginSubmit} disabled={loading} className="bg-indigo-600 py-4 rounded-xl items-center">
-                {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-lg">Sign In</Text>}
+
+              {generalError && (
+                <Text className="text-red-500 text-sm mb-4 text-center font-medium">
+                  {generalError}
+                </Text>
+              )}
+
+              <TouchableOpacity 
+                onPress={handleLoginSubmit} 
+                disabled={loading} 
+                className="bg-indigo-600 py-4 rounded-xl items-center"
+              >
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text className="text-white font-bold text-lg">Sign In</Text>
+                )}
               </TouchableOpacity>
             </View>
+
             <TouchableOpacity onPress={() => navigation.navigate("Register")} className="mt-8 items-center">
-              <Text className="text-gray-600 text-sm">Don't have an account? <Text className="text-indigo-600 font-bold">Register here</Text></Text>
+              <Text className="text-gray-600 text-sm">
+                Don't have an account? <Text className="text-indigo-600 font-bold">Register here</Text>
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

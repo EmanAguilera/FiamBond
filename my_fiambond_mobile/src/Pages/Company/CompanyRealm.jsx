@@ -118,7 +118,7 @@ export default function CompanyRealm({ route }) {
 
     const getTransactions = useCallback(async () => {
         try {
-            const res = await fetch(`http://localhost:3000/api/transactions?company_id=${companyId}`);
+            const res = await fetch(`https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api/transactions?company_id=${companyId}`);
             return await res.json();
         } catch {
             return [];
@@ -127,7 +127,7 @@ export default function CompanyRealm({ route }) {
 
     const getGoals = useCallback(async () => {
         try {
-            const res = await fetch(`http://localhost:3000/api/goals?company_id=${companyId}`); 
+            const res = await fetch(`https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api/goals?company_id=${companyId}`); 
             return await res.json();
         } catch {
             return [];
@@ -136,7 +136,7 @@ export default function CompanyRealm({ route }) {
 
     const getReport = useCallback(async () => {
         try {
-            const res = await fetch(`http://localhost:3000/api/reports/company/${companyId}?period=${period}`);
+            const res = await fetch(`https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api/reports/company/${companyId}?period=${period}`);
             return await res.json();
         } catch {
             return null;

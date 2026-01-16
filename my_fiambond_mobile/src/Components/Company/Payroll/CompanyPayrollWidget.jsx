@@ -14,7 +14,7 @@ import { AppContext } from '../../../Context/AppContext.jsx';
 export default function CompanyPayrollWidget({ company, members = [], onSuccess }) {
     const { user } = useContext(AppContext);
 
-    const API_URL = 'http://localhost:3000'; // ← Change to your real backend IP/port when testing on real device
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; // ← Change to your real backend IP/port when testing on real device
 
     const [activeTab, setActiveTab] = useState('salary');
     const [loading, setLoading] = useState(false);

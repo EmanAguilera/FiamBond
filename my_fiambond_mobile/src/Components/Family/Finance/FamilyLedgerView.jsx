@@ -81,7 +81,7 @@ const formatDataForChart = (transactions) => {
 
 function FamilyLedgerView({ family, onBack }) {
     const { user } = useContext(AppContext);
-    const API_URL = 'http://192.168.1.4:3000'; // Replace with mobile-accessible IP
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; // Replace with mobile-accessible IP
 
     const [allTransactions, setAllTransactions] = useState([]);
     const [reportSummary, setReportSummary] = useState(null);

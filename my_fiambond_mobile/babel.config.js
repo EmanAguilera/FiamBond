@@ -8,7 +8,7 @@ module.exports = function (api) {
       "nativewind/babel",
     ],
     plugins: [
-      // 1. Module Resolver (Para sa code logic)
+      // 1. Module Resolver
       [
         "module-resolver",
         {
@@ -18,9 +18,9 @@ module.exports = function (api) {
           },
         },
       ],
-      // 2. Worklets Plugin - Gamitin ang aliased name
-      "react-native-worklets/plugin",
-      // 3. Reanimated Plugin (Laging huli)
+      // 2. Worklets Plugin - This MUST match the core package name
+      "react-native-worklets-core/plugin",
+      // 3. Reanimated Plugin (Always keep this last)
       "react-native-reanimated/plugin",
     ],
   };

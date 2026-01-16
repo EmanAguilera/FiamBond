@@ -26,7 +26,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
     const { user } = useContext(AppContext) as any;
     
     // Replace with your local machine IP if testing on a physical device
-    const API_URL = 'http://localhost:3000';
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api';
 
     const totalOwed = loan.total_owed || loan.amount;
     const outstanding = totalOwed - (loan.repaid_amount || 0);
@@ -94,8 +94,7 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
 
                 const response = await fetch(CLOUDINARY_API_URL, { 
                     method: 'POST', 
-                    body: uploadFormData,
-                    headers: { 'content-type': 'multipart/form-data' }
+                    body: uploadFormData
                 });
                 
                 if (!response.ok) throw new Error('Failed to upload receipt photo.');

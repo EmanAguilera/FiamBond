@@ -136,7 +136,7 @@ const TransactionItem = ({ transaction }: { transaction: Transaction }) => {
 
 export default function FamilyTransactionsWidget({ family }: FamilyTransactionsWidgetProps) {
     const { user } = useContext(AppContext) as any;
-    const API_URL = 'http://localhost:3000'; // Replace with local IP for dev
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; // Replace with local IP for dev
 
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [groupedTransactions, setGroupedTransactions] = useState<{ [key: string]: Transaction[] }>({});

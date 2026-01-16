@@ -25,7 +25,7 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
   const user = context?.user;
   
   // Use local IP for physical device testing, or localhost for simulator
-  const API_URL = 'http://localhost:3000';
+  const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev';
 
   const [familyName, setFamilyName] = useState<string>("");
   const [generalError, setGeneralError] = useState<string | null>(null);

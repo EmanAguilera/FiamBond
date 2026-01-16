@@ -74,7 +74,7 @@ const AddEmployeeForm = ({ onAdd, onCancel }) => {
 // Type annotations removed from the function signature
 export default function ManageEmployeesWidget({ company, members, onUpdate }) {
     // API URL for mobile environments (use your local machine IP if testing on physical device)
-    const API_URL = 'http://localhost:3000'; 
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev'; 
     const [showAddForm, setShowAddForm] = useState(false);
 
     // Type annotation removed from the parameter 'email'

@@ -24,7 +24,7 @@ const CompanyGoalListWidget = ({ goals, onDataChange }) => { // Removed type ann
     const [goalToComplete, setGoalToComplete] = useState(null); // Removed type annotation
     const [userProfiles, setUserProfiles] = useState({}); // Removed type annotation
 
-    const API_URL = 'http://localhost:3000'; // Replace with local IP for dev
+    const API_URL = 'https://super-duper-engine-57wjxxp4jxq2p64w-3000.app.github.dev/api'; // Replace with local IP for dev
 
     // 1. Organize Data
     const { activeGoals, completedGoals } = useMemo(() => {
