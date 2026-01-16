@@ -8,14 +8,28 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 2. DYNAMIC CORS CONFIGURATION FOR CODESPACES
+// 2. CORS CONFIGURATION (FIXED: Explicitly allowing production domain)
+const allowedOrigins = [
+    'https://fiambond.web.app', // <--- YOUR PRODUCTION DOMAIN
+    'https://fiam-bond.vercel.app', // Vercel domain
+    'http://localhost:5173', // Common local dev ports
+    'http://localhost:3000',
+    /\.vercel\.app$/, // Vercel preview domains
+    /\.github\.dev$/ // Codespace domain
+];
+
 app.use(cors({
     origin: function (origin, callback) {
-        // Automatically allow any origin from your specific github workspace or localhost
-        if (!origin || origin.includes('github.dev') || origin.includes('localhost')) {
+        // Allow requests with no origin (like mobile apps, curl, or same-origin)
+        if (!origin) return callback(null, true);
+        
+        // Check if the origin is explicitly allowed or matches a RegExp pattern
+        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(rx => rx instanceof RegExp && rx.test(origin))) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            // Block the request and log the attempted origin
+            console.error('CORS Blocked Origin:', origin);
+            callback(new Error(`Not allowed by CORS: ${origin}`));
         }
     },
     credentials: true,
@@ -23,18 +37,8 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
 
-/**
- * MANUAL PRE-FLIGHT HANDLER
- * Required for some browser environments in Codespaces to ensure 
- * the 'OPTIONS' handshake succeeds.
- */
-app.options(/(.*)/, (req, res) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.sendStatus(200);
-});
+// Enable pre-flight for all routes
+app.options(/.*/, cors()); 
 
 app.use(express.json());
 
@@ -68,16 +72,8 @@ async function connectToDatabase() {
     return cached.conn;
 }
 
-// 4. MIDDLEWARE
+// 4. MIDDLEWARE (Simplified - only handles DB connection/error response)
 app.use(async (req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin && (origin.includes('github.dev') || origin.includes('localhost'))) {
-        res.header('Access-Control-Allow-Origin', origin);
-    }
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-
     try {
         await connectToDatabase();
         next();
