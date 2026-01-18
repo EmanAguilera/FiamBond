@@ -442,6 +442,27 @@ app.get('/api/companies', async (req, res) => {
     }
 });
 
+app.post('/api/companies', async (req, res) => {
+    try {
+        const { owner_id, name } = req.body;
+        if (!owner_id || !name) return res.status(400).json({ error: "owner_id and name required" });
+        
+        // Check if company already exists for this owner
+        const existing = await Company.findOne({ owner_id });
+        if (existing) return res.status(409).json({ error: "Company already exists for this user" });
+        
+        const newCompany = new Company({
+            owner_id,
+            name,
+            member_ids: [owner_id]
+        });
+        await newCompany.save();
+        res.json(newCompany);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/companies/:id', async (req, res) => {
     try {
         const companyIdentifier = req.params.id;
