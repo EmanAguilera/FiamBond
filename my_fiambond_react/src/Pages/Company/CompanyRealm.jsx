@@ -109,10 +109,23 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
         if (!company || !user) return;
         setLoading(true);
         try {
-            const [txRes, goalRes, compRes] = await Promise.all([
+            // First, ensure company exists
+            let compRes = await fetch(`${API_URL}/companies/${company.id}`);
+            if (!compRes.ok && compRes.status === 404) {
+                // Create the company
+                const createRes = await fetch(`${API_URL}/companies`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ owner_id: company.id, name: company.name })
+                });
+                if (createRes.ok) {
+                    compRes = await fetch(`${API_URL}/companies/${company.id}`);
+                }
+            }
+
+            const [txRes, goalRes] = await Promise.all([
                 fetch(`${API_URL}/transactions?company_id=${company.id}`),
-                fetch(`${API_URL}/goals?company_id=${company.id}`),
-                fetch(`${API_URL}/companies/${company.id}`)
+                fetch(`${API_URL}/goals?company_id=${company.id}`)
             ]);
 
             // --- Transaction Handling ---
