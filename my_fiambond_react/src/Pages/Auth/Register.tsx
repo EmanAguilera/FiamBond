@@ -3,7 +3,7 @@
 import { useState, FormEvent, ChangeEvent } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { auth, db, googleProvider } from "../../config/firebase-config";
-import { createUserWithEmailAndPassword, sendEmailVerification, signOut, signInWithPopup } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
 interface RegisterFormData {
@@ -37,6 +37,16 @@ export default function Register() {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
+      // Wait for auth state to propagate
+      await new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+          if (currentUser && currentUser.uid === user.uid) {
+            unsubscribe();
+            resolve(null);
+          }
+        });
+      });
+
       await setDoc(doc(db, "users", user.uid), {
         first_name: formData.first_name,
         last_name: formData.last_name,
@@ -45,12 +55,12 @@ export default function Register() {
         created_at: serverTimestamp(),
       });
       
-      await sendEmailVerification(user);
+      // CRITICAL FIX: Sign the user out immediately to enforce the login -> verify-email flow
       await signOut(auth);
 
       navigate('/login', { 
         state: { 
-          message: 'Registration successful! Please check your email to verify your account before logging in.' 
+          message: 'Registration successful! Please log in to verify your email.' 
         } 
       });
 
@@ -59,6 +69,7 @@ export default function Register() {
         setGeneralError('This email is already registered.');
       } else {
         setGeneralError('Failed to register. Please try again.');
+        console.error("Registration Error:", error);
       }
     }
   }

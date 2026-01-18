@@ -310,7 +310,7 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                 {isFamilyTransactionsModalOpen && <Modal isOpen={isFamilyTransactionsModalOpen} onClose={() => setIsFamilyTransactionsModalOpen(false)} title={`Shared Family Transactions`}><FamilyTransactionsWidget family={family} /></Modal>}
                 {isGoalsListModalOpen && <Modal isOpen={isGoalsListModalOpen} onClose={() => setIsGoalsListModalOpen(false)} title={`Shared Family Goals`}><GoalListsWidget family={family} onDataChange={handleRealmRefresh} /></Modal>}
                 {isLoanListModalOpen && <Modal isOpen={isLoanListModalOpen} onClose={() => setIsLoanListModalOpen(false)} title={`Shared Family Loan Tracker`}><LoanTrackingWidget family={family} onDataChange={handleRealmRefresh} /></Modal>}
-                {isMembersModalOpen && <Modal isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)} title={`Manage Member Access`}><FamilyMembersView family={family} onFamilyUpdate={handleMembersUpdate}/></Modal>}
+                {isMembersModalOpen && <Modal isOpen={isMembersModalOpen} onClose={() => setIsMembersModalOpen(false)} title={`Manage Member Access`}><ManageMembersWidget family={family} members={familyMembers} onUpdate={handleMembersUpdate}/></Modal>}
             </Suspense>
         </div>
     );

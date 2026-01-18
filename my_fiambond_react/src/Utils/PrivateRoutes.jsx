@@ -1,11 +1,7 @@
-// src/Utils/PrivateRoutes.jsx
-
 import { useContext } from 'react';
-// THE FIX IS HERE: Import the Outlet component
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { AppContext } from '../Context/AppContext';
 
-// THE FIX IS HERE: Remove the 'children' prop from the function signature
 export default function PrivateRoutes() {
     const { user, loading, getRealmAccess } = useContext(AppContext);
     const location = useLocation();
@@ -14,13 +10,12 @@ export default function PrivateRoutes() {
     const getRequiredRealm = (pathname) => {
         if (pathname.startsWith('/company')) return 'company';
         if (pathname.startsWith('/family')) return 'family';
-        // Admin and Personal pages are covered by AdminRoute and default access
         return null;
     };
 
     const requiredRealm = getRequiredRealm(location.pathname);
 
-    // While the context is loading the user's auth state, show a loading message.
+    // 1. Loading State
     if (loading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -29,21 +24,18 @@ export default function PrivateRoutes() {
         );
     }
 
-    // If there is no user, redirect to the login page.
+    // 2. Not Logged In
     if (!user) {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    // If there is a user, but their email is not verified, redirect to the verify page.
-    if (!user.emailVerified) {
+    // 3. Not Verified
+    // CRITICAL FIX: Only redirect to /verify-email if the user is unverified AND they are NOT already on the /verify-email path.
+    if (!user.emailVerified && location.pathname !== '/verify-email') { 
         return <Navigate to="/verify-email" state={{ from: location }} replace />;
     }
 
-    // THE FIX IS HERE: If the user is authenticated and verified,
-    // render the <Outlet />. This tells React Router to render the
-    // nested child route (e.g., <Home /> or <Settings />).
-
-    // Check subscription access for restricted realms
+    // 4. Access Check (Verified and Logged In)
     if (user && user.subscription_tier) {
         const hasAccess = getRealmAccess(user.subscription_tier).includes(requiredRealm);
 
@@ -53,5 +45,6 @@ export default function PrivateRoutes() {
         }
     }
     
+    // 5. Render Child Route
     return <Outlet />;
 }
