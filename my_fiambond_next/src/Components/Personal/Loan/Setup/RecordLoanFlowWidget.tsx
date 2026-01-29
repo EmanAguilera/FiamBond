@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useContext } from 'react';
 import { AppContext } from '../../../../Context/AppContext.jsx';
-import CreateLoanWidget from './CreateLoanWidget.tsx'; 
+import CreateLoanWidget from './CreateLoanWidget'; 
 
 // --- 1. ADD FIREBASE IMPORTS ---
 import { db } from '../../../../config/firebase-config.js';
