@@ -82,6 +82,16 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
 
             setFlowState('loadingMembers');
             setError(null);
+            
+            // ⭐️ CRITICAL FIX: Guard Clause for 'db'
+            if (!db) {
+                console.error("Firestore not initialized. Cannot fetch family member profiles.");
+                toast.error("Profile lookup failed. Check logs.");
+                setError("Profile lookup failed.");
+                setFlowState('selecting');
+                return;
+            }
+
             try {
                 const memberIds = selectedFamily.member_ids || [];
 
@@ -92,6 +102,7 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
                 }
 
                 // --- DIRECT FIREBASE QUERY (Client-side) ---
+                // This line is now safe because we check for 'db' above.
                 const usersRef = collection(db, "users");
                 // Firebase 'in' limit is 10. Slice to prevent crash if family is huge.
                 const safeIds = memberIds.slice(0, 10); 
