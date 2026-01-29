@@ -57,7 +57,7 @@ interface CollapsibleSectionProps {
     children: ReactNode;
 }
 
-// --- SKELETON ---
+// --- SKELETON (kept as is) ---
 const LoanListSkeleton = () => (
     <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden p-4">
         <div className="flex border-b border-slate-200 mb-4">
@@ -80,7 +80,7 @@ const LoanListSkeleton = () => (
     </div>
 );
 
-// --- HELPER COMPONENTS ---
+// --- HELPER COMPONENTS (kept as is) ---
 const DeadlineNotification = ({ deadline, outstanding }: { deadline: Date | undefined; outstanding: number }) => {
     if (!deadline || outstanding <= 0) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -112,7 +112,7 @@ const CollapsibleSection = ({ title, colorClass, count, isOpen, onClick, childre
     </div>
 );
 
-// --- LOAN ITEM ---
+// --- LOAN ITEM (kept as is) ---
 const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess: () => void }) => {
     const { user } = useContext(AppContext);
     
@@ -289,6 +289,14 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
         if (!user) return; 
         setLoading(true); 
         setError(null);
+        
+        // ⭐️ CRITICAL FIX: Guard Clause for db 
+        if (!db) {
+            console.warn("Firestore not initialized. Cannot fetch user details.");
+            // We can still fetch the loans from the API, but user names will be 'Unknown'
+            // We won't return early unless the API call also fails.
+        }
+        
         try {
             const response = await fetch(`${API_URL}/loans?user_id=${user.uid}`);
             if (!response.ok) throw new Error("Failed to fetch loans");
@@ -314,7 +322,7 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
             });
             
             const usersMap: Record<string, UserProfile> = {};
-            if (userIds.size > 0) { 
+            if (userIds.size > 0 && db) { // <-- SAFE CHECK HERE
                 const usersQuery = query(collection(db, "users"), where(documentId(), "in", [...userIds])); 
                 const usersSnapshot = await getDocs(usersQuery); 
                 usersSnapshot.forEach(doc => { usersMap[doc.id] = { id: doc.id, full_name: "Unknown", ...doc.data() } as UserProfile; }); 
