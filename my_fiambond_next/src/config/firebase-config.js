@@ -1,3 +1,5 @@
+// config/firebase-config.js
+
 "use client";
 
 import { initializeApp } from "firebase/app";
@@ -14,9 +16,21 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+// --- FIX: Only initialize Firebase if the API Key is present ---
+let app;
+if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
+    app = initializeApp(firebaseConfig);
+}
+
+// Export modules with checks to avoid errors if app is not defined, 
+// though the component logic should handle the app being unavailable.
+
+// Provide fallbacks if the app didn't initialize
+export const auth = app ? getAuth(app) : null;
 export const googleProvider = new GoogleAuthProvider();
+export const db = app ? getFirestore(app) : null;
 
-export const db = getFirestore(app);
-
+// You must be sure your client components handle 'auth' being null! 
+// However, the critical issue is solved: the app won't crash the build.
+// If the app is correctly deployed, the secrets *will* be in the built file,
+// and 'app' will successfully initialize when the client loads.
