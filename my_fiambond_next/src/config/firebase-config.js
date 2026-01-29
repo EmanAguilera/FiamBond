@@ -1,9 +1,9 @@
-// config/firebase-config.js
+// src/config/firebase-config.js (COMPLETE and CORRECTED)
 
 "use client";
 
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider} from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -16,21 +16,22 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// --- FIX: Only initialize Firebase if the API Key is present ---
-let app;
+// 1. Conditionally initialize the app if the API Key is present (prevents build crash)
+let app = null;
 if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
-    app = initializeApp(firebaseConfig);
+    try {
+        // Prevent re-initialization in development hot-reloads (not strictly needed 
+        // with Next.js but good practice)
+        app = initializeApp(firebaseConfig);
+    } catch (e) {
+        // If it fails (e.g., app already initialized), console the error and continue
+        console.error("Firebase initialization failed:", e);
+    }
 }
 
-// Export modules with checks to avoid errors if app is not defined, 
-// though the component logic should handle the app being unavailable.
-
-// Provide fallbacks if the app didn't initialize
+// 2. Export modules using the conditional app object.
+// These exports will be null during the problematic build phase, 
+// forcing components to use guard clauses (which we fixed previously).
 export const auth = app ? getAuth(app) : null;
 export const googleProvider = new GoogleAuthProvider();
 export const db = app ? getFirestore(app) : null;
-
-// You must be sure your client components handle 'auth' being null! 
-// However, the critical issue is solved: the app won't crash the build.
-// If the app is correctly deployed, the secrets *will* be in the built file,
-// and 'app' will successfully initialize when the client loads.

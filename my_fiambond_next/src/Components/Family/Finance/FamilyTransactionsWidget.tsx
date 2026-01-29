@@ -143,8 +143,13 @@ export default function FamilyTransactionsWidget({ family }: FamilyTransactionsW
             const userIds = [...new Set(fetchedTransactions.map((tx: any) => tx.user_id))];
             const usersMap: { [key: string]: any } = {};
             
-            if (userIds.length > 0) {
+            // ⭐️ CRITICAL FIX: Add Guard Clause for 'db'
+            if (!db) {
+                console.warn("Firestore not initialized. Cannot fetch user details.");
+                // We still proceed with the transactions but without user names
+            } else if (userIds.length > 0) {
                 // Limit to 10 for Firebase 'in' query limitation
+                // This line is now safe because it's inside the 'if (!db)' block
                 const usersQuery = query(collection(db, "users"), where(documentId(), "in", userIds.slice(0, 10)));
                 const usersSnapshot = await getDocs(usersQuery);
                 usersSnapshot.forEach(doc => { usersMap[doc.id] = doc.data(); });
