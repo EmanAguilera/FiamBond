@@ -17,7 +17,7 @@ jobs:
           npm run build
         working-directory: my_fiambond_next
         env: # Injecting NEXT_PUBLIC_ variables required for Next.js build prerender step
-          NEXT_PUBLIC_API_URL: https://us-central1-fiambond.cloudfunctions.net/api # Use the deployed function URL or a hardcoded one
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }} # Assuming you have a Cloudinary secret
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
