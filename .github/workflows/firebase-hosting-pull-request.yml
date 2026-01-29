@@ -17,6 +17,7 @@ jobs:
         run: |
           npm ci --legacy-peer-deps
           npm run build
+          npx next export 
         working-directory: my_fiambond_next
         env: # Injecting NEXT_PUBLIC_ variables required for Next.js build prerender step
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
