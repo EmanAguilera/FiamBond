@@ -1,3 +1,5 @@
+// babel.config.js
+
 module.exports = function (api) {
   api.cache(true);
   return {
@@ -8,14 +10,12 @@ module.exports = function (api) {
       "nativewind/babel",
     ],
     plugins: [
-      // 1. Module Resolver
+      // 1. Module Resolver (KEEP THIS IF YOU NEED OTHER ALIASES, otherwise remove the whole block)
       [
         "module-resolver",
         {
           root: ["./"],
-          alias: {
-            "react-native-worklets": "react-native-worklets-core",
-          },
+          // REMOVED: alias: { "react-native-worklets": "react-native-worklets-core" },
         },
       ],
       // 2. Worklets Plugin - This MUST match the core package name

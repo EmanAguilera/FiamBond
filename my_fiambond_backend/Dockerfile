@@ -15,7 +15,7 @@ RUN npm install
 COPY . .
 
 # Step 6: Tell Docker that our application will be listening on port 3000.
-EXPOSE 3000
+EXPOSE 5000
 
 # Step 7: This is the command that starts our engine when the container runs.
 CMD [ "node", "server.js" ]
