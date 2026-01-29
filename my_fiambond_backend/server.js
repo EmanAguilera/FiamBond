@@ -6,16 +6,23 @@ const cors = require('cors');
 require('dotenv').config(); 
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 
-// 2. CORS CONFIGURATION (FIXED: Explicitly allowing production domain)
+// 2. CORS CONFIGURATION (UPDATED for dynamic cloud origins)
 const allowedOrigins = [
-    'https://fiambond.web.app', // <--- YOUR PRODUCTION DOMAIN
-    'https://fiam-bond.vercel.app', // Vercel domain
-    'http://localhost:5173', // Common local dev ports
+    'https://fiambond.web.app', 
+    'https://fiam-bond.vercel.app', 
+    'http://localhost:5173', 
     'http://localhost:3000',
-    /\.vercel\.app$/, // Vercel preview domains
-    /\.github\.dev$/ // Codespace domain
+    
+    // 1. YOUR DYNAMIC DOMAIN REGEX (To allow 3000- and 5000-)
+    /^https:\/\/\d+-firebase-fiambond-1769270722588\.cluster-osvg2nzmmzhzqqjio6oojllbg4\.cloudworkstations\.dev$/,
+    
+    // 2. EXPLICITLY ADD THE REDIRECT DOMAIN (The 42795 port)
+    'https://42795-firebase-fiambond-1769270722588.cluster-osvg2nzmmzhzqqjio6oojllbg4.cloudworkstations.dev',
+    
+    /\.vercel\.app$/,
+    /\.github\.dev$/
 ];
 
 app.use(cors({
@@ -23,13 +30,15 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps, curl, or same-origin)
         if (!origin) return callback(null, true);
         
-        // Check if the origin is explicitly allowed or matches a RegExp pattern
+        // Check if the origin is an exact match OR matches a RegExp pattern
         if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(rx => rx instanceof RegExp && rx.test(origin))) {
             callback(null, true);
         } else {
             // Block the request and log the attempted origin
             console.error('CORS Blocked Origin:', origin);
-            callback(new Error(`Not allowed by CORS: ${origin}`));
+            // NOTE: Temporarily removing the error throw here might let the request hit the server, revealing if the problem is authorization instead of CORS.
+            // callback(new Error(`Not allowed by CORS: ${origin}`));
+            callback(null, false); // Block the request with a false flag
         }
     },
     credentials: true,
