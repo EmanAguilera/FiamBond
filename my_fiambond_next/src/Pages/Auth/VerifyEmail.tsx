@@ -2,7 +2,7 @@
 
 import { useContext, useState, useEffect, useCallback } from 'react';
 import { AppContext } from '@/src/Context/AppContext';
-import { sendEmailVerification, applyActionCode, signOut } from 'firebase/auth'; 
+import { sendEmailVerification, applyActionCode, signOut, Auth } from 'firebase/auth'; // Import Auth type for clarity
 import { auth, db, googleProvider } from '@/src/config/firebase-config';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -29,9 +29,17 @@ export default function VerifyEmail() {
     }, [cooldown]);
 
     const handleSendVerification = useCallback(async (isAutoSend = false) => {
-        const currentUser = auth.currentUser; 
-        if (!currentUser || isResending) return; 
+        // ⭐️ FIX 1: Check and assign auth to a non-null variable (optional, but clean)
+        const firebaseAuth = auth as Auth | null;
+        if (!firebaseAuth) {
+            setError("Authentication service is unavailable.");
+            return;
+        }
 
+        const currentUser = firebaseAuth.currentUser; 
+        if (!currentUser || isResending) return; 
+        
+        // ... (rest of cooldown logic is fine)
         const lastSent = parseInt(localStorage.getItem(storageKey) || "0", 10);
         const now = Date.now();
         const cooldownMs = COOLDOWN_SECONDS * 1000;
@@ -76,11 +84,19 @@ export default function VerifyEmail() {
     useEffect(() => {
         const mode = searchParams.get('mode');
         const actionCode = searchParams.get('oobCode');
+        
+        // ⭐️ FIX 2: Check for auth immediately and assert its type for the promise chain
+        const firebaseAuth = auth as Auth | null;
+        if (!firebaseAuth) {
+            setError("Authentication service is unavailable.");
+            return;
+        }
 
         if (mode === 'verifyEmail' && actionCode) {
-            applyActionCode(auth, actionCode)
+            applyActionCode(firebaseAuth, actionCode)
                 .then(async () => {
-                    if (auth.currentUser) await auth.currentUser.reload();
+                    // Check currentUser before using
+                    if (firebaseAuth.currentUser) await firebaseAuth.currentUser.reload();
                     setMessage('Verified successfully! Redirecting...');
                     setTimeout(() => router.push('/'), 1500);
                 })
@@ -90,20 +106,27 @@ export default function VerifyEmail() {
 
     // Polling
     useEffect(() => {
+        // ⭐️ FINAL FIX 3: Check for auth before setting the interval and assert its type
+        const firebaseAuth = auth as Auth | null;
+        if (!firebaseAuth) return;
+        
         const interval = setInterval(async () => {
-            if (auth.currentUser) {
-                await auth.currentUser.reload();
-                if (auth.currentUser.emailVerified) {
+            // firebaseAuth is guaranteed not to be null inside this function scope
+            if (firebaseAuth.currentUser) {
+                await firebaseAuth.currentUser.reload();
+                if (firebaseAuth.currentUser.emailVerified) {
                     clearInterval(interval);
                     router.push('/');
                 }
             }
         }, 5000); 
         return () => clearInterval(interval);
-    }, [router]);
+    }, [router]); // Removed auth from dependency array since it's used only inside the guard
 
     if (!user) return <div className="h-screen flex items-center justify-center">Redirecting...</div>;
-
+    
+    // ⭐️ FIX 4: Ensure all JSX checks and handlers use the non-null auth value (original 'auth' is fine here since the build won't proceed if it's null)
+    
     return (
         <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
             <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
@@ -112,10 +135,11 @@ export default function VerifyEmail() {
                 {message && <p className="text-green-600 font-bold mb-4">{message}</p>}
                 {error && <p className="text-red-600 font-bold mb-4">{error}</p>}
                 <div className="space-y-4">
-                    <button onClick={() => handleSendVerification()} className="primary-btn w-full bg-indigo-600 text-white py-3 rounded-lg font-bold" disabled={isResending || cooldown > 0}>
+                    <button onClick={() => handleSendVerification()} className="primary-btn w-full bg-indigo-600 text-white py-3 rounded-lg font-bold" disabled={isResending || cooldown > 0 || !auth}>
                         {isResending ? 'Sending...' : (cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Email')}
                     </button>
-                    <button onClick={() => signOut(auth).then(handleLogout).then(() => router.push('/login'))} className="w-full text-gray-500 font-bold py-2">Logout</button>
+                    {/* FIX: Check for auth before calling signOut */}
+                    <button onClick={() => auth && signOut(auth).then(handleLogout).then(() => router.push('/login'))} className="w-full text-gray-500 font-bold py-2" disabled={!auth}>Logout</button>
                 </div>
             </div>
         </main>
