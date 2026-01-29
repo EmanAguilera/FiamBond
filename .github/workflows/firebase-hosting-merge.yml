@@ -30,6 +30,6 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FIAMBOND }}
-          entryPoint: my_fiambond_next
+          entryPoint: .
           channelId: live
           projectId: fiambond
