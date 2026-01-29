@@ -37,13 +37,21 @@ export default function Login() {
     setGeneralError(null);
   };
 
-  // --- EMAIL/PASSWORD LOGIN ---
+  // --- EMAIL/PASSWORD LOGIN (FIXED) ---
   async function handleLoginSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setGeneralError(null);
     setIsSubmitting(true);
+    
+    // ⭐️ FIX 1: Guard Clause for auth
+    if (!auth) {
+        setGeneralError("Authentication service is temporarily unavailable.");
+        setIsSubmitting(false);
+        return;
+    }
 
     try {
+      // 'auth' is now guaranteed not to be null
       await signInWithEmailAndPassword(auth, formData.email, formData.password);
       toast.success("Login successful!");
       
@@ -57,10 +65,18 @@ export default function Login() {
     }
   }
 
-  // --- GOOGLE SIGN IN ---
+  // --- GOOGLE SIGN IN (FIXED) ---
   const handleGoogleSignIn = async () => {
     setGeneralError(null);
+    
+    // ⭐️ FIX 2: Guard Clause for auth
+    if (!auth || !db) { // Check for db as well since it's used inside
+        setGeneralError("Authentication service is temporarily unavailable.");
+        return;
+    }
+
     try {
+      // 'auth' is now guaranteed not to be null
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
@@ -90,14 +106,22 @@ export default function Login() {
     }
   };
 
-  // --- PASSWORD RESET ---
+  // --- PASSWORD RESET (FIXED) ---
   const handlePasswordReset = async () => {
     if (!formData.email) {
       setGeneralError("Please enter your email address to reset your password.");
       return;
     }
+    
+    // ⭐️ FIX 3: Guard Clause for auth
+    if (!auth) {
+        setGeneralError("Authentication service is temporarily unavailable.");
+        return;
+    }
+
     const toastId = toast.loading('Sending password reset email...');
     try {
+      // 'auth' is now guaranteed not to be null
       await sendPasswordResetEmail(auth, formData.email);
       toast.success("Check your inbox!", { id: toastId });
     } catch (error: any) {
@@ -116,6 +140,8 @@ export default function Login() {
           onClick={handleGoogleSignIn} 
           type="button"
           className="w-full mb-6 flex items-center justify-center gap-2 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors shadow-sm"
+          // Disable button if auth is null, showing an issue
+          disabled={!auth}
         > 
            <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -169,8 +195,8 @@ export default function Login() {
           )}
 
           <button 
-            disabled={isSubmitting}
-            className={`w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`} 
+            disabled={isSubmitting || !auth} // Disable if auth is null
+            className={`w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md ${isSubmitting || !auth ? 'opacity-50 cursor-not-allowed' : ''}`} 
             type="submit"
           >
             {isSubmitting ? "Signing in..." : "Sign In"}
