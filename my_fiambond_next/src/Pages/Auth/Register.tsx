@@ -31,6 +31,12 @@ export default function Register() {
   async function handleRegisterSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setGeneralError(null);
+    
+    // ⭐️ FIX 1: Guard Clause for auth and db
+    if (!auth || !db) {
+        setGeneralError("Authentication service is temporarily unavailable.");
+        return;
+    }
 
     if (formData.password !== formData.password_confirmation) {
       setGeneralError("Passwords do not match.");
@@ -38,10 +44,12 @@ export default function Register() {
     }
 
     try {
+      // 'auth' is now guaranteed not to be null
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
       // Create the user document in Firestore
+      // 'db' is now guaranteed not to be null
       await setDoc(doc(db, "users", user.uid), {
         first_name: formData.first_name,
         last_name: formData.last_name,
@@ -63,9 +71,19 @@ export default function Register() {
   }
 
   const handleGoogleSignIn = async () => {
+    
+    // ⭐️ FIX 2: Guard Clause for auth and db
+    if (!auth || !db) {
+        setGeneralError("Authentication service is temporarily unavailable.");
+        return;
+    }
+
     try {
+      // 'auth' is now guaranteed not to be null
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      
+      // 'db' is now guaranteed not to be null
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
@@ -93,6 +111,7 @@ export default function Register() {
         <button 
           onClick={handleGoogleSignIn} 
           className="w-full mb-6 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors"
+          disabled={!auth} // Disable if auth is null
         > 
           Sign Up With Google
         </button>
@@ -114,7 +133,11 @@ export default function Register() {
           
           {generalError && <p className="text-red-500 text-sm font-bold text-center">{generalError}</p>}
           
-          <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-colors" type="submit">
+          <button 
+            className={`w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-colors ${!auth ? 'opacity-50 cursor-not-allowed' : ''}`}
+            type="submit"
+            disabled={!auth}
+          >
             Create Account
           </button>
         </form>
