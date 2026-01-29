@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "my_fiambond_react/dist",
+    "public": "my_fiambond_next/out",
     "ignore": [
       "firebase.json",
       "**/.*",
