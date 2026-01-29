@@ -17,10 +17,10 @@ jobs:
         run: |
           npm ci --legacy-peer-deps
           npm run build
-        working-directory: my_fiambond_react
+        working-directory: my_fiambond_next
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FIAMBOND }}
-          entryPoint: my_fiambond_react
+          entryPoint: my_fiambond_next
           projectId: fiambond
