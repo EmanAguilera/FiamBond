@@ -1,10 +1,12 @@
-'use client'; 
+"use client";
 
 import { useEffect, useState, useCallback, Suspense, useContext } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { AppContext } from '../../context/AppContext';
-import { collection, getDocs, db } from "../../config/firebase-config";
+// ⭐️ FIXED: collection and getDocs come from 'firebase/firestore', db comes from your config
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../config/firebase-config";
 
 // --- DYNAMIC IMPORTS ---
 const Modal = dynamic(() => import("../../components/layout/Modal"), { ssr: false });
@@ -21,7 +23,7 @@ const Icons = {
     Entities: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
     Shield: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
     Refresh: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>,
-    Report: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+    Report: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1.001.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
 };
 
 // --- REUSABLE COMPONENTS ---
@@ -117,11 +119,10 @@ const ManageTeamWidget = ({ adminUsers, onAddAdmin }) => {
 
 // --- MAIN DASHBOARD ---
 export default function AdminDashboard({ onBack }) {
-    // ⭐️ Build safety: get context object first
     const context = useContext(AppContext);
     const user = context?.user;
-
     const router = useRouter(); 
+
     const adminLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'Admin');
 
     const [users, setUsers] = useState([]);
@@ -152,7 +153,6 @@ export default function AdminDashboard({ onBack }) {
 
         premiumList.forEach(p => {
             if (p.user_id === user.id) return;
-
             const timestamp = p.granted_at;
             if (timestamp?.seconds) {
                 const txDate = new Date(timestamp.seconds * 1000);
@@ -208,7 +208,6 @@ export default function AdminDashboard({ onBack }) {
 
             setUsers(usersList);
             setPremiums(premiumsList);
-
             setPremiumUsers(usersList.filter(u => u.is_premium || u.is_family_premium));
             setAdminUsers(usersList.filter(u => u.role === 'admin'));
             setPendingCount(usersList.filter(u => u.subscription_status === 'pending_approval' || u.family_subscription_status === 'pending_approval').length);
@@ -221,7 +220,7 @@ export default function AdminDashboard({ onBack }) {
             setCurrentTotalFunds(totalValue);
             generateReport(premiumsList, period);
         } catch (error) {
-            console.error(error);
+            console.error("Fetch Error:", error);
         } finally {
             setLoading(false);
         }
@@ -238,18 +237,14 @@ export default function AdminDashboard({ onBack }) {
     }, [period, premiums, generateReport, user]);
 
     const handleTogglePremium = async (userId, action, type) => {
-        // Logic should be added based on your handleTogglePremium function
         fetchData();
     };
 
     const handleAddAdmin = async (email) => {
-        // Logic for promotion
         fetchData();
     };
 
-    // ⭐️ SAFETY GATE: Prevents "destructure" crash during build
     if (!context || !user) return <div className="p-10 text-center text-slate-400">Loading Secure Admin Access...</div>;
-
     if (loading) return <div className="p-10 text-center animate-pulse text-slate-400">Loading Admin Realm...</div>;
 
     return (
