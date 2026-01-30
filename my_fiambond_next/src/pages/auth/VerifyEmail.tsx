@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useState, useEffect, useCallback } from 'react';
+import React, { useContext, useState, useEffect, useCallback } from 'react';
 import { AppContext } from '@/src/context/AppContext';
 import { sendEmailVerification, applyActionCode, signOut, Auth } from 'firebase/auth'; 
 import { auth } from '@/src/config/firebase-config';
@@ -9,7 +9,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 const COOLDOWN_SECONDS = 60;
 
 export default function VerifyEmail() {
-    const { user, handleLogout } = useContext(AppContext);
+    // ⭐️ FIX: Handle undefined context during Build/Prerender
+    const context = useContext(AppContext);
+    const user = context?.user;
+    const handleLogout = context?.handleLogout;
+
     const router = useRouter();
     const searchParams = useSearchParams();
     const [message, setMessage] = useState('');
@@ -80,7 +84,6 @@ export default function VerifyEmail() {
     }, [user, userUid, router, handleSendVerification, storageKey]); 
 
     useEffect(() => {
-        // ⭐️ FIX: Added optional chaining '?.' to handle 'searchParams is possibly null'
         const mode = searchParams?.get('mode');
         const actionCode = searchParams?.get('oobCode');
         
@@ -101,7 +104,6 @@ export default function VerifyEmail() {
         }
     }, [searchParams, router]);
 
-    // Polling
     useEffect(() => {
         const firebaseAuth = auth as Auth | null;
         if (!firebaseAuth) return;
@@ -118,7 +120,8 @@ export default function VerifyEmail() {
         return () => clearInterval(interval);
     }, [router]);
 
-    if (!user) return <div className="h-screen flex items-center justify-center">Redirecting...</div>;
+    // ⭐️ FIX: If no user or context, show loading/redirecting so the build worker doesn't crash
+    if (!context || !user) return <div className="h-screen flex items-center justify-center">Redirecting...</div>;
     
     return (
         <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
