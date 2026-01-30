@@ -115,7 +115,7 @@ const formatDataForChart = (transactions) => {
     }
 };
 
-export default function UserDashboard({ onEnterAdmin }) {
+export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAdmin }) {
     const { user, premiumDetails } = useContext(AppContext);
     const router = useRouter(); 
     
