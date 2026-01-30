@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "app/page.tsx", "src/Pages/Personal/UserRealm.jsx", "src/Pages/Family/FamilyRealm.jsx"  ],
+, "src/app/page.tsx", "src/pages/realm/UserRealm.jsx", "src/pages/realm/FamilyRealm.jsx"  ],
   "exclude": ["node_modules"]
 }
