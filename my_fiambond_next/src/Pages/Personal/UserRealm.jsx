@@ -123,7 +123,16 @@ const formatDataForChart = (transactions) => {
 };
 
 export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAdmin }) {
-    const { user, premiumDetails } = useContext(AppContext);
+    const context = useContext(AppContext);
+
+    // 🛑 CRITICAL FIX: Add this check right here
+    // This prevents the "Cannot destructure property 'user' of 'useContext(...)' as it is null" error.
+    if (!context || !context.user || context.loading) {
+        return <div className="p-20 text-center text-slate-500">Authenticating...</div>;
+    }
+
+    const { user, premiumDetails } = context;
+    
     // 1. Next.js change: Replace useNavigate with useRouter
     const router = useRouter(); 
     

@@ -92,7 +92,7 @@ export default function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={contextValue}>
-      {!loading && children}
+      {children}
     </AppContext.Provider>
   );
 }
