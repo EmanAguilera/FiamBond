@@ -7,7 +7,18 @@
       "**/node_modules/**"
     ],
     "cleanUrls": true,
-    "trailingSlash": false,
+    "trailingSlash": true,
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin-allow-popups"
+          }
+        ]
+      }
+    ],
     "rewrites": [
       {
         "source": "**",
