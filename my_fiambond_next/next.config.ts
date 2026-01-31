@@ -1,26 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* REMOVED: output: 'export' 
-     Vercel works best with the default build. This allows us to use 
-     custom headers to fix your Firebase popup errors.
-  */
+  // ⭐️ KEEP THIS: Required for your Firebase Hosting deployment
+  output: 'export', 
 
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin-allow-popups', 
-          },
-        ],
-      },
-    ];
-  },
+  // ⭐️ ADD THIS: Prevents the "Unexpected token <" error by ensuring 
+  // the app knows where to find the static files
+  trailingSlash: true,
 
-  // Ensures your images (like Cloudinary) work correctly
   images: {
     unoptimized: true, 
   },
