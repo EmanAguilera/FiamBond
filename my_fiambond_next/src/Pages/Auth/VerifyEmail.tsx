@@ -1,14 +1,15 @@
 "use client";
 
-import { useContext, useState, useEffect, useCallback } from 'react';
+import { useContext, useState, useEffect, useCallback, Suspense } from 'react';
 import { AppContext } from '@/src/Context/AppContext';
-import { sendEmailVerification, applyActionCode, signOut, Auth } from 'firebase/auth'; // Import Auth type for clarity
-import { auth, db, googleProvider } from '@/src/config/firebase-config';
+import { sendEmailVerification, applyActionCode, signOut, Auth } from 'firebase/auth';
+import { auth } from '@/src/config/firebase-config';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 const COOLDOWN_SECONDS = 60;
 
-export default function VerifyEmail() {
+// 1. THE CONTENT COMPONENT: Logic and UI
+function VerifyEmailContent() {
     const { user, handleLogout } = useContext(AppContext);
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -29,7 +30,6 @@ export default function VerifyEmail() {
     }, [cooldown]);
 
     const handleSendVerification = useCallback(async (isAutoSend = false) => {
-        // ⭐️ FIX 1: Check and assign auth to a non-null variable (optional, but clean)
         const firebaseAuth = auth as Auth | null;
         if (!firebaseAuth) {
             setError("Authentication service is unavailable.");
@@ -39,7 +39,6 @@ export default function VerifyEmail() {
         const currentUser = firebaseAuth.currentUser; 
         if (!currentUser || isResending) return; 
         
-        // ... (rest of cooldown logic is fine)
         const lastSent = parseInt(localStorage.getItem(storageKey) || "0", 10);
         const now = Date.now();
         const cooldownMs = COOLDOWN_SECONDS * 1000;
@@ -85,7 +84,6 @@ export default function VerifyEmail() {
         const mode = searchParams.get('mode');
         const actionCode = searchParams.get('oobCode');
         
-        // ⭐️ FIX 2: Check for auth immediately and assert its type for the promise chain
         const firebaseAuth = auth as Auth | null;
         if (!firebaseAuth) {
             setError("Authentication service is unavailable.");
@@ -95,7 +93,6 @@ export default function VerifyEmail() {
         if (mode === 'verifyEmail' && actionCode) {
             applyActionCode(firebaseAuth, actionCode)
                 .then(async () => {
-                    // Check currentUser before using
                     if (firebaseAuth.currentUser) await firebaseAuth.currentUser.reload();
                     setMessage('Verified successfully! Redirecting...');
                     setTimeout(() => router.push('/'), 1500);
@@ -104,14 +101,11 @@ export default function VerifyEmail() {
         }
     }, [searchParams, router]);
 
-    // Polling
     useEffect(() => {
-        // ⭐️ FINAL FIX 3: Check for auth before setting the interval and assert its type
         const firebaseAuth = auth as Auth | null;
         if (!firebaseAuth) return;
         
         const interval = setInterval(async () => {
-            // firebaseAuth is guaranteed not to be null inside this function scope
             if (firebaseAuth.currentUser) {
                 await firebaseAuth.currentUser.reload();
                 if (firebaseAuth.currentUser.emailVerified) {
@@ -121,11 +115,9 @@ export default function VerifyEmail() {
             }
         }, 5000); 
         return () => clearInterval(interval);
-    }, [router]); // Removed auth from dependency array since it's used only inside the guard
+    }, [router]);
 
     if (!user) return <div className="h-screen flex items-center justify-center">Redirecting...</div>;
-    
-    // ⭐️ FIX 4: Ensure all JSX checks and handlers use the non-null auth value (original 'auth' is fine here since the build won't proceed if it's null)
     
     return (
         <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -135,13 +127,38 @@ export default function VerifyEmail() {
                 {message && <p className="text-green-600 font-bold mb-4">{message}</p>}
                 {error && <p className="text-red-600 font-bold mb-4">{error}</p>}
                 <div className="space-y-4">
-                    <button onClick={() => handleSendVerification()} className="primary-btn w-full bg-indigo-600 text-white py-3 rounded-lg font-bold" disabled={isResending || cooldown > 0 || !auth}>
+                    <button 
+                        onClick={() => handleSendVerification()} 
+                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition-all disabled:opacity-50" 
+                        disabled={isResending || cooldown > 0 || !auth}
+                    >
                         {isResending ? 'Sending...' : (cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Email')}
                     </button>
-                    {/* FIX: Check for auth before calling signOut */}
-                    <button onClick={() => auth && signOut(auth).then(handleLogout).then(() => router.push('/login'))} className="w-full text-gray-500 font-bold py-2" disabled={!auth}>Logout</button>
+                    <button 
+                        onClick={() => auth && signOut(auth).then(handleLogout).then(() => router.push('/login'))} 
+                        className="w-full text-gray-500 font-bold py-2 hover:text-gray-700 transition-all" 
+                        disabled={!auth}
+                    >
+                        Logout
+                    </button>
                 </div>
             </div>
         </main>
+    );
+}
+
+// 2. THE EXPORTED PAGE: Wraps everything in Suspense
+export default function VerifyEmail() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen flex items-center justify-center bg-gray-50">
+                <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-slate-500 font-medium">Checking verification status...</p>
+                </div>
+            </div>
+        }>
+            <VerifyEmailContent />
+        </Suspense>
     );
 }
