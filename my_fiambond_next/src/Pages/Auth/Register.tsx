@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, FormEvent, ChangeEvent } from "react"; // ADDED React import to fix UMD global error
+import React, { useState, FormEvent, ChangeEvent, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-// Ensure this path matches your folder structure: login/page.tsx is 3 levels deep from root
 import { auth, db, googleProvider } from "../../../src/config/firebase-config"; 
 import { createUserWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
@@ -16,7 +15,8 @@ interface RegisterFormData {
   password_confirmation: string;
 }
 
-export default function Register() {
+// 1. THE CONTENT COMPONENT
+function RegisterContent() {
   const router = useRouter();
   const [formData, setFormData] = useState<RegisterFormData>({
     first_name: "", last_name: "", email: "", password: "", password_confirmation: "",
@@ -32,7 +32,6 @@ export default function Register() {
     e.preventDefault();
     setGeneralError(null);
     
-    // ⭐️ FIX 1: Guard Clause for auth and db
     if (!auth || !db) {
         setGeneralError("Authentication service is temporarily unavailable.");
         return;
@@ -44,22 +43,20 @@ export default function Register() {
     }
 
     try {
-      // 'auth' is now guaranteed not to be null
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
-      // Create the user document in Firestore
-      // 'db' is now guaranteed not to be null
       await setDoc(doc(db, "users", user.uid), {
         first_name: formData.first_name,
         last_name: formData.last_name,
         full_name: `${formData.first_name} ${formData.last_name}`,
         email: user.email,
         created_at: serverTimestamp(),
+        role: 'user'
       });
       
-      // Forces user to login again to trigger the verification flow
       await signOut(auth);
+      // Redirect with a message - handled by the Suspense in the Login page
       router.push('/login?message=Registration successful! Please log in to verify your email.');
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -71,19 +68,15 @@ export default function Register() {
   }
 
   const handleGoogleSignIn = async () => {
-    
-    // ⭐️ FIX 2: Guard Clause for auth and db
     if (!auth || !db) {
         setGeneralError("Authentication service is temporarily unavailable.");
         return;
     }
 
     try {
-      // 'auth' is now guaranteed not to be null
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
-      // 'db' is now guaranteed not to be null
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
@@ -95,46 +88,47 @@ export default function Register() {
           full_name: user.displayName,
           email: user.email,
           created_at: serverTimestamp(),
+          role: 'user'
         });
       }
-      router.push("/");
+      router.push("/realm");
     } catch (error) {
       setGeneralError("Google sign-up failed.");
     }
   };
 
   return (
-    <main className="login-wrapper min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="login-card w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
         <h1 className="text-center text-2xl font-bold mb-6 text-gray-800">Create Account</h1>
 
         <button 
           onClick={handleGoogleSignIn} 
-          className="w-full mb-6 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors"
-          disabled={!auth} // Disable if auth is null
+          className="w-full mb-6 flex items-center justify-center gap-2 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors shadow-sm"
+          disabled={!auth}
         > 
           Sign Up With Google
         </button>
 
         <div className="relative flex items-center py-4">
           <div className="flex-grow border-t border-gray-200"></div>
-          <span className="flex-shrink mx-4 text-xs text-gray-400 font-bold uppercase">Or use email</span>
+          <span className="flex-shrink mx-4 text-xs text-gray-400 font-bold uppercase tracking-wider">Or use email</span>
           <div className="flex-grow border-t border-gray-200"></div>
         </div>
 
         <form onSubmit={handleRegisterSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <input id="first_name" placeholder="First Name" type="text" value={formData.first_name} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:outline-indigo-500" />
-            <input id="last_name" placeholder="Last Name" type="text" value={formData.last_name} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:outline-indigo-500" />
+            <input id="first_name" placeholder="First Name" type="text" value={formData.first_name} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+            <input id="last_name" placeholder="Last Name" type="text" value={formData.last_name} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
           </div>
-          <input id="email" placeholder="Email" type="email" value={formData.email} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:outline-indigo-500" />
-          <input id="password" placeholder="Password" type="password" value={formData.password} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:outline-indigo-500" />
-          <input id="password_confirmation" placeholder="Confirm Password" type="password" value={formData.password_confirmation} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:outline-indigo-500" />
+          <input id="email" placeholder="Email" type="email" value={formData.email} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          <input id="password" placeholder="Password" type="password" value={formData.password} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+          <input id="password_confirmation" placeholder="Confirm Password" type="password" value={formData.password_confirmation} onChange={handleInputChange} required className="p-3 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
           
           {generalError && <p className="text-red-500 text-sm font-bold text-center">{generalError}</p>}
           
           <button 
-            className={`w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-colors ${!auth ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-all ${!auth ? 'opacity-50 cursor-not-allowed' : ''}`}
             type="submit"
             disabled={!auth}
           >
@@ -147,5 +141,18 @@ export default function Register() {
         </p>
       </div>
     </main>
+  );
+}
+
+// 2. THE EXPORTED PAGE WRAPPER
+export default function Register() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-pulse text-gray-400">Loading Registration...</div>
+      </div>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }
