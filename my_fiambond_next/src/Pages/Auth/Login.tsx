@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, FormEvent, ChangeEvent, useEffect } from "react";
+import React, { useState, FormEvent, ChangeEvent, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-// Paths adjusted based on: app/(auth)/login/page.tsx -> 3 levels up to src/config
+// Paths based on: app/(auth)/login/page.tsx -> src/config
 import { auth, db, googleProvider } from "../../../src/config/firebase-config";
 import { signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -14,7 +14,8 @@ interface LoginFormData {
   password: string;
 }
 
-export default function Login() {
+// 1. INTERNAL COMPONENT: Contains all the logic and JSX
+function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({ email: "", password: "" });
@@ -26,7 +27,6 @@ export default function Login() {
     const message = searchParams.get('message');
     if (message) {
       toast.success(message);
-      // Clean the URL
       router.replace('/login');
     }
   }, [searchParams, router]);
@@ -37,13 +37,11 @@ export default function Login() {
     setGeneralError(null);
   };
 
-  // --- EMAIL/PASSWORD LOGIN (FIXED) ---
   async function handleLoginSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setGeneralError(null);
     setIsSubmitting(true);
     
-    // ⭐️ FIX 1: Guard Clause for auth
     if (!auth) {
         setGeneralError("Authentication service is temporarily unavailable.");
         setIsSubmitting(false);
@@ -51,11 +49,8 @@ export default function Login() {
     }
 
     try {
-      // 'auth' is now guaranteed not to be null
       await signInWithEmailAndPassword(auth, formData.email, formData.password);
       toast.success("Login successful!");
-      
-      // ⭐️ REDIRECT TO REALM INSTEAD OF "/"
       router.push("/realm"); 
     } catch (error: any) {
       console.error("Login Error:", error);
@@ -65,22 +60,17 @@ export default function Login() {
     }
   }
 
-  // --- GOOGLE SIGN IN (FIXED) ---
   const handleGoogleSignIn = async () => {
     setGeneralError(null);
-    
-    // ⭐️ FIX 2: Guard Clause for auth
-    if (!auth || !db) { // Check for db as well since it's used inside
+    if (!auth || !db) {
         setGeneralError("Authentication service is temporarily unavailable.");
         return;
     }
 
     try {
-      // 'auth' is now guaranteed not to be null
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      // Sync with Firestore
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
@@ -92,13 +82,11 @@ export default function Login() {
           full_name: user.displayName,
           email: user.email,
           created_at: serverTimestamp(),
-          role: 'user' // Default role
+          role: 'user'
         });
       }
       
       toast.success("Signed in with Google!");
-      
-      // ⭐️ REDIRECT TO REALM INSTEAD OF "/"
       router.push("/realm");
     } catch (error) {
       console.error("Google Auth Error:", error);
@@ -106,14 +94,11 @@ export default function Login() {
     }
   };
 
-  // --- PASSWORD RESET (FIXED) ---
   const handlePasswordReset = async () => {
     if (!formData.email) {
       setGeneralError("Please enter your email address to reset your password.");
       return;
     }
-    
-    // ⭐️ FIX 3: Guard Clause for auth
     if (!auth) {
         setGeneralError("Authentication service is temporarily unavailable.");
         return;
@@ -121,7 +106,6 @@ export default function Login() {
 
     const toastId = toast.loading('Sending password reset email...');
     try {
-      // 'auth' is now guaranteed not to be null
       await sendPasswordResetEmail(auth, formData.email);
       toast.success("Check your inbox!", { id: toastId });
     } catch (error: any) {
@@ -135,12 +119,10 @@ export default function Login() {
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
         <h1 className="text-center text-2xl font-bold mb-8 text-gray-800">Sign in to FiamBond</h1>
         
-        {/* Google Auth Button */}
         <button 
           onClick={handleGoogleSignIn} 
           type="button"
           className="w-full mb-6 flex items-center justify-center gap-2 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition-colors shadow-sm"
-          // Disable button if auth is null, showing an issue
           disabled={!auth}
         > 
            <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -158,7 +140,6 @@ export default function Login() {
           <div className="flex-grow border-t border-gray-200"></div>
         </div>
 
-        {/* Email Form */}
         <form onSubmit={handleLoginSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold mb-1 text-gray-700" htmlFor="email">Email address</label>
@@ -195,7 +176,7 @@ export default function Login() {
           )}
 
           <button 
-            disabled={isSubmitting || !auth} // Disable if auth is null
+            disabled={isSubmitting || !auth} 
             className={`w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md ${isSubmitting || !auth ? 'opacity-50 cursor-not-allowed' : ''}`} 
             type="submit"
           >
@@ -208,5 +189,21 @@ export default function Login() {
         </p>
       </div>
     </main>
+  );
+}
+
+// 2. EXPORTED PAGE: Wraps the content in a Suspense Boundary
+export default function Login() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium">Loading Authentication...</p>
+        </div>
+      </div>
+    }>
+      <LoginFormContent />
+    </Suspense>
   );
 }
