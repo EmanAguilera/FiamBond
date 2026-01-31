@@ -8,37 +8,32 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// 2. CORS CONFIGURATION (UPDATED for dynamic cloud origins)
+// 2. CORS CONFIGURATION
 const allowedOrigins = [
     'https://fiambond.web.app', 
     'https://fiam-bond.vercel.app', 
     'http://localhost:5173', 
     'http://localhost:3000',
-    
-    // 1. YOUR DYNAMIC DOMAIN REGEX (To allow 3000- and 5000-)
     /^https:\/\/\d+-firebase-fiambond-1769270722588\.cluster-osvg2nzmmzhzqqjio6oojllbg4\.cloudworkstations\.dev$/,
-    
-    // 2. EXPLICITLY ADD THE REDIRECT DOMAIN (The 42795 port)
     'https://42795-firebase-fiambond-1769270722588.cluster-osvg2nzmmzhzqqjio6oojllbg4.cloudworkstations.dev',
-    
     /\.vercel\.app$/,
     /\.github\.dev$/
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps, curl, or same-origin)
         if (!origin) return callback(null, true);
         
-        // Check if the origin is an exact match OR matches a RegExp pattern
-        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(rx => rx instanceof RegExp && rx.test(origin))) {
+        const isAllowed = allowedOrigins.some(allowed => {
+            if (allowed instanceof RegExp) return allowed.test(origin);
+            return allowed === origin;
+        });
+
+        if (isAllowed) {
             callback(null, true);
         } else {
-            // Block the request and log the attempted origin
             console.error('CORS Blocked Origin:', origin);
-            // NOTE: Temporarily removing the error throw here might let the request hit the server, revealing if the problem is authorization instead of CORS.
-            // callback(new Error(`Not allowed by CORS: ${origin}`));
-            callback(null, false); // Block the request with a false flag
+            callback(new Error(`Not allowed by CORS: ${origin}`));
         }
     },
     credentials: true,
@@ -46,9 +41,7 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
 
-// Enable pre-flight for all routes
-app.options(/.*/, cors()); 
-
+app.options(/(.*)/, cors());
 app.use(express.json());
 
 // 3. DATABASE CONNECTION
@@ -81,7 +74,6 @@ async function connectToDatabase() {
     return cached.conn;
 }
 
-// 4. MIDDLEWARE (Simplified - only handles DB connection/error response)
 app.use(async (req, res, next) => {
     try {
         await connectToDatabase();
@@ -92,10 +84,7 @@ app.use(async (req, res, next) => {
     }
 });
 
-// ==========================================
-// 5. SCHEMAS
-// ==========================================
-
+// 4. SCHEMAS
 const UserSchema = new mongoose.Schema({ 
     _id: String, 
     full_name: String, 
@@ -190,10 +179,7 @@ const CompanySchema = new mongoose.Schema({
 });
 const Company = mongoose.models.Company || mongoose.model('Company', CompanySchema);
 
-// ==========================================
-// 6. ROUTES
-// ==========================================
-
+// 5. ROUTES
 app.get('/', (req, res) => {
     res.status(200).send(`FiamBond V3 API Online 🚀`);
 });
@@ -456,7 +442,6 @@ app.post('/api/companies', async (req, res) => {
         const { owner_id, name } = req.body;
         if (!owner_id || !name) return res.status(400).json({ error: "owner_id and name required" });
         
-        // Check if company already exists for this owner
         const existing = await Company.findOne({ owner_id });
         if (existing) return res.status(409).json({ error: "Company already exists for this user" });
         
@@ -550,6 +535,10 @@ app.get('/api/reports/personal/:user_id', async (req, res) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`🚀 Server running on port ${port}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(port, () => {
+        console.log(`🚀 Local Server running on port ${port}`);
+    });
+}
+
+module.exports = app;
