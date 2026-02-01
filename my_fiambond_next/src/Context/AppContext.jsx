@@ -23,17 +23,26 @@ export default function AppProvider({ children }) {
     let unsubscribeFromFirestore = null;
 
     const unsubscribeFromAuth = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        const userDocRef = doc(db, "users", currentUser.uid);
+      // If no user is logged in, reset everything immediately
+      if (!currentUser) {
+        setUser(null);
+        setPremiumDetails({ company: null, family: null });
+        setLoading(false);
+        if (unsubscribeFromFirestore) unsubscribeFromFirestore();
+        return;
+      }
 
-        unsubscribeFromFirestore = onSnapshot(userDocRef, async (docSnap) => {
-          if (docSnap.exists()) {
-            const userData = docSnap.data();
-            
-            // --- SYNC PREMIUM DETAILS ---
-            let companyInfo = null;
-            let familyInfo = null;
+      // If user exists, listen to their Firestore document
+      const userDocRef = doc(db, "users", currentUser.uid);
+      unsubscribeFromFirestore = onSnapshot(userDocRef, async (docSnap) => {
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          
+          // Optimization: Prepare these but don't let them block the initial user set if not needed
+          let companyInfo = null;
+          let familyInfo = null;
 
+          try {
             // Fetch Company Premium Dates if ID exists
             if (userData.active_company_premium_id) {
                 const compSnap = await getDoc(doc(db, "premiums", userData.active_company_premium_id));
@@ -45,26 +54,30 @@ export default function AppProvider({ children }) {
                 const famSnap = await getDoc(doc(db, "premiums", userData.active_family_premium_id));
                 if (famSnap.exists()) familyInfo = famSnap.data();
             }
-
-            setPremiumDetails({ company: companyInfo, family: familyInfo });
-
-            setUser({
-              uid: currentUser.uid,
-              email: currentUser.email,
-              emailVerified: currentUser.emailVerified,
-              ...userData
-            });
-          } else {
-            setUser({ uid: currentUser.uid, email: currentUser.email, emailVerified: currentUser.emailVerified });
+          } catch (err) {
+            console.error("Error fetching premium details:", err);
           }
-          setLoading(false);
-        });
-      } else {
-        setUser(null);
-        setPremiumDetails({ company: null, family: null });
+
+          // SET STATE ALL AT ONCE to prevent multiple re-renders
+          setPremiumDetails({ company: companyInfo, family: familyInfo });
+          setUser({
+            uid: currentUser.uid,
+            email: currentUser.email,
+            emailVerified: currentUser.emailVerified,
+            ...userData
+          });
+        } else {
+          // Fallback if document doesn't exist yet
+          setUser({ 
+            uid: currentUser.uid, 
+            email: currentUser.email, 
+            emailVerified: currentUser.emailVerified 
+          });
+        }
+        
+        // Finalize loading
         setLoading(false);
-        if (unsubscribeFromFirestore) unsubscribeFromFirestore();
-      }
+      });
     });
 
     return () => {
@@ -75,6 +88,7 @@ export default function AppProvider({ children }) {
 
   const handleLogout = async () => {
     try {
+      setLoading(true); // Set loading while logging out
       await signOut(auth);
       router.push("/login");
     } catch (error) {
@@ -87,7 +101,7 @@ export default function AppProvider({ children }) {
     setUser,
     loading,
     handleLogout,
-    premiumDetails // Global access to dates
+    premiumDetails 
   };
 
   return (

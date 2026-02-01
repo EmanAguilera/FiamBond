@@ -1,4 +1,4 @@
-'use client'; // Required for all components using state, effects, or context in Next.js App Router
+'use client'; // Essential for Next.js App Router client components
 
 import { useContext, useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import dynamic from 'next/dynamic';
@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../config/firebase-config.js";
 
-// --- WIDGET IMPORTS (Converted to next/dynamic) ---
+// --- WIDGET IMPORTS (Next/Dynamic for performance and hydration safety) ---
 const Modal = dynamic(() => import("../../Components/Modal.jsx"), { ssr: false });
 const GoalListsWidget = dynamic(() => import("../../Components/Personal/Goal/GoalListsWidget.jsx"), { ssr: false });
 const CreateGoalWidget = dynamic(() => import("../../Components/Personal/Goal/CreateGoalWidget.tsx"), { ssr: false });
@@ -87,7 +87,8 @@ const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorCl
             <h4 className="font-bold text-gray-600 pr-4">{title}</h4>
             <div className={`flex-shrink-0 ${colorClass}`}>{icon}</div>
         </div>
-        <div className="flex-grow"><p className={`text-4xl font-bold mt-2 ${colorClass}`}>{value}</p>
+        <div className="flex-grow">
+            <p className={`text-4xl font-bold mt-2 ${colorClass}`}>{value}</p>
             {subtext && <p className="text-slate-400 text-sm font-medium mt-1">{subtext}</p>}
         </div>
         <span className="text-indigo-600 text-sm mt-3 inline-block transition-all duration-200 group-hover:text-indigo-700">
@@ -141,7 +142,8 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
 
     // --- VARIABLES ---
     const { user, premiumDetails } = context || {};
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'; 
+    // Ensure API_URL points to Vercel and doesn't fallback to Firebase Domain for APIs
+    const API_URL = process.env.NEXT_PUBLIC_API_URL; 
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
     // --- MEMOIZED SUBSCRIPTION LOGIC ---
@@ -164,12 +166,20 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const toggleModal = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
 
     const fetchData = useCallback(async () => {
-        if (!user?.uid) return;
+        // PREVENT "ID required" ERROR: Only fetch if user.uid exists
+        if (!user?.uid) return; 
+
         try {
             const txRes = await fetch(`${API_URL}/transactions?user_id=${user.uid}`);
+            if (!txRes.ok) throw new Error("Fetch failed");
+            
             const txs = await txRes.json();
             let balance = 0;
-            txs.forEach((tx) => { if (!tx.family_id) tx.type === 'income' ? balance += tx.amount : balance -= tx.amount; });
+            txs.forEach((tx) => { 
+                if (!tx.family_id) {
+                    tx.type === 'income' ? balance += tx.amount : balance -= tx.amount; 
+                }
+            });
             setSummaryData({ netPosition: balance });
 
             const gRes = await fetch(`${API_URL}/goals?user_id=${user.uid}`);
@@ -179,15 +189,23 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             if (lRes.ok) {
                 const loans = await lRes.json();
                 let out = 0;
-                loans.forEach(l => { if (l.creditor_id === user.uid && (l.status === 'outstanding' || l.status === 'pending_confirmation')) out += ((l.total_owed || l.amount) - (l.repaid_amount || 0)); });
+                loans.forEach(l => { 
+                    if (l.creditor_id === user.uid && (l.status === 'outstanding' || l.status === 'pending_confirmation')) {
+                        out += ((l.total_owed || l.amount) - (l.repaid_amount || 0)); 
+                    }
+                });
                 setLendingSummary({ outstanding: out });
             }
-        } catch (e) { console.error(e); setSummaryError("Error"); }
-    }, [user, API_URL]);
+        } catch (e) { 
+            console.error("Dashboard Fetch Error:", e); 
+            setSummaryError("Error"); 
+        }
+    }, [user?.uid, API_URL]); // Depend on user?.uid specifically
 
     const getReport = useCallback(async () => {
         if (!user?.uid) return;
-        setReportLoading(true); setReportError(null);
+        setReportLoading(true); 
+        setReportError(null);
         try {
             const endDate = new Date();
             const startDate = new Date();
@@ -199,22 +217,46 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             if (!res.ok) throw new Error('API Error');
             const data = await res.json();
 
-            const txs = data.filter(tx => !tx.family_id).map(tx => ({ ...tx, created_at: { toDate: () => new Date(tx.created_at) } }));
+            // Guard against non-array data
+            const txList = Array.isArray(data) ? data : [];
+            const txs = txList.filter(tx => !tx.family_id).map(tx => ({ 
+                ...tx, 
+                created_at: { toDate: () => new Date(tx.created_at) } 
+            }));
+            
             let inflow = 0, outflow = 0;
             txs.forEach(tx => tx.type === 'income' ? inflow += tx.amount : outflow += tx.amount);
 
             setReport({
-                chartData: formatDataForChart(txs), totalInflow: inflow, totalOutflow: outflow, netPosition: inflow - outflow,
-                reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`, transactionCount: txs.length
+                chartData: formatDataForChart(txs), 
+                totalInflow: inflow, 
+                totalOutflow: outflow, 
+                netPosition: inflow - outflow,
+                reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`, 
+                transactionCount: txs.length
             });
-        } catch { setReportError("No Data"); } finally { setReportLoading(false); }
-    }, [user, period, API_URL]);
+        } catch (err) { 
+            console.error("Report Fetch Error:", err);
+            setReportError("No Data"); 
+        } finally { 
+            setReportLoading(false); 
+        }
+    }, [user?.uid, period, API_URL]);
 
     const refresh = useCallback(() => { fetchData(); getReport(); }, [fetchData, getReport]);
 
     // --- EFFECTS ---
-    useEffect(() => { if (user) { setIsInitialLoading(true); refresh(); setIsInitialLoading(false); } }, [user, refresh]);
-    useEffect(() => { if (!isInitialLoading) getReport(); }, [period, isInitialLoading, getReport]);
+    useEffect(() => { 
+        if (user?.uid) { 
+            setIsInitialLoading(true); 
+            refresh(); 
+            setIsInitialLoading(false); 
+        } 
+    }, [user?.uid, refresh]);
+
+    useEffect(() => { 
+        if (!isInitialLoading && user?.uid) getReport(); 
+    }, [period, isInitialLoading, getReport, user?.uid]);
 
     const handleUpgradeSubmit = async (paymentData) => {
         try {
@@ -240,7 +282,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
         }
     };
 
-    // --- AUTHENTICATION RENDER CHECK (Moved after Hooks) ---
+    // --- AUTHENTICATION RENDER CHECK ---
     if (!context || !context.user || context.loading) {
         return <div className="p-20 text-center text-slate-500">Authenticating...</div>;
     }
@@ -250,8 +292,8 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
 
     return (
         <div className="w-full">
-            <SubscriptionReminder details={premiumDetails.company} type="company" />
-            <SubscriptionReminder details={premiumDetails.family} type="family" />
+            <SubscriptionReminder details={premiumDetails?.company} type="company" />
+            <SubscriptionReminder details={premiumDetails?.family} type="family" />
 
             <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="flex items-center gap-4">
@@ -293,9 +335,33 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <DashboardCard title="Personal Funds" value={summaryError ? 'Error' : `₱${parseFloat(summaryData?.netPosition || 0).toLocaleString()}`} subtext="Available Balance" linkText="View Transactions" onClick={() => toggleModal('transactions', true)} icon={Icons.Wallet} colorClass="text-emerald-600" />
-                <DashboardCard title="Active Goals" value={activeGoalsCount} subtext="Targets in Progress" linkText="View Goals" onClick={() => toggleModal('goals', true)} icon={Icons.Flag} colorClass="text-rose-600" />
-                <DashboardCard title="Outstanding Loans" value={`₱${lendingSummary.outstanding.toLocaleString()}`} subtext="Total Receivables" linkText="Manage Lending" onClick={() => toggleModal('lending', true)} icon={Icons.Gift} colorClass="text-amber-600" />
+                <DashboardCard 
+                    title="Personal Funds" 
+                    value={summaryError ? 'Error' : `₱${(summaryData?.netPosition || 0).toLocaleString()}`} 
+                    subtext="Available Balance" 
+                    linkText="View Transactions" 
+                    onClick={() => toggleModal('transactions', true)} 
+                    icon={Icons.Wallet} 
+                    colorClass="text-emerald-600" 
+                />
+                <DashboardCard 
+                    title="Active Goals" 
+                    value={activeGoalsCount} 
+                    subtext="Targets in Progress" 
+                    linkText="View Goals" 
+                    onClick={() => toggleModal('goals', true)} 
+                    icon={Icons.Flag} 
+                    colorClass="text-rose-600" 
+                />
+                <DashboardCard 
+                    title="Outstanding Loans" 
+                    value={`₱${(lendingSummary?.outstanding || 0).toLocaleString()}`} 
+                    subtext="Total Receivables" 
+                    linkText="Manage Lending" 
+                    onClick={() => toggleModal('lending', true)} 
+                    icon={Icons.Gift} 
+                    colorClass="text-amber-600" 
+                />
             </div>
 
             <div className="dashboard-section">
