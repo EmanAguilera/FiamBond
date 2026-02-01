@@ -1,14 +1,13 @@
 'use client'; // Required for all components using state, effects, or context in Next.js App Router
 
 import { useContext, useEffect, useState, useCallback, useMemo, Suspense } from "react";
-import dynamic from 'next/dynamic'; // Use next/dynamic instead of React.lazy
+import dynamic from 'next/dynamic';
 import { AppContext } from "../../Context/AppContext.jsx";
-import { useRouter } from "next/navigation"; // Use useRouter from next/navigation
+import { useRouter } from "next/navigation";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../config/firebase-config.js";
 
 // --- WIDGET IMPORTS (Converted to next/dynamic) ---
-// Using ssr: false for components that rely purely on client-side logic/APIs
 const Modal = dynamic(() => import("../../Components/Modal.jsx"), { ssr: false });
 const GoalListsWidget = dynamic(() => import("../../Components/Personal/Goal/GoalListsWidget.jsx"), { ssr: false });
 const CreateGoalWidget = dynamic(() => import("../../Components/Personal/Goal/CreateGoalWidget.tsx"), { ssr: false });
@@ -24,7 +23,7 @@ const FamilyRealm = dynamic(() => import("../Family/FamilyRealm.jsx"), { ssr: fa
 const CompanyRealm = dynamic(() => import("../Company/CompanyRealm.jsx"), { ssr: false });
 const ApplyPremiumWidget = dynamic(() => import("../../Components/Company/Onboarding/ApplyPremiumWidget.jsx"), { ssr: false });
 
-// --- ICONS (Kept as is) ---
+// --- ICONS ---
 const Icons = {
     Plus: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>,
     Users: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m16-10a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>,
@@ -35,7 +34,6 @@ const Icons = {
     Gift: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>
 };
 
-// --- SUBSCRIPTION REMINDER SUB-COMPONENT (Kept as is) ---
 const SubscriptionReminder = ({ details, type }) => {
     if (!details) return null;
     const expiryDate = details.expires_at?.toDate();
@@ -44,7 +42,7 @@ const SubscriptionReminder = ({ details, type }) => {
     const diffTime = expiryDate - new Date();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays > 7) return null; // Only show reminder if 7 days left
+    if (diffDays > 7) return null;
 
     return (
         <div className={`mb-6 p-4 rounded-2xl border flex items-center justify-between animate-in fade-in slide-in-from-top-4 duration-500
@@ -65,7 +63,6 @@ const SubscriptionReminder = ({ details, type }) => {
     );
 };
 
-// --- REUSABLE BUTTON (Kept as is) ---
 const Btn = ({ onClick, type = 'sec', icon, children, className = '', disabled = false }) => {
     const styles = {
         pri: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm border border-transparent",
@@ -84,7 +81,6 @@ const Btn = ({ onClick, type = 'sec', icon, children, className = '', disabled =
     );
 };
 
-// --- DASHBOARD CARD (Kept as is) ---
 const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorClass }) => (
     <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
         <div className="flex justify-between items-start">
@@ -100,7 +96,6 @@ const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorCl
     </div>
 );
 
-// --- CHART DATA HELPER (Kept as is) ---
 const formatDataForChart = (transactions) => {
     if (!transactions || transactions.length === 0) return { labels: [], datasets: [] };
     const data = {};
@@ -124,44 +119,13 @@ const formatDataForChart = (transactions) => {
 
 export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAdmin }) {
     const context = useContext(AppContext);
-
-    // 🛑 CRITICAL FIX: Add this check right here
-    // This prevents the "Cannot destructure property 'user' of 'useContext(...)' as it is null" error.
-    if (!context || !context.user || context.loading) {
-        return <div className="p-20 text-center text-slate-500">Authenticating...</div>;
-    }
-
-    const { user, premiumDetails } = context;
-    
-    // 1. Next.js change: Replace useNavigate with useRouter
     const router = useRouter(); 
     
-    // 2. Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'; 
-    const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
-
-    // NEW SUBSCRIPTION LOGIC (Using AppContext detailed dates) (Kept as is)
-    const isCompanyActive = useMemo(() => {
-        if (user?.role === 'admin') return true;
-        if (!premiumDetails.company) return false;
-        return premiumDetails.company.expires_at?.toDate() > new Date();
-    }, [user, premiumDetails.company]);
-
-    const isFamilyActive = useMemo(() => {
-        if (user?.role === 'admin') return true;
-        if (!premiumDetails.family) return false;
-        return premiumDetails.family.expires_at?.toDate() > new Date();
-    }, [user, premiumDetails.family]);
-
-    const isCompanyPending = user?.subscription_status === 'pending_approval';
-    const isFamilyPending = user?.family_subscription_status === 'pending_approval';
-
-    // Modals (Kept as is)
+    // --- STATE HOOKS ---
     const [modals, setModals] = useState({
         transactions: false, goals: false, families: false, lending: false,
         createTx: false, createGoal: false, recordLoan: false, applyCompany: false, applyFamily: false
     });
-
     const [loanFlowStep, setLoanFlowStep] = useState('choice');
     const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
     const [showCompanyRealm, setShowCompanyRealm] = useState(false);
@@ -175,11 +139,32 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const [reportError, setReportError] = useState(null);
     const [period, setPeriod] = useState('monthly');
 
+    // --- VARIABLES ---
+    const { user, premiumDetails } = context || {};
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'; 
+    const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
+
+    // --- MEMOIZED SUBSCRIPTION LOGIC ---
+    const isCompanyActive = useMemo(() => {
+        if (user?.role === 'admin') return true;
+        if (!premiumDetails?.company) return false;
+        return premiumDetails.company.expires_at?.toDate() > new Date();
+    }, [user, premiumDetails?.company]);
+
+    const isFamilyActive = useMemo(() => {
+        if (user?.role === 'admin') return true;
+        if (!premiumDetails?.family) return false;
+        return premiumDetails.family.expires_at?.toDate() > new Date();
+    }, [user, premiumDetails?.family]);
+
+    const isCompanyPending = user?.subscription_status === 'pending_approval';
+    const isFamilyPending = user?.family_subscription_status === 'pending_approval';
+
+    // --- CALLBACKS ---
     const toggleModal = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
 
-    // Data fetching logic (Kept as is, using updated API_URL)
     const fetchData = useCallback(async () => {
-        if (!user) return;
+        if (!user?.uid) return;
         try {
             const txRes = await fetch(`${API_URL}/transactions?user_id=${user.uid}`);
             const txs = await txRes.json();
@@ -201,7 +186,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     }, [user, API_URL]);
 
     const getReport = useCallback(async () => {
-        if (!user) return;
+        if (!user?.uid) return;
         setReportLoading(true); setReportError(null);
         try {
             const endDate = new Date();
@@ -227,6 +212,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
 
     const refresh = useCallback(() => { fetchData(); getReport(); }, [fetchData, getReport]);
 
+    // --- EFFECTS ---
     useEffect(() => { if (user) { setIsInitialLoading(true); refresh(); setIsInitialLoading(false); } }, [user, refresh]);
     useEffect(() => { if (!isInitialLoading) getReport(); }, [period, isInitialLoading, getReport]);
 
@@ -254,16 +240,19 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
         }
     };
 
+    // --- AUTHENTICATION RENDER CHECK (Moved after Hooks) ---
+    if (!context || !context.user || context.loading) {
+        return <div className="p-20 text-center text-slate-500">Authenticating...</div>;
+    }
+
     if (activeFamilyRealm) return <Suspense fallback={<div/>}><FamilyRealm family={activeFamilyRealm} onBack={() => setActiveFamilyRealm(null)} onDataChange={refresh} /></Suspense>;
     if (showCompanyRealm) return <Suspense fallback={<div/>}><CompanyRealm company={{ id: user.uid, name: "Company" }} onBack={() => setShowCompanyRealm(false)} onDataChange={refresh} /></Suspense>;
 
     return (
         <div className="w-full">
-            {/* ... (SubscriptionReminder and other components) ... */}
             <SubscriptionReminder details={premiumDetails.company} type="company" />
             <SubscriptionReminder details={premiumDetails.family} type="family" />
 
-            {/* --- HEADER --- */}
             <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="flex items-center gap-4">
                     <div className="w-1 h-12 bg-indigo-600 rounded-full opacity-80"></div>
@@ -280,7 +269,6 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                         <Btn onClick={() => { setLoanFlowStep('choice'); toggleModal('recordLoan', true); }} icon={Icons.Plus}>Loan</Btn>
                         <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
 
-                        {/* FAMILY BTN */}
                         {isFamilyActive ? (
                             <Btn onClick={() => toggleModal('families', true)} icon={Icons.Users}>Families</Btn>
                         ) : isFamilyPending ? (
@@ -289,7 +277,6 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                             <Btn onClick={() => toggleModal('applyFamily', true)} type="sec" icon={Icons.Lock}>Families</Btn>
                         )}
 
-                        {/* COMPANY BTN */}
                         {isCompanyActive ? (
                             <Btn onClick={() => setShowCompanyRealm(true)} type="comp" icon={Icons.Build}>Company</Btn>
                         ) : isCompanyPending ? (
@@ -299,21 +286,18 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                         )}
 
                         {user?.role === 'admin' && (
-                            // 3. Next.js change: Replace navigate('/admin') with router.push('/admin')
                             <Btn onClick={onEnterAdmin} icon={Icons.Lock} className="col-span-2 md:col-span-1">Admin</Btn>
                         )}
                     </div>
                 </div>
             </header>
 
-            {/* --- CARDS --- */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <DashboardCard title="Personal Funds" value={summaryError ? 'Error' : `₱${parseFloat(summaryData?.netPosition || 0).toLocaleString()}`} subtext="Available Balance" linkText="View Transactions" onClick={() => toggleModal('transactions', true)} icon={Icons.Wallet} colorClass="text-emerald-600" />
                 <DashboardCard title="Active Goals" value={activeGoalsCount} subtext="Targets in Progress" linkText="View Goals" onClick={() => toggleModal('goals', true)} icon={Icons.Flag} colorClass="text-rose-600" />
                 <DashboardCard title="Outstanding Loans" value={`₱${lendingSummary.outstanding.toLocaleString()}`} subtext="Total Receivables" linkText="Manage Lending" onClick={() => toggleModal('lending', true)} icon={Icons.Gift} colorClass="text-amber-600" />
             </div>
 
-            {/* --- CHART SECTION --- */}
             <div className="dashboard-section">
                 <div className="flex justify-center gap-2 mb-6 bg-slate-100 p-1 rounded-xl w-fit mx-auto">
                     {['weekly', 'monthly', 'yearly'].map(p => (
@@ -325,7 +309,6 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                  <Suspense fallback={<div className="h-96"/>}><PersonalReportChartWidget report={report} /></Suspense>}
             </div>
 
-            {/* --- MODALS --- */}
             <Suspense fallback={null}>
                 {modals.transactions && <Modal isOpen={modals.transactions} onClose={() => toggleModal('transactions', false)} title="Personal Transactions"><PersonalTransactionsWidget /></Modal>}
                 {modals.goals && <Modal isOpen={modals.goals} onClose={() => toggleModal('goals', false)} title="Goals"><GoalListsWidget onDataChange={refresh} /></Modal>}
