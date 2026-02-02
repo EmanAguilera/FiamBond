@@ -143,7 +143,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     // --- VARIABLES ---
     const { user, premiumDetails } = context || {};
     // Ensure API_URL points to Vercel and doesn't fallback to Firebase Domain for APIs
-    const API_URL = process.env.NEXT_PUBLIC_API_URL; 
+    const API_URL = 'https://fiam-bond.vercel.app/api';
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
     // --- MEMOIZED SUBSCRIPTION LOGIC ---
