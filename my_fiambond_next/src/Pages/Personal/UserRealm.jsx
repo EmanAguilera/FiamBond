@@ -1,4 +1,4 @@
-'use client'; // Essential for Next.js App Router client components
+'use client'; 
 
 import { useContext, useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import dynamic from 'next/dynamic';
@@ -6,8 +6,9 @@ import { AppContext } from "../../Context/AppContext.jsx";
 import { useRouter } from "next/navigation";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../config/firebase-config.js";
+import { API_BASE_URL } from "../../config/apiConfig";
 
-// --- WIDGET IMPORTS (Next/Dynamic for performance and hydration safety) ---
+// --- WIDGET IMPORTS ---
 const Modal = dynamic(() => import("../../Components/Modal.jsx"), { ssr: false });
 const GoalListsWidget = dynamic(() => import("../../Components/Personal/Goal/GoalListsWidget.jsx"), { ssr: false });
 const CreateGoalWidget = dynamic(() => import("../../Components/Personal/Goal/CreateGoalWidget.tsx"), { ssr: false });
@@ -38,12 +39,9 @@ const SubscriptionReminder = ({ details, type }) => {
     if (!details) return null;
     const expiryDate = details.expires_at?.toDate();
     if (!expiryDate) return null;
-
     const diffTime = expiryDate - new Date();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
     if (diffDays > 7) return null;
-
     return (
         <div className={`mb-6 p-4 rounded-2xl border flex items-center justify-between animate-in fade-in slide-in-from-top-4 duration-500
             ${diffDays <= 0 ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
@@ -122,7 +120,6 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const context = useContext(AppContext);
     const router = useRouter(); 
     
-    // --- STATE HOOKS ---
     const [modals, setModals] = useState({
         transactions: false, goals: false, families: false, lending: false,
         createTx: false, createGoal: false, recordLoan: false, applyCompany: false, applyFamily: false
@@ -140,13 +137,9 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const [reportError, setReportError] = useState(null);
     const [period, setPeriod] = useState('monthly');
 
-    // --- VARIABLES ---
     const { user, premiumDetails } = context || {};
-    // Ensure API_URL points to Vercel and doesn't fallback to Firebase Domain for APIs
-    const API_URL = 'https://fiam-bond.vercel.app/api';
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
-    // --- MEMOIZED SUBSCRIPTION LOGIC ---
     const isCompanyActive = useMemo(() => {
         if (user?.role === 'admin') return true;
         if (!premiumDetails?.company) return false;
@@ -162,15 +155,13 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const isCompanyPending = user?.subscription_status === 'pending_approval';
     const isFamilyPending = user?.family_subscription_status === 'pending_approval';
 
-    // --- CALLBACKS ---
     const toggleModal = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
 
     const fetchData = useCallback(async () => {
-        // PREVENT "ID required" ERROR: Only fetch if user.uid exists
         if (!user?.uid) return; 
 
         try {
-            const txRes = await fetch(`${API_URL}/transactions?user_id=${user.uid}`);
+            const txRes = await fetch(`${API_BASE_URL}/transactions?user_id=${user.uid}`);
             if (!txRes.ok) throw new Error("Fetch failed");
             
             const txs = await txRes.json();
@@ -182,10 +173,10 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             });
             setSummaryData({ netPosition: balance });
 
-            const gRes = await fetch(`${API_URL}/goals?user_id=${user.uid}`);
+            const gRes = await fetch(`${API_BASE_URL}/goals?user_id=${user.uid}`);
             if (gRes.ok) setActiveGoalsCount((await gRes.json()).filter(g => g.status === 'active').length);
 
-            const lRes = await fetch(`${API_URL}/loans?user_id=${user.uid}`);
+            const lRes = await fetch(`${API_BASE_URL}/loans?user_id=${user.uid}`);
             if (lRes.ok) {
                 const loans = await lRes.json();
                 let out = 0;
@@ -200,7 +191,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             console.error("Dashboard Fetch Error:", e); 
             setSummaryError("Error"); 
         }
-    }, [user?.uid, API_URL]); // Depend on user?.uid specifically
+    }, [user?.uid]);
 
     const getReport = useCallback(async () => {
         if (!user?.uid) return;
@@ -213,11 +204,9 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             else if (period === 'yearly') startDate.setFullYear(endDate.getFullYear() - 1);
             else startDate.setMonth(endDate.getMonth() - 1);
 
-            const res = await fetch(`${API_URL}/transactions?user_id=${user.uid}&startDate=${startDate.toISOString()}`);
+            const res = await fetch(`${API_BASE_URL}/transactions?user_id=${user.uid}&startDate=${startDate.toISOString()}`);
             if (!res.ok) throw new Error('API Error');
             const data = await res.json();
-
-            // Guard against non-array data
             const txList = Array.isArray(data) ? data : [];
             const txs = txList.filter(tx => !tx.family_id).map(tx => ({ 
                 ...tx, 
@@ -241,11 +230,10 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
         } finally { 
             setReportLoading(false); 
         }
-    }, [user?.uid, period, API_URL]);
+    }, [user?.uid, period]);
 
     const refresh = useCallback(() => { fetchData(); getReport(); }, [fetchData, getReport]);
 
-    // --- EFFECTS ---
     useEffect(() => { 
         if (user?.uid) { 
             setIsInitialLoading(true); 
@@ -282,7 +270,6 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
         }
     };
 
-    // --- AUTHENTICATION RENDER CHECK ---
     if (!context || !context.user || context.loading) {
         return <div className="p-20 text-center text-slate-500">Authenticating...</div>;
     }

@@ -1,14 +1,13 @@
-'use client'; // Required for all components using state, effects, or context in Next.js App Router
+'use client'; 
 
 import { useState, Suspense, useContext, useCallback, useEffect } from 'react';
-import dynamic from 'next/dynamic'; // Use next/dynamic instead of React.lazy
+import dynamic from 'next/dynamic';
 import { AppContext } from '../../Context/AppContext.jsx';
 import { db } from '../../config/firebase-config.js';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
-// Removed: import { Link } from 'react-router-dom'; (Not needed, navigation handled by 'onBack' prop)
+import { API_BASE_URL } from "../../config/apiConfig";
 
-// --- WIDGET IMPORTS (Converted to next/dynamic) ---
-// Using ssr: false for components that rely purely on client-side logic/APIs
+// --- WIDGET IMPORTS ---
 const Modal = dynamic(() => import('../../Components/Modal.jsx'), { ssr: false });
 const FamilyReportChartWidget = dynamic(() => import('../../Components/Family/Analytics/FamilyReportChartWidget.jsx'), { ssr: false });
 const LoanTrackingWidget = dynamic(() => import('../../Components/Personal/Loan/LoanTrackingWidget'), { ssr: false });
@@ -19,7 +18,7 @@ const CreateFamilyGoalWidget = dynamic(() => import('../../Components/Family/Goa
 const FamilyTransactionsWidget = dynamic(() => import('../../Components/Family/Finance/FamilyTransactionsWidget'), { ssr: false });
 const ManageMembersWidget = dynamic(() => import('../../Components/Family/Members/ManageMembersWidget.jsx'), { ssr: false });
 
-// --- ICONS (Kept as is) ---
+// --- ICONS ---
 const Icons = {
     Plus: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>,
     Back: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>,
@@ -29,7 +28,6 @@ const Icons = {
     Gift: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>
 };
 
-// --- REUSABLE BUTTON (Kept as is) ---
 const Btn = ({ onClick, type = 'sec', icon, children, className = '' }) => {
     const styles = {
         pri: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm border border-transparent",
@@ -43,7 +41,6 @@ const Btn = ({ onClick, type = 'sec', icon, children, className = '' }) => {
     );
 };
 
-// --- DASHBOARD CARD (Kept as is) ---
 const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorClass }) => (
     <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
         <div className="flex justify-between items-start">
@@ -58,7 +55,6 @@ const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorCl
     </div>
 );
 
-// --- HELPER FUNCTION (Kept as is) ---
 const formatDataForChart = (transactions) => {
     if (!transactions || transactions.length === 0) return { labels: [], datasets: [] };
     const data = {};
@@ -82,8 +78,6 @@ const formatDataForChart = (transactions) => {
 
 export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpdate }) {
     const { user } = useContext(AppContext);
-    // Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
     const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -104,11 +98,10 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
     const [period, setPeriod] = useState('monthly');
     const [familyMembers, setFamilyMembers] = useState([]);
 
-    // --- FETCH DATA LOGIC (Kept as is, using updated API_URL) ---
     const getFamilyMembers = useCallback(async () => {
         if (!family) return;
         try {
-            const famRes = await fetch(`${API_URL}/families/${family.id}`);
+            const famRes = await fetch(`${API_BASE_URL}/families/${family.id}`);
             if (!famRes.ok) return;
             const freshFamily = await famRes.json();
             const memberIds = freshFamily.member_ids || [];
@@ -123,12 +116,12 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             const fetchedMembers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setFamilyMembers(fetchedMembers);
         } catch (error) { console.error("Failed to fetch members", error); }
-    }, [family, API_URL]);
+    }, [family]);
 
     const getFamilyBalance = useCallback(async () => {
         if (!user || !family || familyNotFound) return;
         try {
-            const response = await fetch(`${API_URL}/transactions?family_id=${family.id}`);
+            const response = await fetch(`${API_BASE_URL}/transactions?family_id=${family.id}`);
             if (response.ok) {
                 const transactions = await response.json();
                 let netPosition = 0;
@@ -139,50 +132,51 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                 setSummaryData({ netPosition });
             }
         } catch (error) { console.error(error); }
-    }, [user, family, familyNotFound, API_URL]);
+    }, [user, family, familyNotFound]);
 
     const getFamilyActiveGoalsCount = useCallback(async () => {
         if (!user || !family || familyNotFound) return;
         try {
-            const response = await fetch(`${API_URL}/goals?family_id=${family.id}`);
+            const response = await fetch(`${API_BASE_URL}/goals?family_id=${family.id}`);
             if (response.ok) {
-                setActiveGoalsCount((await response.json()).filter(g => g.status === 'active').length);
+                const goals = await response.json();
+                setActiveGoalsCount(goals.filter(g => g.status === 'active').length);
             }
         } catch (error) { console.error(error); }
-    }, [user, family, familyNotFound, API_URL]);
+    }, [user, family, familyNotFound]);
 
     const getFamilyActiveLoansCount = useCallback(async () => {
         if (!user || !family || familyNotFound) return;
         try {
-            const response = await fetch(`${API_URL}/loans?family_id=${family.id}`);
+            const response = await fetch(`${API_BASE_URL}/loans?family_id=${family.id}`);
             if (response.ok) {
                 const loans = await response.json();
                 setActiveLoansCount(loans.filter(l => l.status === 'outstanding' || l.status === 'pending_confirmation').length);
             }
         } catch (error) { console.error(error); }
-    }, [user, family, familyNotFound, API_URL]);
+    }, [user, family, familyNotFound]);
 
     const getFamilyReport = useCallback(async () => {
         if (!user || !family || familyNotFound) return;
         setReportLoading(true); setReportError(null);
         try {
-            // FIX: Independent Date calculation for accurate report titles
             const endDate = new Date();
             const startDate = new Date();
 
-            if (period === 'weekly') {
-                startDate.setDate(endDate.getDate() - 7);
-            } else if (period === 'yearly') {
-                startDate.setFullYear(endDate.getFullYear() - 1);
-            } else {
-                // Monthly default
-                startDate.setMonth(endDate.getMonth() - 1);
-            }
+            if (period === 'weekly') startDate.setDate(endDate.getDate() - 7);
+            else if (period === 'yearly') startDate.setFullYear(endDate.getFullYear() - 1);
+            else startDate.setMonth(endDate.getMonth() - 1);
 
-            const response = await fetch(`${API_URL}/transactions?family_id=${family.id}&startDate=${startDate.toISOString()}`);
+            const response = await fetch(`${API_BASE_URL}/transactions?family_id=${family.id}&startDate=${startDate.toISOString()}`);
             if (!response.ok) throw new Error('API Error');
 
-            const transactions = (await response.json()).map(tx => ({ ...tx, id: tx._id, created_at: { toDate: () => new Date(tx.created_at) } }));
+            const data = await response.json();
+            const txList = Array.isArray(data) ? data : [];
+            const transactions = txList.map(tx => ({ 
+                ...tx, 
+                id: tx._id, 
+                created_at: { toDate: () => new Date(tx.created_at) } 
+            }));
 
             let totalInflow = 0, totalOutflow = 0;
             transactions.forEach(tx => { tx.type === 'income' ? totalInflow += tx.amount : totalOutflow += tx.amount; });
@@ -192,7 +186,6 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                 totalInflow,
                 totalOutflow,
                 netPosition: totalInflow - totalOutflow,
-                // FIX: Dynamic Date Range Title
                 reportTitle: `Funds Report: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`,
                 transactionCount: transactions.length
             });
@@ -200,7 +193,7 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             console.error("Report Fetch Error:", error);
             setReportError("No data");
         } finally { setReportLoading(false); }
-    }, [user, family, period, familyNotFound, API_URL]);
+    }, [user, family, period, familyNotFound]);
 
     const handleRealmRefresh = useCallback(async () => {
         if (familyNotFound) return;
@@ -214,32 +207,26 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             if (!family || !user) return;
             setLoading(true);
             try {
-                const checkResponse = await fetch(`${API_URL}/families/${family.id}`);
+                const checkResponse = await fetch(`${API_BASE_URL}/families/${family.id}`);
                 if (checkResponse.status === 404) { setFamilyNotFound(true); setLoading(false); return; }
                 await Promise.all([ getFamilyBalance(), getFamilyActiveGoalsCount(), getFamilyActiveLoansCount(), getFamilyReport(), getFamilyMembers() ]);
             } catch (error) { console.error(error); } finally { setLoading(false); }
         };
         fetchAllData();
-    }, [family, user, API_URL, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport, getFamilyMembers]);
+    }, [family, user, getFamilyBalance, getFamilyActiveGoalsCount, getFamilyActiveLoansCount, getFamilyReport, getFamilyMembers]);
 
     useEffect(() => { if (!loading && !familyNotFound) getFamilyReport(); }, [period, loading, familyNotFound, getFamilyReport]);
 
     const handleMembersUpdate = (updatedFamily) => { getFamilyMembers(); if (onFamilyUpdate) onFamilyUpdate(updatedFamily); };
 
     if (loading) return <div className="p-10 text-center animate-pulse text-slate-500">Loading Family Realm...</div>;
-    if (familyNotFound) return <div className="p-10 text-center">Family Not Found <button onClick={onBack}>Back</button></div>;
+    if (familyNotFound) return <div className="p-10 text-center text-slate-500">Family Not Found <button className="ml-2 text-indigo-600 underline" onClick={onBack}>Back</button></div>;
 
     return (
         <div className="w-full">
-            {/* --- HEADER --- */}
             <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="flex flex-col gap-1">
-
-                    {/* Utility Pill Back Button */}
-                    <button
-                        onClick={onBack}
-                        className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-sm font-medium hover:border-indigo-300 hover:text-indigo-600 hover:shadow-sm transition-all mb-4 w-fit"
-                    >
+                    <button onClick={onBack} className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-sm font-medium hover:border-indigo-300 hover:text-indigo-600 hover:shadow-sm transition-all mb-4 w-fit">
                         <span className="group-hover:-translate-x-0.5 transition-transform">{Icons.Back}</span>
                         <span>Back to Personal</span>
                     </button>
@@ -247,38 +234,22 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                     <div className="flex items-center gap-4">
                         <div className="w-1 h-12 bg-indigo-600 rounded-full opacity-80"></div>
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-800 tracking-tight leading-none">
-                                {family.family_name}
-                            </h1>
-                            <p className="text-slate-500 font-medium text-sm mt-1 tracking-wide">
-                                Family Realm
-                            </p>
+                            <h1 className="text-3xl font-bold text-slate-800 tracking-tight leading-none">{family.family_name}</h1>
+                            <p className="text-slate-500 font-medium text-sm mt-1 tracking-wide">Family Realm</p>
                         </div>
                     </div>
                 </div>
 
-                {/* --- RESPONSIVE BUTTON GRID --- */}
                 <div className="w-full md:w-auto">
                     <div className="grid grid-cols-2 gap-3 md:flex md:items-center">
-
-                        {/* Transaction Button: Full Width on Mobile */}
                         <div className="col-span-2 md:col-span-1 md:w-auto">
-                            <Btn onClick={() => setIsTransactionModalOpen(true)} type="pri" icon={Icons.Plus} className="w-full">
-                                Transaction
-                            </Btn>
+                            <Btn onClick={() => setIsTransactionModalOpen(true)} type="pri" icon={Icons.Plus} className="w-full">Transaction</Btn>
                         </div>
-
-                        {/* Middle Buttons */}
                         <Btn onClick={() => setIsGoalModalOpen(true)} icon={Icons.Plus}>Goal</Btn>
                         <Btn onClick={() => setIsLoanModalOpen(true)} icon={Icons.Plus}>Loan</Btn>
-
                         <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
-
-                        {/* Members Button: Full Width on Mobile (Matches Transaction) */}
                         <div className="col-span-2 md:col-span-1 md:w-auto">
-                            <Btn onClick={() => setIsMembersModalOpen(true)} icon={Icons.Users} className="w-full">
-                                Members
-                            </Btn>
+                            <Btn onClick={() => setIsMembersModalOpen(true)} icon={Icons.Users} className="w-full">Members</Btn>
                         </div>
                     </div>
                 </div>
@@ -291,7 +262,6 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
             </div>
 
             <div className="dashboard-section">
-                {/* --- UPDATED PERIOD SELECTOR (Pill Style) --- */}
                 <div className="flex justify-center gap-2 mb-6 bg-slate-100 p-1 rounded-xl w-fit mx-auto">
                     {['weekly', 'monthly', 'yearly'].map(p => (
                         <button key={p} onClick={() => setPeriod(p)} className={`px-4 py-1 text-sm rounded-lg capitalize transition ${period === p ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}>{p}</button>
@@ -309,7 +279,7 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                 )}
             </div>
 
-            <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center text-white">Loading...</div>}>
+            <Suspense fallback={null}>
                 {isLoanModalOpen && <Modal isOpen={isLoanModalOpen} onClose={() => setIsLoanModalOpen(false)} title="Record New Loan"><CreateLoanWidget family={family} members={familyMembers} onSuccess={handleRealmRefresh} /></Modal>}
                 {isTransactionModalOpen && <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} title={`Record New Transaction`}><CreateFamilyTransactionWidget family={family} onSuccess={handleRealmRefresh} /></Modal>}
                 {isGoalModalOpen && <Modal isOpen={isGoalModalOpen} onClose={() => setIsGoalModalOpen(false)} title={`Record New Goal`}><CreateFamilyGoalWidget family={family} onSuccess={handleRealmRefresh} /></Modal>}
