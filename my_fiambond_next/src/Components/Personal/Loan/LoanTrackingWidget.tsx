@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { AppContext } from "../../../Context/AppContext";
 import { db } from '../../../config/firebase-config';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
+import { API_BASE_URL } from "@/src/config/apiConfig"; // <--- ADDED IMPORT
 
 // --- DYNAMIC IMPORTS ---
 const Modal = dynamic(() => import('../../Modal'), { ssr: false });
@@ -266,7 +267,7 @@ const LoanItem = ({ loan, onRepaymentSuccess }: { loan: Loan; onRepaymentSuccess
 // --- MAIN WIDGET ---
 export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackingWidgetProps) {
     const { user } = useContext(AppContext);
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    // REMOVED: const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
     const [activeTab, setActiveTab] = useState<'outstanding' | 'history'>('outstanding');
     const [openSection, setOpenSection] = useState<string | null>('actionRequired');
@@ -293,12 +294,11 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
         // ⭐️ CRITICAL FIX: Guard Clause for db 
         if (!db) {
             console.warn("Firestore not initialized. Cannot fetch user details.");
-            // We can still fetch the loans from the API, but user names will be 'Unknown'
-            // We won't return early unless the API call also fails.
         }
         
         try {
-            const response = await fetch(`${API_URL}/loans?user_id=${user.uid}`);
+            // UPDATED: Using the imported API_BASE_URL
+            const response = await fetch(`${API_BASE_URL}/loans?user_id=${user.uid}`);
             if (!response.ok) throw new Error("Failed to fetch loans");
             
             const rawLoans: any[] = await response.json();
@@ -322,7 +322,7 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
             });
             
             const usersMap: Record<string, UserProfile> = {};
-            if (userIds.size > 0 && db) { // <-- SAFE CHECK HERE
+            if (userIds.size > 0 && db) { 
                 const usersQuery = query(collection(db, "users"), where(documentId(), "in", [...userIds])); 
                 const usersSnapshot = await getDocs(usersQuery); 
                 usersSnapshot.forEach(doc => { usersMap[doc.id] = { id: doc.id, full_name: "Unknown", ...doc.data() } as UserProfile; }); 
@@ -364,7 +364,7 @@ export default function LoanTrackingWidget({ family, onDataChange }: LoanTrackin
         } finally { 
             setLoading(false); 
         }
-    }, [user, family, API_URL]);
+    }, [user, family]); // UPDATED dependency array: API_BASE_URL is a constant, so it's removed.
 
     useEffect(() => { getLoans(); }, [getLoans]);
 

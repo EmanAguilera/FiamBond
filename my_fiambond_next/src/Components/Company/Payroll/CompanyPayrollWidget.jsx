@@ -2,12 +2,11 @@
 
 import { useState, useContext } from 'react';
 import { AppContext } from '../../../Context/AppContext.jsx';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 import { toast } from 'react-hot-toast'; // Client-side library
 
 export default function CompanyPayrollWidget({ company, members, onSuccess }) {
     const { user } = useContext(AppContext);
-    // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
     const [activeTab, setActiveTab] = useState('salary'); // 'salary' or 'advance'
     const [loading, setLoading] = useState(false);
@@ -48,7 +47,7 @@ export default function CompanyPayrollWidget({ company, members, onSuccess }) {
                 date: new Date().toISOString() // Use ISO string
             };
 
-            const response = await fetch(`${API_URL}/transactions`, {
+            const response = await fetch(`${API_BASE_URL}/transactions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(transactionPayload)
@@ -61,7 +60,7 @@ export default function CompanyPayrollWidget({ company, members, onSuccess }) {
             setFormData({ employeeId: '', amount: '', notes: '' });
 
         } catch (err) {
-            console.error(err);
+            console.error("Payroll Error:", err);
             setError("Failed to record transaction.");
             toast.error("Failed to record payroll.");
         } finally {
@@ -75,15 +74,15 @@ export default function CompanyPayrollWidget({ company, members, onSuccess }) {
             <div className="flex border-b border-gray-200">
                 <button 
                     onClick={() => setActiveTab('salary')} 
-                    type="button" // Use type="button" to prevent form submission
-                    className={`flex-1 py-2 text-sm font-medium border-b-2 ${activeTab === 'salary' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    type="button" 
+                    className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'salary' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                     Run Salary
                 </button>
                 <button 
                     onClick={() => setActiveTab('advance')} 
-                    type="button" // Use type="button"
-                    className={`flex-1 py-2 text-sm font-medium border-b-2 ${activeTab === 'advance' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    type="button" 
+                    className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'advance' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                     Cash Advance
                 </button>
@@ -97,7 +96,7 @@ export default function CompanyPayrollWidget({ company, members, onSuccess }) {
                         value={formData.employeeId} 
                         onChange={handleInputChange} 
                         required
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                     >
                         <option value="">-- Choose Employee --</option>
                         {members.map(m => (
@@ -135,22 +134,22 @@ export default function CompanyPayrollWidget({ company, members, onSuccess }) {
                 </div>
 
                 {activeTab === 'salary' && (
-                    <div className="bg-blue-50 p-3 rounded-md text-xs text-blue-700">
+                    <div className="bg-blue-50 p-3 rounded-md text-xs text-blue-700 border border-blue-100">
                         This will generate a payroll expense in the company ledger and can be exported as a PDF invoice later.
                     </div>
                 )}
                 {activeTab === 'advance' && (
-                    <div className="bg-amber-50 p-3 rounded-md text-xs text-amber-700">
+                    <div className="bg-amber-50 p-3 rounded-md text-xs text-amber-700 border border-amber-100">
                         This will be recorded as a company expense. Ensure you have an agreement for repayment.
                     </div>
                 )}
 
-                {error && <p className="text-red-500 text-sm">{error}</p>}
+                {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
 
                 <button 
                     type="submit" 
                     disabled={loading}
-                    className={`w-full py-2.5 rounded-xl font-bold text-white shadow-md transition-all active:scale-95 ${activeTab === 'salary' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                    className={`w-full py-2.5 rounded-xl font-bold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${activeTab === 'salary' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
                 >
                     {loading ? 'Processing...' : activeTab === 'salary' ? 'Disburse Salary' : 'Grant Advance'}
                 </button>

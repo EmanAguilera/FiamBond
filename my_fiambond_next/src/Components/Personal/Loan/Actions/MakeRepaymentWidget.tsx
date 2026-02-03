@@ -1,10 +1,11 @@
-'use client'; // Required due to the use of useState, useContext, and browser APIs (fetch, FormData, File)
+'use client'; // Required due to the use of useState, useContext, and browser APIs
 
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
-import { AppContext } from '../../../../Context/AppContext.jsx';
-import { toast } from 'react-hot-toast'; // Client-side library
+import { AppContext } from '@/src/Context/AppContext';
+import { API_BASE_URL } from '@/src/config/apiConfig';
+import { toast } from 'react-hot-toast';
 
-// ⭐️ Next.js change: Replace import.meta.env with process.env.NEXT_PUBLIC_
+// Next.js Cloudinary Environment Variables
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -16,21 +17,16 @@ interface MakeRepaymentWidgetProps {
 
 export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWidgetProps) {
     const { user } = useContext(AppContext);
-    // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
     const totalOwed = loan.total_owed || loan.amount;
     const outstanding = totalOwed - (loan.repaid_amount || 0);
 
-    // State typing retained from original .tsx
     const [amount, setAmount] = useState<string>(outstanding.toFixed(2));
     const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>('Submit for Confirmation');
-
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Function typing retained from original .tsx
     const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setAttachmentFile(e.target.files[0]);
@@ -39,21 +35,20 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
         }
     };
 
-    // Function typing retained from original .tsx
     const handleSubmitForConfirmation = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const repaymentAmount = parseFloat(amount);
 
         if (!user || !loan || !loan.id) {
-            setError("Cannot process payment. Missing user or loan data.");
+            setError("Critical data is missing.");
             return;
         }
         if (isNaN(repaymentAmount) || repaymentAmount <= 0) {
-            setError("Please enter a valid, positive amount.");
+            setError("Please enter a valid amount.");
             return;
         }
-        if (repaymentAmount > outstanding) {
-            setError(`Payment cannot exceed the outstanding amount of ₱${outstanding.toFixed(2)}.`);
+        if (repaymentAmount > outstanding + 0.01) { // 0.01 buffer for float math
+            setError(`Cannot exceed outstanding balance of ₱${outstanding.toLocaleString()}.`);
             return;
         }
 
@@ -63,66 +58,64 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
         try {
             let receiptUrl = null;
 
-            // 1. Upload Receipt to Cloudinary
+            // 1. Upload Proof to Cloudinary
             if (attachmentFile) {
                 setStatusMessage("Uploading receipt...");
                 const uploadFormData = new FormData();
                 uploadFormData.append('file', attachmentFile);
                 uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-                const response = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: uploadFormData });
-                if (!response.ok) throw new Error('Failed to upload receipt.');
+                const cloudRes = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: uploadFormData });
+                if (!cloudRes.ok) throw new Error('Proof upload failed.');
                 
-                const data = await response.json();
-                receiptUrl = data.secure_url;
+                const cloudData = await cloudRes.json();
+                receiptUrl = cloudData.secure_url;
             }
             
-            setStatusMessage("Submitting for confirmation...");
+            setStatusMessage("Submitting...");
 
-            // 2. Update Loan (PATCH) to add pending_repayment
-            // We send the object structure that the backend expects
+            // 2. Submit Repayment Request to Loan Object
             const pendingRepaymentData = {
                 amount: repaymentAmount,
                 submitted_by: user.uid,
-                submitted_at: new Date(),
+                submitted_at: new Date().toISOString(),
                 receipt_url: receiptUrl || null,
             };
 
-            const loanResponse = await fetch(`${API_URL}/loans/${loan.id}`, {
+            const loanRes = await fetch(`${API_BASE_URL}/loans/${loan.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    pending_repayment: pendingRepaymentData 
-                })
+                body: JSON.stringify({ pending_repayment: pendingRepaymentData })
             });
 
-            if (!loanResponse.ok) throw new Error("Failed to submit repayment to server.");
+            if (!loanRes.ok) throw new Error("Server failed to process repayment.");
 
-            // 3. Create Expense Transaction (POST)
+            // 3. Create Expense Transaction
             const transactionData = {
                 user_id: user.uid,
                 family_id: null,
                 type: 'expense',
                 amount: repaymentAmount,
-                description: `Loan repayment for: ${loan.description}`,
-                attachment_url: receiptUrl
+                description: `Loan repayment: ${loan.description}`,
+                attachment_url: receiptUrl,
+                created_at: new Date().toISOString()
             };
 
-            const txResponse = await fetch(`${API_URL}/transactions`, {
+            const txRes = await fetch(`${API_BASE_URL}/transactions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(transactionData)
             });
 
-            if (!txResponse.ok) throw new Error("Repayment submitted, but failed to record expense.");
+            if (!txRes.ok) throw new Error("Failed to record expense transaction.");
 
-            toast.success("Repayment submitted for lender confirmation!");
+            toast.success("Repayment submitted for confirmation!");
             onSuccess();
 
         } catch (err: any) {
-            console.error("Failed to submit repayment:", err);
-            setError("Could not submit payment. Please check your connection and try again.");
-            toast.error("Failed to submit repayment.");
+            console.error(err);
+            setError(err.message || "Submission failed.");
+            toast.error("Process failed.");
         } finally {
             setLoading(false);
             setStatusMessage('Submit for Confirmation');
@@ -130,49 +123,61 @@ export default function MakeRepaymentWidget({ loan, onSuccess }: MakeRepaymentWi
     };
 
     return (
-        <form onSubmit={handleSubmitForConfirmation} className="space-y-4">
-            <div>
-                <p className="text-sm text-gray-600">You are making a repayment for:</p>
-                <p className="font-semibold text-gray-800">{loan.description}</p>
-                <p className="text-lg font-bold text-rose-600 mt-2">
-                    Outstanding: ₱{outstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-            </div>
-            <hr />
-            <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Repayment Amount (₱)</label>
-                <input 
-                    id="amount" 
-                    type="number" 
-                    step="0.01" 
-                    value={amount} 
-                    onChange={(e) => setAmount(e.target.value)} 
-                    required 
-                    disabled={loading} 
-                    className="w-full p-2 border border-gray-300 rounded-md" 
-                />
-            </div>
-            
-            <div>
-                <label htmlFor="repaymentAttachment" className="block text-sm font-medium text-gray-700">
-                    Attach Proof of Payment (Optional)
-                </label>
-                <input 
-                    id="repaymentAttachment" 
-                    type="file" 
-                    accept="image/*,.pdf"
-                    onChange={handleAttachmentChange} 
-                    disabled={loading} 
-                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                />
+        <form onSubmit={handleSubmitForConfirmation} className="space-y-6">
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Repaying Loan</p>
+                <p className="font-bold text-slate-800 text-lg leading-tight">{loan.description}</p>
+                <div className="mt-3 flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Total Outstanding:</span>
+                    <span className="text-xl font-black text-rose-600">
+                        ₱{outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                </div>
             </div>
 
-            {error && <p className="error text-center text-rose-600 text-sm">{error}</p>}
-            <button type="submit" className="primary-btn w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50" disabled={loading}>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Amount to Pay (₱)</label>
+                    <input 
+                        type="number" 
+                        step="0.01" 
+                        value={amount} 
+                        onChange={(e) => setAmount(e.target.value)} 
+                        required 
+                        disabled={loading} 
+                        className="w-full p-4 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700" 
+                    />
+                </div>
+                
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Upload Receipt</label>
+                    <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleAttachmentChange} 
+                        disabled={loading} 
+                        className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-dashed border-slate-200 rounded-xl p-4" 
+                    />
+                </div>
+            </div>
+
+            {error && <p className="text-center text-rose-600 text-xs font-bold bg-rose-50 p-2 rounded-lg">{error}</p>}
+            
+            <button 
+                type="submit" 
+                className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50" 
+                disabled={loading}
+            >
+                {loading && (
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                )}
                 {loading ? statusMessage : 'Submit for Confirmation'}
             </button>
-            <p className="text-xs text-center text-gray-500">
-                This will be deducted from your personal balance. The lender must confirm this payment.
+            <p className="text-[10px] text-center text-slate-400 font-medium">
+                Funds will be deducted from your personal balance immediately. The lender will review and confirm this repayment to update the loan status.
             </p>
         </form>
     );

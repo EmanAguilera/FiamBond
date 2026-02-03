@@ -3,9 +3,10 @@
 import { useState, memo } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../config/firebase-config';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 import { toast } from 'react-hot-toast'; 
 
-// --- INTERNAL COMPONENT: Add Member Form (Kept as is) ---
+// --- INTERNAL COMPONENT: Add Member Form ---
 const AddMemberForm = ({ onAdd, onCancel }) => {
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ const AddMemberForm = ({ onAdd, onCancel }) => {
     );
 };
 
-// --- INTERNAL COMPONENT: Member Row (Kept as is) ---
+// --- INTERNAL COMPONENT: Member Row ---
 const MemberRow = ({ member }) => {
     const initials = (member.full_name || member.first_name || "U").substring(0, 2).toUpperCase();
     
@@ -64,8 +65,6 @@ const MemberRow = ({ member }) => {
 
 // --- MAIN WIDGET ---
 const ManageMembersWidget = ({ family, members, onUpdate }) => {
-    // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
     const [showAddForm, setShowAddForm] = useState(false);
 
     const handleAddMember = async (email) => {
@@ -83,7 +82,7 @@ const ManageMembersWidget = ({ family, members, onUpdate }) => {
             const newUserId = snapshot.docs[0].id;
 
             // 2. Add to Family in MongoDB
-            const res = await fetch(`${API_URL}/families/${family.id}/members`, {
+            const res = await fetch(`${API_BASE_URL}/families/${family.id}/members`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ newMemberId: newUserId })
@@ -97,7 +96,6 @@ const ManageMembersWidget = ({ family, members, onUpdate }) => {
             setShowAddForm(false);
 
         } catch (error) {
-            // Note: The original code used error.message in the catch, which is good practice.
             console.error(error);
             toast.error(error.message || "Failed to process invitation."); 
         }

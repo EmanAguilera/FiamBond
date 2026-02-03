@@ -1,10 +1,10 @@
-'use client'; // Required due to the use of useState, useContext, and browser APIs (fetch, FormData, File)
+'use client'; // Required due to the use of useState, useContext, and browser APIs
 
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
-import { AppContext } from '../../../Context/AppContext.jsx'; // Fixed Import path (up 3 levels)
+import { AppContext } from "../../../Context/AppContext";
+import { API_BASE_URL } from '@/src/config/apiConfig';
+import { toast } from 'react-hot-toast';
 
-// The Goal interface (retained for type clarity, will be stripped in JS conversion)
-// NOTE: Since the original file was TSX, I'll keep the types here but ensure it converts correctly to JS/TSX-compatible code.
 interface Goal {
     id: string; 
     name: string;
@@ -20,74 +20,65 @@ interface CompleteGoalWidgetProps {
     onSuccess: () => void;
 }
 
-// ⭐️ Next.js change: Replace import.meta.env with process.env.NEXT_PUBLIC_
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
-// Function component signature with props type annotation (from original .tsx)
 export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidgetProps) {
     const { user } = useContext(AppContext);
     
-    // ⭐️ Next.js change: Replace import.meta.env with process.env.NEXT_PUBLIC_
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-
-    // State typing retained from original .tsx
     const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>('Confirm & Complete Goal');
 
-    // Function typing retained from original .tsx
     const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setAttachmentFile(e.target.files[0]);
         }
     };
 
-    // Function typing retained from original .tsx
     const handleConfirmCompletion = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (!user) return;
+        if (!user) return toast.error("User session not found");
+        
         setLoading(true);
-        setError(null);
 
         try {
             let achievementUrl: string | null = null;
 
-            // 1. Upload Image
+            // 1. Upload Achievement Photo
             if (attachmentFile) {
                 setStatusMessage("Uploading photo...");
                 const uploadFormData = new FormData();
                 uploadFormData.append('file', attachmentFile);
                 uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
                 
-                const response = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: uploadFormData });
-                if (!response.ok) throw new Error('Failed to upload achievement photo.');
+                const cloudRes = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: uploadFormData });
+                if (!cloudRes.ok) throw new Error('Failed to upload achievement photo.');
                 
-                const data = await response.json();
-                achievementUrl = data.secure_url;
+                const cloudData = await cloudRes.json();
+                achievementUrl = cloudData.secure_url;
             }
 
-            // 2. Update Goal Status (Use API_URL)
+            // 2. Update Goal Status
             setStatusMessage("Updating Goal...");
             
             const goalUpdatePayload = {
                 status: "completed",
-                completed_at: new Date(), 
+                completed_at: new Date().toISOString(), 
                 completed_by_user_id: user.uid,
                 ...(achievementUrl && { achievement_url: achievementUrl }),
             };
 
-            const goalResponse = await fetch(`${API_URL}/goals/${goal.id}`, {
+            const goalRes = await fetch(`${API_BASE_URL}/goals/${goal.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(goalUpdatePayload)
             });
 
-            if (!goalResponse.ok) throw new Error("Failed to update goal status on server.");
+            if (!goalRes.ok) throw new Error("Failed to update goal status.");
 
-            // 3. Create Transaction (Use API_URL)
+            // 3. Create Automated Transaction
             setStatusMessage("Recording Transaction...");
 
             const transactionPayload = {
@@ -98,23 +89,24 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
                 description: goal.family_id 
                     ? `Family Goal Achieved: ${goal.name}`
                     : `Goal Achieved: ${goal.name}`,
-                created_at: new Date(),
+                created_at: new Date().toISOString(),
                 attachment_url: achievementUrl,
             };
 
-            const transactionResponse = await fetch(`${API_URL}/transactions`, {
+            const txRes = await fetch(`${API_BASE_URL}/transactions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(transactionPayload)
             });
 
-            if (!transactionResponse.ok) throw new Error("Goal updated, but failed to record transaction.");
+            if (!txRes.ok) throw new Error("Goal completed, but transaction record failed.");
             
+            toast.success("Congratulations! Goal Completed.");
             onSuccess();
 
         } catch (err: any) {
-            console.error("Failed to complete goal:", err);
-            setError(err.message || "Could not complete the goal.");
+            console.error("Completion error:", err);
+            toast.error(err.message || "Could not complete the goal.");
         } finally {
             setLoading(false);
             setStatusMessage('Confirm & Complete Goal');
@@ -122,36 +114,50 @@ export default function CompleteGoalWidget({ goal, onSuccess }: CompleteGoalWidg
     };
 
     return (
-        <form onSubmit={handleConfirmCompletion} className="space-y-4">
-            <div>
-                <p className="text-sm text-gray-600">You are about to complete the goal:</p>
-                <p className="font-semibold text-lg text-gray-800 mt-1">{goal.name}</p>
+        <form onSubmit={handleConfirmCompletion} className="space-y-6">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Target Achievement</p>
+                <p className="font-bold text-xl text-slate-800">{goal.name}</p>
                 
-                <p className="text-sm text-gray-500 mt-2">
-                    {goal.family_id 
-                        ? `An expense of ₱${goal.target_amount.toLocaleString()} will be recorded from the family's shared balance.`
-                        : `An expense of ₱${goal.target_amount.toLocaleString()} will be recorded from your personal balance.`
-                    }
-                </p>
+                <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                        ₱
+                    </div>
+                    <span>
+                        {goal.family_id ? 'Family' : 'Personal'} expense of 
+                        <span className="font-bold text-slate-800 ml-1">₱{goal.target_amount.toLocaleString()}</span>
+                    </span>
+                </div>
             </div>
-            <hr />
-            <div>
-                <label htmlFor="achievementAttachment" className="block text-sm font-medium text-gray-700">
-                    Upload a Photo of Your Achievement (Optional)
+
+            <div className="space-y-2">
+                <label htmlFor="achievementAttachment" className="block text-sm font-bold text-slate-700">
+                    Proof of Achievement <span className="text-slate-400 font-normal">(Optional)</span>
                 </label>
-                <input 
-                    id="achievementAttachment" 
-                    type="file" 
-                    accept="image/*"
-                    onChange={handleAttachmentChange} 
-                    disabled={loading} 
-                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                />
+                <div className="relative group">
+                    <input 
+                        id="achievementAttachment" 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleAttachmentChange} 
+                        disabled={loading} 
+                        className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-dashed border-slate-300 rounded-2xl p-4 bg-slate-50/50" 
+                    />
+                </div>
+                <p className="text-[10px] text-slate-400 italic">Uploading a photo will attach it to the transaction and the goal history.</p>
             </div>
             
-            {error && <p className="error text-center">{error}</p>}
-            
-            <button type="submit" className="primary-btn w-full" disabled={loading}>
+            <button 
+                type="submit" 
+                className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2" 
+                disabled={loading}
+            >
+                {loading && (
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                )}
                 {loading ? statusMessage : 'Confirm & Complete Goal'}
             </button>
         </form>

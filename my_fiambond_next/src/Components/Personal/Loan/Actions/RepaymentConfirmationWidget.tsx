@@ -1,33 +1,29 @@
-'use client'; // Required due to the use of useState, useContext, and browser APIs (fetch)
+'use client'; // Required for hooks and interactivity
 
 import { useState, useContext, FormEvent } from 'react';
-import { AppContext } from '../../../../Context/AppContext.jsx';
-import { toast } from 'react-hot-toast'; // Client-side library
-// import { Loan } from '../../../../types/index.js'; // Optional if using TS
+import { AppContext } from '@/src/Context/AppContext';
+import { API_BASE_URL } from '@/src/config/apiConfig';
+import { toast } from 'react-hot-toast';
 
 interface RepaymentConfirmationWidgetProps {
-    loan: any; // using any for flexibility with MongoDB _id
+    loan: any; 
     onSuccess: () => void;
 }
 
 export default function RepaymentConfirmationWidget({ loan, onSuccess }: RepaymentConfirmationWidgetProps) {
     const { user } = useContext(AppContext);
-    // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-
-    // State typing retained from original .tsx
+    
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // The repayment object should exist if this widget is being rendered.
     const pendingAmount = loan.pending_repayment?.amount || 0;
+    const debtorDisplayName = loan.debtor?.full_name || loan.debtor_name || 'The borrower';
 
-    // Function typing retained from original .tsx
     const handleConfirmRepayment = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         if (!user || !loan || !loan.id || !loan.pending_repayment) {
-            setError("Cannot process confirmation. Critical data is missing.");
+            setError("Critical data is missing. Cannot confirm.");
             return;
         }
 
@@ -39,104 +35,110 @@ export default function RepaymentConfirmationWidget({ loan, onSuccess }: Repayme
             const currentRepaid = parseFloat(loan.repaid_amount || 0);
             const totalOwed = parseFloat(loan.total_owed || loan.amount);
 
-            // 1. Calculate New Values
+            // 1. Calculate logic for state update
             const newRepaidAmount = currentRepaid + repaymentAmount;
-            // Check if fully paid (allow for tiny floating point differences)
             const newStatus = newRepaidAmount >= (totalOwed - 0.01) ? "repaid" : "outstanding";
 
-            // 2. Preserve Receipt: Move it from 'pending' to 'history'
-            let updatedReceipts = loan.repayment_receipts || [];
+            // 2. Prepare receipt history
+            let updatedReceipts = [...(loan.repayment_receipts || [])];
             if (loan.pending_repayment.receipt_url) {
-                updatedReceipts = [...updatedReceipts, {
+                updatedReceipts.push({
                     url: loan.pending_repayment.receipt_url,
                     amount: repaymentAmount,
-                    recorded_at: new Date() // Save current time
-                }];
+                    recorded_at: new Date().toISOString()
+                });
             }
 
-            // 3. PATCH Loan: Update amounts, status, receipts, and CLEAR pending_repayment
-            const loanUpdatePayload = {
-                repaid_amount: newRepaidAmount,
-                status: newStatus,
-                pending_repayment: null, // Setting to null removes it in Mongoose
-                repayment_receipts: updatedReceipts
-            };
-
-            const loanResponse = await fetch(`${API_URL}/loans/${loan.id}`, {
+            // 3. PATCH: Update Loan and CLEAR the pending flag
+            const loanRes = await fetch(`${API_BASE_URL}/loans/${loan.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(loanUpdatePayload)
+                body: JSON.stringify({
+                    repaid_amount: newRepaidAmount,
+                    status: newStatus,
+                    pending_repayment: null, // Clear the pending request
+                    repayment_receipts: updatedReceipts
+                })
             });
 
-            if (!loanResponse.ok) throw new Error("Failed to update loan status.");
+            if (!loanRes.ok) throw new Error("Failed to update loan status.");
 
-            // 4. POST Transaction: Record Income for Creditor
-            const debtorName = loan.debtor?.full_name || loan.debtor_name || 'the borrower';
-            const transactionData = {
-                user_id: user.uid, // Income for YOU (Creditor)
-                family_id: null,   // Personal balance
-                type: 'income',
-                amount: repaymentAmount,
-                description: `Repayment received from ${debtorName} for: ${loan.description}`,
-                attachment_url: loan.pending_repayment.receipt_url || null
-                // created_at handled by backend
-            };
-
-            const txResponse = await fetch(`${API_URL}/transactions`, {
+            // 4. POST: Record Income for the Lender
+            await fetch(`${API_BASE_URL}/transactions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(transactionData)
+                body: JSON.stringify({
+                    user_id: user.uid,
+                    type: 'income',
+                    amount: repaymentAmount,
+                    description: `Confirmed repayment from ${debtorDisplayName}: ${loan.description}`,
+                    attachment_url: loan.pending_repayment.receipt_url || null,
+                    created_at: new Date().toISOString()
+                })
             });
 
-            if (!txResponse.ok) throw new Error("Loan updated, but failed to record income transaction.");
-
-            toast.success("Repayment confirmed and funds added to your balance!");
-            if (onSuccess) {
-                onSuccess();
-            }
+            toast.success("Repayment confirmed!");
+            onSuccess();
 
         } catch (err: any) {
-            console.error("Failed to confirm repayment:", err);
-            setError("Could not confirm repayment. Please try again.");
-            toast.error("Failed to confirm repayment.");
+            console.error(err);
+            setError("Confirmation failed. Please try again.");
+            toast.error("Process failed.");
         } finally {
             setLoading(false);
         }
     };
-    
-    const debtorDisplayName = loan.debtor?.full_name || loan.debtor_name || 'The borrower';
 
     return (
-        <form onSubmit={handleConfirmRepayment} className="space-y-4">
-            <div>
-                <p className="text-sm text-gray-600">Please confirm you have received the following repayment:</p>
-                <div className="mt-2 p-3 bg-blue-50 rounded-md border border-blue-200">
-                    <p className="font-semibold text-gray-800">{loan.description}</p>
-                    <p className="text-sm text-gray-500 mt-1">From: <span className="font-medium">{debtorDisplayName}</span></p>
-                    <p className="text-lg font-bold text-green-600 mt-2">
-                        Amount: ₱{Number(pendingAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <form onSubmit={handleConfirmRepayment} className="space-y-6">
+            <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100">
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-3 text-center">Payment Verification</p>
+                
+                <div className="text-center space-y-1 mb-4">
+                    <p className="text-sm text-slate-500 italic">Received from {debtorDisplayName}</p>
+                    <p className="text-3xl font-black text-emerald-700">
+                        ₱{Number(pendingAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
-                    
-                    {loan.pending_repayment?.receipt_url && (
-                        <div className="mt-2 pt-2 border-t border-blue-200">
-                            <a 
-                                href={loan.pending_repayment.receipt_url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-600 underline hover:text-blue-800"
-                            >
-                                View Attached Receipt
-                            </a>
-                        </div>
-                    )}
                 </div>
+
+                <div className="bg-white/60 rounded-xl p-3 border border-emerald-100/50">
+                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">For Loan:</p>
+                    <p className="text-sm font-semibold text-slate-700 line-clamp-1">{loan.description}</p>
+                </div>
+
+                {loan.pending_repayment?.receipt_url && (
+                    <div className="mt-4">
+                        <a 
+                            href={loan.pending_repayment.receipt_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 py-2 px-4 bg-white border border-emerald-200 rounded-xl text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View Attached Receipt
+                        </a>
+                    </div>
+                )}
             </div>
-            <hr />
-            {error && <p className="error text-center text-rose-600 text-sm">{error}</p>}
-            <button type="submit" className="primary-btn w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50" disabled={loading}>
-                {loading ? 'Confirming...' : 'Confirm Repayment Received'}
+
+            <hr className="border-slate-100" />
+            
+            {error && <p className="text-center text-rose-600 text-xs font-bold bg-rose-50 p-2 rounded-lg">{error}</p>}
+            
+            <button 
+                type="submit" 
+                className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50" 
+                disabled={loading}
+            >
+                {loading ? 'Processing...' : 'Confirm & Add to Balance'}
             </button>
-            <p className="text-xs text-center text-gray-500">This will add the repayment amount to your personal balance as income.</p>
+            
+            <p className="text-[10px] text-center text-slate-400 font-medium leading-relaxed">
+                By confirming, you acknowledge receipt of funds. This will update the loan status and record this amount as **Income** in your ledger.
+            </p>
         </form>
     );
 }

@@ -1,21 +1,17 @@
-'use client'; // Required due to the use of useState, useContext, and browser APIs (fetch, FormData, File)
+'use client'; // Required due to the use of hooks and browser APIs
 
 import { useState, useContext, FormEvent } from 'react';
-import { AppContext } from '../../../../Context/AppContext.jsx';
+import { AppContext } from '@/src/Context/AppContext';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 import { toast } from "react-hot-toast";
-
-// Removed Firebase Imports
-// import { Loan } from '../../../../types/index.js'; // Optional if using TS
 
 interface Member { id: string; full_name: string; }
 interface CreateLoanWidgetProps { family: { id: string }; members: Member[]; onSuccess?: () => void; }
 
-// ⭐️ Next.js change: Replace import.meta.env with process.env.NEXT_PUBLIC_
+// Next.js Cloudinary Environment Variables
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ml_default";
 const CLOUD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-// ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
 export default function CreateLoanWidget({ family, members, onSuccess }: CreateLoanWidgetProps) {
   const { user } = useContext(AppContext);
@@ -23,7 +19,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Filter out current user
+  // Filter out the current user so they don't lend to themselves
   const otherMembers = (members || []).filter(m => String(m.id) !== String(user?.uid));
 
   const submit = async (e: FormEvent) => {
@@ -33,6 +29,8 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
     setLoading(true);
     try {
       let attachment_url = null;
+      
+      // 1. Upload to Cloudinary if a file exists
       if (file) {
         const fd = new FormData();
         fd.append('file', file);
@@ -45,8 +43,8 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
       const principal = parseFloat(form.amount) || 0;
       const interest = parseFloat(form.interest) || 0;
 
-      // 1. Create Loan Record
-      const loanRes = await fetch(`${API_URL}/loans`, {
+      // 2. Create Loan Record (status: pending_confirmation)
+      const loanRes = await fetch(`${API_BASE_URL}/loans`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -59,7 +57,7 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
           total_owed: principal + interest,
           repaid_amount: 0,
           description: form.desc,
-          deadline: form.deadline ? new Date(form.deadline) : null,
+          deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
           status: "pending_confirmation",
           attachment_url
         })
@@ -67,13 +65,13 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
 
       if (!loanRes.ok) throw new Error("Loan creation failed");
 
-      // 2. Record Transaction (Expense)
-      await fetch(`${API_URL}/transactions`, {
+      // 3. Record Personal Expense for the Creditor
+      await fetch(`${API_BASE_URL}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.uid,
-          family_id: null, // Personal expense (from creditor)
+          family_id: null, 
           type: "expense",
           amount: principal,
           description: `Loan to ${debtorName}: ${form.desc}`,
@@ -86,60 +84,99 @@ export default function CreateLoanWidget({ family, members, onSuccess }: CreateL
       setForm({ amount: "", interest: "", desc: "", debtorId: "", deadline: "" });
       setFile(null);
       onSuccess?.();
-    } catch (e) { toast.error("Error processing loan"); }
+    } catch (e) { 
+      console.error(e);
+      toast.error("Error processing loan"); 
+    }
     setLoading(false);
   };
 
-  const inputStyle = "w-full p-3 border rounded-lg outline-none focus:ring-2 ring-indigo-500 placeholder:text-slate-300";
+  const inputStyle = "w-full p-4 border border-slate-200 rounded-xl outline-none focus:ring-2 ring-indigo-500 placeholder:text-slate-300 transition-all font-medium text-slate-700";
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-5">
       <div>
-        <label className="block text-sm font-bold text-gray-700 mb-1">Lending To</label>
-        <select required value={form.debtorId} onChange={e => setForm({ ...form, debtorId: e.target.value })}
-          className={`${inputStyle} bg-white`}>
-          <option value="">{otherMembers.length > 0 ? "Select Family Member" : "No other members"}</option>
+        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Lending To</label>
+        <select 
+          required 
+          value={form.debtorId} 
+          onChange={e => setForm({ ...form, debtorId: e.target.value })}
+          className={`${inputStyle} bg-white appearance-none cursor-pointer`}
+        >
+          <option value="">{otherMembers.length > 0 ? "Select Family Member" : "No other members available"}</option>
           {otherMembers.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
         </select>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1">Amount (₱)</label>
-          <input type="number" step="0.01" required placeholder="0.00" value={form.amount}
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Principal (₱)</label>
+          <input 
+            type="number" 
+            step="0.01" 
+            required 
+            placeholder="0.00" 
+            value={form.amount}
             onChange={e => setForm({ ...form, amount: e.target.value })}
-            className={`${inputStyle} text-lg font-mono`} />
+            className={`${inputStyle} font-mono`} 
+          />
         </div>
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1">Interest (Optional)</label>
-          <input type="number" step="0.01" placeholder="0.00" value={form.interest}
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Interest (Optional)</label>
+          <input 
+            type="number" 
+            step="0.01" 
+            placeholder="0.00" 
+            value={form.interest}
             onChange={e => setForm({ ...form, interest: e.target.value })}
-            className={`${inputStyle} text-lg font-mono`} />
+            className={`${inputStyle} font-mono text-emerald-600`} 
+          />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
-        <input type="text" required placeholder="e.g. Lunch money" value={form.desc}
+        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Purpose / Description</label>
+        <input 
+          type="text" 
+          required 
+          placeholder="e.g. Shared grocery expense" 
+          value={form.desc}
           onChange={e => setForm({ ...form, desc: e.target.value })}
-          className={inputStyle} />
+          className={inputStyle} 
+        />
       </div>
 
-      <div>
-        <label className="block text-sm font-bold text-gray-700 mb-1">Deadline <span className="text-gray-400 font-normal">(Optional)</span></label>
-        <input type="date" value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })}
-          className={inputStyle} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Due Date</label>
+          <input 
+            type="date" 
+            value={form.deadline} 
+            onChange={e => setForm({ ...form, deadline: e.target.value })}
+            className={inputStyle} 
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Proof of Transfer</label>
+          <input 
+            type="file" 
+            onChange={e => setFile(e.target.files?.[0] || null)} 
+            accept="image/*,.pdf"
+            className="block w-full text-xs text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-dashed border-slate-200 rounded-xl p-2.5" 
+          />
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-bold text-gray-700 mb-1">Receipt <span className="text-gray-400 font-normal">(Optional)</span></label>
-        <input type="file" key={file ? "has-file" : "no-file"} onChange={e => setFile(e.target.files?.[0] || null)} accept="image/*,.pdf"
-          className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-slate-200 rounded-lg p-2" />
-      </div>
-
-      <button disabled={loading || otherMembers.length === 0} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-lg shadow-indigo-200">
-        {loading ? 'Processing...' : 'Confirm & Lend'}
+      <button 
+        disabled={loading || otherMembers.length === 0} 
+        className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-xl shadow-indigo-100 uppercase tracking-widest text-sm"
+      >
+        {loading ? 'Processing...' : 'Confirm & Create Loan'}
       </button>
+      
+      <p className="text-[10px] text-center text-slate-400 font-medium">
+        This will deduct the principal from your balance immediately. The borrower must confirm receipt for the loan to become active.
+      </p>
     </form>
   );
 }

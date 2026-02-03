@@ -1,9 +1,8 @@
 'use client'; // Required due to the use of useState, useContext, and memo
 
-// Components/FamilyListItem.jsx
-
 import { useState, useContext, memo } from 'react';
 import { AppContext } from '../../../Context/AppContext.jsx';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 import { toast } from 'react-hot-toast'; // Client-side library
 
 function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
@@ -11,9 +10,6 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
   const [isEditing, setIsEditing] = useState(false);
   const [familyName, setFamilyName] = useState(family.family_name);
   const [error, setError] = useState(null);
-
-  // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
   const isOwner = user?.uid === family.owner_id;
   const canPerformActions = isOwner;
@@ -30,7 +26,7 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
     setError(null);
     try {
       // 1. Send PATCH request to Node.js Backend
-      const response = await fetch(`${API_URL}/families/${family.id}`, {
+      const response = await fetch(`${API_BASE_URL}/families/${family.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -46,12 +42,12 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
       const updatedFamily = { ...family, family_name: familyName };
       onFamilyUpdated(updatedFamily);
       setIsEditing(false);
-      toast.success("Family renamed successfully!"); // Added toast
+      toast.success("Family renamed successfully!");
 
     } catch (err) {
       console.error('Failed to update family:', err);
       setError('Failed to update the family name.');
-      toast.error(err.message || 'Failed to update family.'); // Added toast
+      toast.error(err.message || 'Failed to update family.');
     }
   }
 
@@ -64,7 +60,7 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
     setError(null);
     try {
       // 1. Send DELETE request to Node.js Backend
-      const response = await fetch(`${API_URL}/families/${family.id}`, {
+      const response = await fetch(`${API_BASE_URL}/families/${family.id}`, {
         method: 'DELETE',
       });
 
@@ -74,30 +70,30 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
       
       // 2. Update UI via Parent Callback
       onFamilyDeleted(family.id);
-      toast.success("Family deleted successfully!"); // Added toast
+      toast.success("Family deleted successfully!");
 
     } catch (err) {
       console.error('Failed to delete family:', err);
       setError('Failed to delete the family.');
-      toast.error(err.message || 'Failed to delete family.'); // Added toast
+      toast.error(err.message || 'Failed to delete family.');
     }
   }
 
-  // --- Inline Button Styles (Simplified for example) ---
+  // --- Inline Button Styles ---
   const primaryBtnSm = "bg-indigo-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50";
   const secondaryBtnSm = "bg-white text-slate-600 border border-slate-300 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50";
   const dangerBtnSm = "bg-rose-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-rose-700 transition disabled:opacity-50";
 
-
   return (
-    <div className="p-4 bg-gray-50 border border-gray-200 rounded-md space-y-3">
+    <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3 transition-all hover:shadow-sm">
       {isEditing ? (
-        <form onSubmit={handleUpdate} className="flex items-center gap-4">
+        <form onSubmit={handleUpdate} className="flex items-center gap-4 animate-in fade-in slide-in-from-left-1 duration-200">
           <input
             type="text"
             value={familyName}
             onChange={(e) => setFamilyName(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            autoFocus
           />
           <button type="submit" className={primaryBtnSm}>Save</button>
           <button type="button" onClick={() => setIsEditing(false)} className={secondaryBtnSm}>Cancel</button>
@@ -105,8 +101,10 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
       ) : (
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div className="min-w-0"> 
-            <h3 className="font-semibold text-lg text-gray-700 break-words">{family.family_name}</h3>
-            <p className="text-xs text-gray-500 truncate">Owner: {family.owner?.full_name || 'Loading...'}</p>
+            <h3 className="font-bold text-lg text-slate-800 break-words">{family.family_name}</h3>
+            <p className="text-xs text-slate-500">
+              Owner: <span className="font-medium text-slate-600">{family.owner?.full_name || 'Loading...'}</span>
+            </p>
           </div>
           
           <div className="flex w-full sm:w-auto items-center gap-2 flex-shrink-0"> 
@@ -114,7 +112,7 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
               <>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className={`${secondaryBtnSm} flex justify-center w-full sm:w-auto`}
+                  className={`${secondaryBtnSm} flex justify-center w-full sm:w-auto active:scale-95`}
                   disabled={!canPerformActions}
                   title={canPerformActions ? "Rename family" : getDisabledMessage()}
                 >
@@ -122,7 +120,7 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
                 </button>
                 <button
                   onClick={handleDelete}
-                  className={`${dangerBtnSm} flex justify-center w-full sm:w-auto`}
+                  className={`${dangerBtnSm} flex justify-center w-full sm:w-auto active:scale-95`}
                   disabled={!canPerformActions}
                   title={canPerformActions ? "Delete family" : getDisabledMessage()}
                 >
@@ -133,7 +131,7 @@ function FamilyListItem({ family, onFamilyUpdated, onFamilyDeleted }) {
           </div>
         </div>
       )}
-      {error && <p className="error text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useContext, useState, ChangeEvent, FormEvent } from "react";
 import { AppContext } from "../../../Context/AppContext.jsx";
+import { API_BASE_URL } from '@/src/config/apiConfig';
 import { toast } from 'react-hot-toast'; // Client-side library
 
 // --- TypeScript Interfaces ---
@@ -17,8 +18,6 @@ interface CreateFamilyWidgetProps {
 
 export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProps) {
   const { user } = useContext(AppContext);
-  // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
   const [familyName, setFamilyName] = useState<string>("");
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -45,7 +44,7 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
       };
 
       // 2. Send POST Request
-      const response = await fetch(`${API_URL}/families`, {
+      const response = await fetch(`${API_BASE_URL}/families`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,7 +71,6 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
         });
       }
     } catch (error: any) {
-      // FIX: By casting to 'any' or checking 'instanceof Error', we can access .message
       console.error('Failed to create family:', error);
       const errorMessage = error instanceof Error ? error.message : 'A network error occurred.';
       setGeneralError(errorMessage);
@@ -90,20 +88,27 @@ export default function CreateFamilyWidget({ onSuccess }: CreateFamilyWidgetProp
     <div className="w-full">
       <form onSubmit={handleCreateFamily} className="space-y-4">
         <div>
+          <label className="block text-sm font-bold text-slate-700 mb-1">New Family Name</label>
           <input
             type="text"
-            placeholder="Family Name (e.g., Smith Household)"
+            placeholder="e.g., Smith Household"
             value={familyName}
             onChange={handleInputChange}
-            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             disabled={loading}
             required
           />
         </div>
-        {generalError && <p className="error text-center text-rose-600 text-sm">{generalError}</p>}
+        
+        {generalError && (
+          <p className="error text-center text-rose-600 text-sm font-medium animate-pulse">
+            {generalError}
+          </p>
+        )}
+
         <button 
           type="submit" 
-          className="primary-btn w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50" 
+          className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md" 
           disabled={loading}
         >
           {loading ? 'Creating...' : 'Create Family'}

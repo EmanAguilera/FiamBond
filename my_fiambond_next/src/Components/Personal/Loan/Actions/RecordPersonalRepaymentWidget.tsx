@@ -1,49 +1,44 @@
-'use client'; // Required due to the use of useState, useContext, and browser APIs (fetch, FormData, File)
+'use client'; // Required for hooks and browser APIs
 
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
-import { AppContext } from '../../../../Context/AppContext.jsx';
-import { toast } from 'react-hot-toast'; // Client-side library
+import { AppContext } from '@/src/Context/AppContext';
+import { API_BASE_URL } from '@/src/config/apiConfig';
+import { toast } from 'react-hot-toast';
 
-// ⭐️ Next.js change: Replace import.meta.env with process.env.NEXT_PUBLIC_
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ml_default";
 const CLOUDINARY_API_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 interface RecordPersonalRepaymentWidgetProps {
-    loan: any; // using any to allow for flexible MongoDB _id/id handling
+    loan: any; 
     onSuccess: () => void;
 }
 
 export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: RecordPersonalRepaymentWidgetProps) {
     const { user } = useContext(AppContext);
-    // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
     
     const totalOwed = loan.total_owed || loan.amount;
     const outstanding = totalOwed - (loan.repaid_amount || 0);
 
-    // State typing retained from original .tsx
     const [amount, setAmount] = useState<string>('');
     const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>('Record Repayment Received');
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Function typing retained from original .tsx
     const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setAttachmentFile(e.target.files[0]);
         }
     };
 
-    // Function typing retained from original .tsx
     const handleRecordRepayment = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const repaymentAmount = parseFloat(amount);
 
         if (!user) { setError("You must be logged in."); return; }
         if (isNaN(repaymentAmount) || repaymentAmount <= 0) { setError("Please enter a valid amount."); return; }
-        if (repaymentAmount > outstanding) { setError(`Amount cannot exceed the outstanding balance of ₱${outstanding.toFixed(2)}.`); return; }
+        if (repaymentAmount > outstanding + 0.01) { setError(`Amount cannot exceed ₱${outstanding.toFixed(2)}.`); return; }
 
         setLoading(true);
         setError(null);
@@ -51,159 +46,139 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
         try {
             let receiptUrl = null;
 
-            // 1. Upload Receipt to Cloudinary
+            // 1. Optional Receipt Upload
             if (attachmentFile) {
-                setStatusMessage("Uploading receipt...");
+                setStatusMessage("Uploading proof...");
                 const uploadFormData = new FormData();
                 uploadFormData.append('file', attachmentFile);
                 uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                const response = await fetch(CLOUDINARY_API_URL, {
-                    method: 'POST',
-                    body: uploadFormData,
-                });
-                if (!response.ok) throw new Error('Failed to upload receipt.');
-                const data = await response.json();
-                receiptUrl = data.secure_url;
+                
+                const cloudRes = await fetch(CLOUDINARY_API_URL, { method: 'POST', body: uploadFormData });
+                if (!cloudRes.ok) throw new Error('Proof upload failed.');
+                const cloudData = await cloudRes.json();
+                receiptUrl = cloudData.secure_url;
             }
 
-            setStatusMessage("Recording payment...");
+            setStatusMessage("Updating loan...");
             
-            // 2. Calculate Updates (Client-side logic replaced Firestore 'increment')
-            const currentRepaid = loan.repaid_amount || 0;
-            const newRepaidAmount = currentRepaid + repaymentAmount;
-            // Update status: if paid in full, mark as 'repaid' (or 'paid')
-            const newStatus = newRepaidAmount >= totalOwed ? "repaid" : "outstanding";
+            const newRepaidAmount = (loan.repaid_amount || 0) + repaymentAmount;
+            const newStatus = newRepaidAmount >= totalOwed - 0.01 ? "repaid" : "outstanding";
 
-            // Prepare Receipt Object
-            const newReceipt = receiptUrl ? {
+            const newReceipt = {
                 url: receiptUrl,
                 amount: repaymentAmount,
-                recorded_at: new Date() // Use JS Date instead of Timestamp
-            } : null;
-
-            // Construct the existing receipts array + new one
-            const existingReceipts = loan.repayment_receipts || [];
-            const updatedReceipts = newReceipt ? [...existingReceipts, newReceipt] : existingReceipts;
-
-            // 3. PATCH Loan (Update loan document)
-            const updatePayload = {
-                repaid_amount: newRepaidAmount,
-                status: newStatus,
-                repayment_receipts: updatedReceipts,
-                // The pending_repayment flag should be cleared if it was there, but this widget is for
-                // manual recording, not confirmation, so we don't worry about clearing that field here.
+                recorded_at: new Date().toISOString()
             };
 
-            const loanResponse = await fetch(`${API_URL}/loans/${loan.id}`, {
+            // 2. PATCH Loan
+            const loanRes = await fetch(`${API_BASE_URL}/loans/${loan.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatePayload)
+                body: JSON.stringify({
+                    repaid_amount: newRepaidAmount,
+                    status: newStatus,
+                    repayment_receipts: [...(loan.repayment_receipts || []), newReceipt]
+                })
             });
 
-            if (!loanResponse.ok) throw new Error("Failed to update loan record.");
+            if (!loanRes.ok) throw new Error("Failed to update loan record.");
 
-            // 4. POST Transaction (Record Income for Creditor)
+            // 3. Record Income for YOU (Lender)
             const debtorName = loan.debtor?.full_name || loan.debtor_name || 'Borrower';
-            const creditorIncomeData = {
-                user_id: user.uid,
-                family_id: null, // Personal income
-                type: 'income',
-                amount: repaymentAmount,
-                description: `Repayment received from ${debtorName} for: ${loan.description}`,
-                attachment_url: receiptUrl
-                // created_at is handled by backend default
-            };
-
-            const creditorTxResponse = await fetch(`${API_URL}/transactions`, {
+            await fetch(`${API_BASE_URL}/transactions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(creditorIncomeData)
+                body: JSON.stringify({
+                    user_id: user.uid,
+                    type: 'income',
+                    amount: repaymentAmount,
+                    description: `Repayment received from ${debtorName} for: ${loan.description}`,
+                    attachment_url: receiptUrl,
+                    created_at: new Date().toISOString()
+                })
             });
 
-            if (!creditorTxResponse.ok) throw new Error("Loan updated, but failed to record creditor income transaction.");
-
-            // 5. POST Transaction (Record Expense for Debtor) - CRITICAL: Record the corresponding expense for the debtor
+            // 4. Record Expense for BORROWER (If registered)
             if (loan.debtor_id) {
-                const creditorName = user.full_name || 'Lender';
-                const debtorExpenseData = {
-                    user_id: loan.debtor_id, // Debtor's UID
-                    family_id: null, // Personal expense
-                    type: 'expense',
-                    amount: repaymentAmount,
-                    description: `Repayment sent to ${creditorName} for: ${loan.description}`,
-                    attachment_url: receiptUrl
-                };
-
-                // NOTE: We log a warning if this fails, but allow the Creditor transaction to succeed.
-                const debtorTxResponse = await fetch(`${API_URL}/transactions`, {
+                await fetch(`${API_BASE_URL}/transactions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(debtorExpenseData)
+                    body: JSON.stringify({
+                        user_id: loan.debtor_id,
+                        type: 'expense',
+                        amount: repaymentAmount,
+                        description: `Repayment paid to ${user.full_name || 'Lender'} for: ${loan.description}`,
+                        attachment_url: receiptUrl,
+                        created_at: new Date().toISOString()
+                    })
                 });
-                
-                if (!debtorTxResponse.ok) {
-                    console.warn(`Warning: Failed to record debtor expense transaction for UID: ${loan.debtor_id}`);
-                }
             }
             
-            toast.success("Repayment successfully recorded.");
+            toast.success("Repayment recorded and balances updated!");
             onSuccess();
 
         } catch (err: any) {
-            console.error("Failed to record repayment:", err);
-            setError("Could not record the repayment. Please try again.");
-            toast.error("Failed to record repayment.");
+            console.error(err);
+            setError("Processing failed. Please try again.");
+            toast.error("Error recording repayment.");
         } finally {
             setLoading(false);
             setStatusMessage('Record Repayment Received');
         }
     };
 
-    const debtorDisplayName = loan.debtor?.full_name || loan.debtor_name || 'Borrower';
-
     return (
-        <form onSubmit={handleRecordRepayment} className="space-y-4">
-            <div>
-                <p className="text-sm text-gray-600">You are recording a repayment received from:</p>
-                <p className="font-semibold text-gray-800">{debtorDisplayName}</p>
-                <p className="text-lg font-bold text-red-600 mt-2">
-                    Outstanding: ₱{outstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-            </div>
-            <hr />
-            <div>
-                <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount Received (₱)</label>
-                <input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                />
-            </div>
-            
-            <div>
-                <label htmlFor="personalRepaymentAttachment" className="block text-sm font-medium text-gray-700">
-                    Attach Proof of Receipt (Optional)
-                </label>
-                <input 
-                    id="personalRepaymentAttachment" 
-                    type="file" 
-                    accept="image/*,.pdf"
-                    onChange={handleAttachmentChange} 
-                    disabled={loading} 
-                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                />
+        <form onSubmit={handleRecordRepayment} className="space-y-6">
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Repayment From</p>
+                <p className="font-bold text-slate-800 text-lg leading-tight">{loan.debtor?.full_name || loan.debtor_name || 'Borrower'}</p>
+                <div className="mt-3 flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Remaining Balance:</span>
+                    <span className="text-xl font-black text-rose-600">
+                        ₱{outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                </div>
             </div>
 
-            {error && <p className="error text-center text-rose-600 text-sm">{error}</p>}
-            <button type="submit" className="primary-btn w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50" disabled={loading}>
-                {loading ? statusMessage : 'Record Repayment Received'}
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Amount Received (₱)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        required
+                        disabled={loading}
+                        className="w-full p-4 border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 placeholder:text-slate-300"
+                    />
+                </div>
+                
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Proof of Receipt (Optional)</label>
+                    <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleAttachmentChange} 
+                        disabled={loading} 
+                        className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-dashed border-slate-200 rounded-xl p-4" 
+                    />
+                </div>
+            </div>
+
+            {error && <p className="text-center text-rose-600 text-xs font-bold bg-rose-50 p-2 rounded-lg">{error}</p>}
+            
+            <button 
+                type="submit" 
+                className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50" 
+                disabled={loading}
+            >
+                {loading ? statusMessage : 'Confirm & Record Repayment'}
             </button>
-            <p className="text-xs text-center text-gray-500">This will be added to your personal balance as income.</p>
+            <p className="text-[10px] text-center text-slate-400 font-medium px-4">
+                Confirming this will update your income and the borrower's expense history automatically.
+            </p>
         </form>
     );
 }

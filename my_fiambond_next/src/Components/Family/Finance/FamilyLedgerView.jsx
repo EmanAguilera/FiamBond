@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useContext, useEffect, memo } from 'react';
 import { AppContext } from '../../../Context/AppContext.jsx';
-// Removed Firebase Imports
+import { API_BASE_URL } from '@/src/config/apiConfig';
 
 // --- CHART IMPORTS ---
 import { Bar } from 'react-chartjs-2';
@@ -23,7 +23,6 @@ const FamilyLedgerSkeleton = () => (
             <div className="h-5 w-1/2 bg-slate-200 rounded"></div>
             <hr className="border-dashed" />
             <div className="h-5 w-full bg-slate-200 rounded"></div>
-            <div className="h-5 w-full bg-slate-200 rounded"></div>
             <div className="h-6 w-full bg-slate-200 rounded mt-1"></div>
         </div>
         <div className="h-7 w-1/3 bg-slate-200 rounded mb-4"></div>
@@ -41,7 +40,7 @@ const FamilyLedgerSkeleton = () => (
     </div>
 );
 
-// --- Helper function to format data for the chart (UNCHANGED) ---
+// --- Helper function to format data for the chart ---
 const formatDataForChart = (transactions) => {
     if (!transactions || transactions.length === 0) {
         return { labels: [], datasets: [] };
@@ -50,7 +49,7 @@ const formatDataForChart = (transactions) => {
     const data = {}; 
 
     transactions.forEach(tx => {
-        // Shim ensures tx.created_at.toDate() exists
+        // Use the shimmed created_at date
         const date = tx.created_at.toDate().toLocaleDateString();
         if (!data[date]) {
             data[date] = { income: 0, expense: 0 };
@@ -62,7 +61,7 @@ const formatDataForChart = (transactions) => {
         }
     });
 
-    const labels = Object.keys(data).sort((a,b) => new Date(a) - new Date(b));
+    const labels = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
     
     return {
         labels,
@@ -81,11 +80,8 @@ const formatDataForChart = (transactions) => {
     };
 };
 
-
 function FamilyLedgerView({ family, onBack }) {
     const { user } = useContext(AppContext);
-    // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
     const [allTransactions, setAllTransactions] = useState([]);
     const [reportSummary, setReportSummary] = useState(null);
@@ -104,9 +100,7 @@ function FamilyLedgerView({ family, onBack }) {
         setError(null);
 
         try {
-            // 1. Calculate start date based on period
             const now = new Date();
-            // Clone the date objects for mutable operations
             const startDate = new Date();
             const endDate = new Date();
             
@@ -118,13 +112,13 @@ function FamilyLedgerView({ family, onBack }) {
                 startDate.setMonth(endDate.getMonth() - 1);
             }
 
-            // 2. Fetch from Node.js Backend
+            // Fetch from centralized API
             const queryParams = new URLSearchParams({
                 family_id: family.id,
                 startDate: startDate.toISOString()
             });
 
-            const response = await fetch(`${API_URL}/transactions?${queryParams}`);
+            const response = await fetch(`${API_BASE_URL}/transactions?${queryParams}`);
             
             if (!response.ok) {
                 throw new Error('Failed to fetch family report data.');
@@ -132,11 +126,10 @@ function FamilyLedgerView({ family, onBack }) {
 
             const fetchedData = await response.json();
 
-            // 3. Transform Data (Shim for UI compatibility)
+            // Transform Data (Shim for UI compatibility)
             const fetchedTransactions = fetchedData.map(doc => ({
-                id: doc._id,
+                id: doc._id || doc.id,
                 ...doc,
-                // Create a fake Firebase Timestamp object for compatibility with existing UI code
                 created_at: { 
                     toDate: () => new Date(doc.created_at) 
                 }
@@ -144,7 +137,6 @@ function FamilyLedgerView({ family, onBack }) {
 
             setAllTransactions(fetchedTransactions);
 
-            // 4. Process the data on the client
             let totalInflow = 0;
             let totalOutflow = 0;
             fetchedTransactions.forEach(tx => {
@@ -156,7 +148,6 @@ function FamilyLedgerView({ family, onBack }) {
                 totalInflow,
                 totalOutflow,
                 netPosition: totalInflow - totalOutflow,
-                // Corrected report title to use the correct end date
                 reportTitle: `Report from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
             });
             
@@ -169,13 +160,12 @@ function FamilyLedgerView({ family, onBack }) {
         } finally {
             setLoading(false);
         }
-    }, [user, family.id, period, API_URL]);
+    }, [user, family.id, period]);
 
     useEffect(() => {
         getReport();
     }, [getReport]);
     
-    // --- Client-Side Pagination Logic (UNCHANGED) ---
     const pageCount = Math.ceil(allTransactions.length / TRANSACTIONS_PER_PAGE);
     const paginatedTransactions = allTransactions.slice(
         (currentPage - 1) * TRANSACTIONS_PER_PAGE,
@@ -191,22 +181,22 @@ function FamilyLedgerView({ family, onBack }) {
         },
     };
     
-    if (loading) {
-        return <FamilyLedgerSkeleton />;
-    }
-
-    if (error) {
-        return <p className="error text-center py-10">{error}</p>;
-    }
+    if (loading) return <FamilyLedgerSkeleton />;
+    if (error) return <p className="error text-center py-10 font-bold text-rose-600">{error}</p>;
 
     return (
         <div>
-            {/* Added standard styling to buttons for a consistent look in Next.js Tailwind projects */}
             <button onClick={onBack} className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50 transition mb-6">&larr; Back to Families List</button>
             
             <div className="w-full mx-auto flex justify-center gap-4 mb-6">
                 {['weekly', 'monthly', 'yearly'].map(p => (
-                    <button key={p} onClick={() => setPeriod(p)} className={`px-4 py-1.5 text-sm rounded-lg capitalize transition font-bold ${period === p ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 hover:text-slate-700 border border-slate-200'}`}>{p}</button>
+                    <button 
+                        key={p} 
+                        onClick={() => setPeriod(p)} 
+                        className={`px-4 py-1.5 text-sm rounded-lg capitalize transition font-bold ${period === p ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 hover:text-slate-700 border border-slate-200'}`}
+                    >
+                        {p}
+                    </button>
                 ))}
             </div>
             
@@ -233,7 +223,7 @@ function FamilyLedgerView({ family, onBack }) {
                                 <div className="min-w-0 pr-4">
                                     <p className="font-semibold text-slate-700 break-words">{transaction.description}</p>
                                     <small className="text-slate-500 text-xs">
-                                    {transaction.created_at.toDate().toLocaleDateString()}
+                                        {transaction.created_at.toDate().toLocaleDateString()}
                                     </small>
                                 </div>
                                 <p className={`flex-shrink-0 font-bold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-500'}`}>

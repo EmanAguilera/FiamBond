@@ -3,10 +3,11 @@
 import { useState, useCallback, useContext, useEffect, memo } from 'react';
 import { AppContext } from '../../../Context/AppContext';
 import { db } from '../../../config/firebase-config';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
-import { toast } from 'react-hot-toast'; // Client-side library
+import { toast } from 'react-hot-toast'; 
 
-// --- ICONS (Kept as is) ---
+// --- ICONS ---
 const Icons = {
     Enter: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>,
     Edit: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>,
@@ -15,7 +16,7 @@ const Icons = {
     X: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
 };
 
-// --- INTERNAL COMPONENT: Create Family Form (Kept as is) ---
+// --- INTERNAL COMPONENT: Create Family Form ---
 const CreateFamilyForm = ({ onAdd, onCancel }) => {
     const [familyName, setFamilyName] = useState("");
     const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ const CreateFamilyForm = ({ onAdd, onCancel }) => {
     );
 };
 
-// --- INTERNAL COMPONENT: Family Row (Kept as is) ---
+// --- INTERNAL COMPONENT: Family Row ---
 const FamilyRow = ({ family, onEnter, onRename, onDelete }) => {
     const initials = (family.family_name || "F").substring(0, 2).toUpperCase();
     const isOwner = family.isOwner; 
@@ -81,7 +82,6 @@ const FamilyRow = ({ family, onEnter, onRename, onDelete }) => {
 
     return (
         <div className="flex flex-col md:flex-row md:items-center justify-between p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors gap-4">
-            {/* LEFT SIDE: Icon & Details */}
             <div className="flex items-center gap-3 flex-grow">
                 <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold border ${isOwner ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                     {initials}
@@ -110,7 +110,6 @@ const FamilyRow = ({ family, onEnter, onRename, onDelete }) => {
                 </div>
             </div>
 
-            {/* RIGHT SIDE: Actions */}
             <div className="flex items-center gap-2 self-end md:self-auto">
                 {isEditing ? (
                     <>
@@ -158,18 +157,13 @@ const FamilyRow = ({ family, onEnter, onRename, onDelete }) => {
 // --- MAIN WIDGET ---
 const ManageFamiliesWidget = ({ onEnterRealm }) => {
     const { user } = useContext(AppContext);
-    // ⭐️ Next.js change: Replace import.meta.env.VITE_API_URL with process.env.NEXT_PUBLIC_API_URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-    
     const [families, setFamilies] = useState([]);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // --- HELPER: Check for Transactions (Kept as is, using updated API_URL) ---
     const checkHasTransactions = async (familyId) => {
         try {
-            // Checks if this family has any transaction history
-            const res = await fetch(`${API_URL}/transactions?family_id=${familyId}`);
+            const res = await fetch(`${API_BASE_URL}/transactions?family_id=${familyId}`);
             if (res.ok) {
                 const transactions = await res.json();
                 return transactions.length > 0;
@@ -185,7 +179,7 @@ const ManageFamiliesWidget = ({ onEnterRealm }) => {
         if (!user) return;
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/families?user_id=${user.uid}`);
+            const res = await fetch(`${API_BASE_URL}/families?user_id=${user.uid}`);
             if (!res.ok) throw new Error('Failed to fetch');
             const raw = await res.json();
             
@@ -217,13 +211,13 @@ const ManageFamiliesWidget = ({ onEnterRealm }) => {
         } finally {
             setLoading(false);
         }
-    }, [user, API_URL]);
+    }, [user]);
 
     useEffect(() => { fetchFamilies(); }, [fetchFamilies]);
 
     const handleCreate = async (name) => {
         try {
-            const res = await fetch(`${API_URL}/families`, {
+            const res = await fetch(`${API_BASE_URL}/families`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -243,9 +237,7 @@ const ManageFamiliesWidget = ({ onEnterRealm }) => {
         }
     };
 
-    // --- RENAME WITH VALIDATION (Kept as is, using updated API_URL) ---
     const handleRename = async (familyId, newName) => {
-        // 1. Check for existing transactions first
         const hasTx = await checkHasTransactions(familyId);
         if (hasTx) {
             toast.error("Cannot rename family: Transactions exist.");
@@ -253,7 +245,7 @@ const ManageFamiliesWidget = ({ onEnterRealm }) => {
         }
 
         try {
-            const res = await fetch(`${API_URL}/families/${familyId}`, {
+            const res = await fetch(`${API_BASE_URL}/families/${familyId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ family_name: newName })
@@ -270,9 +262,7 @@ const ManageFamiliesWidget = ({ onEnterRealm }) => {
         }
     };
 
-    // --- DELETE WITH VALIDATION (Kept as is, using updated API_URL) ---
     const handleDelete = async (familyId) => {
-        // 1. Check for existing transactions first
         const hasTx = await checkHasTransactions(familyId);
         if (hasTx) {
             toast.error("Cannot delete family: Transactions exist. Please archive instead.");
@@ -280,7 +270,7 @@ const ManageFamiliesWidget = ({ onEnterRealm }) => {
         }
 
         try {
-            const res = await fetch(`${API_URL}/families/${familyId}`, {
+            const res = await fetch(`${API_BASE_URL}/families/${familyId}`, {
                 method: 'DELETE'
             });
 
@@ -295,7 +285,6 @@ const ManageFamiliesWidget = ({ onEnterRealm }) => {
 
     return (
         <div className="space-y-4">
-            {/* 1. TOP SECTION */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 {!showCreateForm ? (
                     <div className="flex items-center justify-between">
@@ -321,7 +310,6 @@ const ManageFamiliesWidget = ({ onEnterRealm }) => {
                 )}
             </div>
 
-            {/* 2. LIST SECTION */}
             <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Available Realms ({families.length})</p>
                 <div className="border border-slate-200 rounded-xl overflow-hidden bg-white max-h-[50vh] overflow-y-auto">
