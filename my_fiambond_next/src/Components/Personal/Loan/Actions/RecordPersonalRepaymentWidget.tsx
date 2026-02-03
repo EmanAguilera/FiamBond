@@ -2,7 +2,8 @@
 
 import { useState, useContext, FormEvent, ChangeEvent } from 'react';
 import { AppContext } from '@/src/Context/AppContext';
-import { API_BASE_URL } from '@/src/config/apiConfig';
+// Assuming the path is correct based on the previous context
+import { API_BASE_URL } from '@/src/config/apiConfig'; 
 import { toast } from 'react-hot-toast';
 
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
@@ -38,6 +39,7 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
 
         if (!user) { setError("You must be logged in."); return; }
         if (isNaN(repaymentAmount) || repaymentAmount <= 0) { setError("Please enter a valid amount."); return; }
+        // Added a slight tolerance (0.01) for floating point arithmetic checks
         if (repaymentAmount > outstanding + 0.01) { setError(`Amount cannot exceed ₱${outstanding.toFixed(2)}.`); return; }
 
         setLoading(true);
@@ -70,6 +72,17 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
                 recorded_at: new Date().toISOString()
             };
 
+            // --- CRITICAL FIX: Sanitize existing repayment_receipts ---
+            // The loan object comes from LoanTrackingWidget, where `recorded_at` 
+            // was wrapped in { toDate: () => Date }. The API likely rejects this.
+            const existingReceipts = (loan.repayment_receipts || []).map((r: any) => ({
+                url: r.url,
+                amount: r.amount,
+                // If it has a .toDate() method, convert it back to a clean ISO string.
+                recorded_at: r.recorded_at?.toDate ? r.recorded_at.toDate().toISOString() : r.recorded_at
+            }));
+            // --------------------------------------------------------
+
             // 2. PATCH Loan
             const loanRes = await fetch(`${API_BASE_URL}/loans/${loan.id}`, {
                 method: 'PATCH',
@@ -77,7 +90,7 @@ export default function RecordPersonalRepaymentWidget({ loan, onSuccess }: Recor
                 body: JSON.stringify({
                     repaid_amount: newRepaidAmount,
                     status: newStatus,
-                    repayment_receipts: [...(loan.repayment_receipts || []), newReceipt]
+                    repayment_receipts: [...existingReceipts, newReceipt] // Use the sanitized array
                 })
             });
 
