@@ -8,7 +8,7 @@ const CheckIcon = () => (<svg className="w-4 h-4" fill="none" stroke="currentCol
 const XIcon = () => (<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>);
 const ClockIcon = () => (<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>);
 
-// --- INTERNAL COMPONENT: AdminUserRow ---
+// --- INTERNAL COMPONENT: AdminUserRow (FIXED) ---
 const AdminUserRow = memo(({ user, onTogglePremium }) => {
     // Determine the type of pending request
     const isCompanyPending = user.subscription_status === 'pending_approval';
@@ -23,7 +23,8 @@ const AdminUserRow = memo(({ user, onTogglePremium }) => {
     const canToggle = user.role !== 'admin';
 
     // --- Action Handlers for Pending Requests ---
-    const handleAction = (action, accessType) => {
+    // FIX: Made handleAction async and added try/catch for robust promise handling
+    const handleAction = async (action, accessType) => {
         if (!onTogglePremium) return;
         
         let confirmMessage;
@@ -38,9 +39,15 @@ const AdminUserRow = memo(({ user, onTogglePremium }) => {
         }
 
         if (window.confirm(confirmMessage)) {
-            // NOTE: The parent 'onTogglePremium' handles the full logic (approve/deny/grant/revoke)
-            onTogglePremium(user.id, action, accessType); 
-            toast.success(`${accessType} request ${action}d!`);
+            try {
+                // NOTE: Await the parent's function call
+                await onTogglePremium(user.id, action, accessType); 
+                toast.success(`${accessType} request ${action}d successfully for ${user.full_name}.`);
+            } catch (error) {
+                // This catches the 'batch is not defined' error from the parent
+                console.error(`Error processing ${action} for ${accessType}:`, error);
+                toast.error(`Failed to process ${accessType} ${action}. An administrator needs to fix the batch function.`);
+            }
         }
     };
     
