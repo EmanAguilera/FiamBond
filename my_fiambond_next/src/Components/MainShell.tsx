@@ -51,8 +51,15 @@ const AppFooter = () => (
     </footer>
 );
 
+// --- Admin Badge Component ---
+const AdminBadge = () => (
+    <span className="text-[10px] font-extrabold border px-2 py-0.5 rounded-full uppercase tracking-wider
+        bg-purple-50 text-purple-700 border-purple-200 ml-2">
+        Admin
+    </span>
+);
+
 export default function MainShell({ children }: { children: React.ReactNode }) {
-    // Renamed premiumDetails to avoid confusion with the derived value
     const { user, handleLogout, premiumDetails: contextPremiumDetails }: any = useContext(AppContext);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -74,7 +81,7 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // FIX: Derive premium details from the `user` object.
+    // Derive premium details from the `user` object.
     const currentPremiumDetails = useMemo(() => {
         if (!user) return null;
 
@@ -84,7 +91,6 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
         if (user.is_premium) {
             details.company = {
                 granted_at: user.premium_granted_at,
-                // Assuming 'premium_plan_cycle' exists on user or defaults to 'monthly'
                 plan_cycle: user.premium_plan_cycle || 'monthly' 
             };
         }
@@ -93,7 +99,6 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
         if (user.is_family_premium) {
             details.family = {
                 granted_at: user.family_premium_granted_at,
-                // Assuming 'family_premium_plan_cycle' exists on user or defaults to 'monthly'
                 plan_cycle: user.family_premium_plan_cycle || 'monthly' 
             };
         }
@@ -102,6 +107,9 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
 
         return details;
     }, [user]);
+
+    // Check if the user is an Admin
+    const isAdmin = user?.role === 'admin';
 
     // --- VIEW A: PUBLIC LAYOUT ---
     if (isPublicLayout) { 
@@ -184,7 +192,11 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                                     className="flex items-center gap-3 p-1 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none"
                                 >
                                     <div className="text-right mr-1">
-                                        <p className="text-sm font-bold text-gray-800 capitalize tracking-wide">{user.full_name || 'User'}</p>
+                                        {/* ⭐️ FIX: Display Admin Badge next to name */}
+                                        <div className="flex items-center justify-end">
+                                            <p className="text-sm font-bold text-gray-800 capitalize tracking-wide">{user.full_name || 'User'}</p>
+                                            {isAdmin && <AdminBadge />}
+                                        </div>
                                     </div>
                                     <div className="h-9 w-9 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm">
                                         {(user.full_name || user.email || 'U')[0].toUpperCase()}
@@ -228,7 +240,11 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                                     {(user?.full_name || 'U')[0].toUpperCase()}
                                 </div>
                                 <div>
-                                    <div className="text-base font-bold text-gray-900">{user?.full_name || 'User'}</div>
+                                    {/* ⭐️ FIX: Display Admin Badge in Mobile Menu */}
+                                    <div className="flex items-center">
+                                        <div className="text-base font-bold text-gray-900">{user?.full_name || 'User'}</div>
+                                        {isAdmin && <AdminBadge />}
+                                    </div>
                                     <div className="text-xs text-gray-500 font-medium">{user?.email}</div>
                                 </div>
                             </div>
