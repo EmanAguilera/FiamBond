@@ -4,14 +4,13 @@
 
 import { useContext, useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import dynamic from 'next/dynamic';
-// ⭐️ FIX: AppContext must provide the refresh function
 import { AppContext } from "../../Context/AppContext.jsx";
 import { useRouter } from "next/navigation";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../config/firebase-config.js";
 import { API_BASE_URL } from "../../config/apiConfig";
 
-// --- WIDGET IMPORTS (omitted for brevity) ---
+// --- WIDGET IMPORTS ---
 const Modal = dynamic(() => import("../../Components/Modal.jsx"), { ssr: false });
 const GoalListsWidget = dynamic(() => import("../../Components/Personal/Goal/GoalListsWidget.jsx"), { ssr: false });
 const CreateGoalWidget = dynamic(() => import("../../Components/Personal/Goal/CreateGoalWidget.tsx"), { ssr: false });
@@ -27,7 +26,7 @@ const FamilyRealm = dynamic(() => import("../Family/FamilyRealm.jsx"), { ssr: fa
 const CompanyRealm = dynamic(() => import("../Company/CompanyRealm.jsx"), { ssr: false });
 const ApplyPremiumWidget = dynamic(() => import("../../Components/Company/Onboarding/ApplyPremiumWidget.jsx"), { ssr: false });
 
-// --- ICONS (omitted for brevity) ---
+// --- ICONS ---
 const Icons = {
     Plus: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>,
     Users: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m16-10a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>,
@@ -38,7 +37,6 @@ const Icons = {
     Gift: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>
 };
 
-// --- SubscriptionReminder (omitted for brevity) ---
 const SubscriptionReminder = ({ details, type }) => {
     if (!details) return null;
     const expiryDate = details.expires_at?.toDate();
@@ -65,7 +63,6 @@ const SubscriptionReminder = ({ details, type }) => {
     );
 };
 
-// --- Btn (omitted for brevity) ---
 const Btn = ({ onClick, type = 'sec', icon, children, className = '', disabled = false }) => {
     const styles = {
         pri: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm border border-transparent",
@@ -84,7 +81,6 @@ const Btn = ({ onClick, type = 'sec', icon, children, className = '', disabled =
     );
 };
 
-// --- DashboardCard (omitted for brevity) ---
 const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorClass }) => (
     <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
         <div className="flex justify-between items-start">
@@ -101,7 +97,6 @@ const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorCl
     </div>
 );
 
-// --- formatDataForChart (omitted for brevity) ---
 const formatDataForChart = (transactions) => {
     if (!transactions || transactions.length === 0) return { labels: [], datasets: [] };
     const data = {};
@@ -144,21 +139,29 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const [reportError, setReportError] = useState(null);
     const [period, setPeriod] = useState('monthly');
 
-    // ⭐️ FIX: Destructure refreshUserData from context
     const { user, premiumDetails, refreshUserData } = context || {};
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
-    const isCompanyActive = useMemo(() => {
+    // REVISED: Clearer check for access.
+    const hasCompanySubscriptionAccess = useMemo(() => {
         if (user?.role === 'admin') return true;
-        if (!premiumDetails?.company) return false;
-        return premiumDetails.company.expires_at?.toDate() > new Date();
+        if (premiumDetails?.company && premiumDetails.company.expires_at?.toDate() > new Date()) {
+            return true;
+        }
+        return false;
     }, [user, premiumDetails?.company]);
 
-    const isFamilyActive = useMemo(() => {
+    const hasFamilySubscriptionAccess = useMemo(() => {
         if (user?.role === 'admin') return true;
-        if (!premiumDetails?.family) return false;
-        return premiumDetails.family.expires_at?.toDate() > new Date();
+        if (premiumDetails?.family && premiumDetails.family.expires_at?.toDate() > new Date()) {
+            return true;
+        }
+        return false;
     }, [user, premiumDetails?.family]);
+
+    // Update variable names to reflect the new logic clarity
+    const isCompanyActive = hasCompanySubscriptionAccess;
+    const isFamilyActive = hasFamilySubscriptionAccess;
 
     const isCompanyPending = user?.subscription_status === 'pending_approval';
     const isFamilyPending = user?.family_subscription_status === 'pending_approval';
@@ -254,14 +257,12 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
         if (!isInitialLoading && user?.uid) getReport(); 
     }, [period, isInitialLoading, getReport, user?.uid]);
 
-    // ⭐️ FIX: Add useEffect to refresh user data when the browser tab becomes visible
+    // FIX: Add useEffect to refresh user data when the browser tab becomes visible
     useEffect(() => {
         if (user?.uid && typeof refreshUserData === 'function') {
             const handleVisibilityChange = () => {
                 if (document.visibilityState === 'visible') {
-                    // Refresh global user state to get latest subscription status
                     refreshUserData(); 
-                    // Refresh local realm data (transactions/goals)
                     refresh();
                 }
             };
@@ -271,7 +272,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                 document.removeEventListener('visibilitychange', handleVisibilityChange);
             };
         }
-    }, [user?.uid, refreshUserData, refresh]); // Depend on refreshUserData/refresh
+    }, [user?.uid, refreshUserData, refresh]);
 
     const handleUpgradeSubmit = async (paymentData) => {
         try {
@@ -292,7 +293,6 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             toggleModal(isFamily ? 'applyFamily' : 'applyCompany', false);
             alert("Success! Request submitted for review.");
             
-            // ⭐️ FIX: Call refreshUserData immediately after user submits a request
             if (typeof refreshUserData === 'function') refreshUserData();
 
         } catch (error) {
@@ -335,7 +335,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                         ) : isFamilyPending ? (
                             <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
                         ) : (
-                            <Btn onClick={() => toggleModal('applyFamily', true)} type="sec" icon={Icons.Lock}>Families</Btn>
+                            <Btn onClick={() => toggleModal('applyFamily', true)} type="sec" icon={Icons.Lock}>Apply Family</Btn>
                         )}
 
                         {/* Company Button Logic */}
@@ -344,7 +344,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                         ) : isCompanyPending ? (
                             <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
                         ) : (
-                            <Btn onClick={() => toggleModal('applyCompany', true)} type="sec" icon={Icons.Lock}>Company</Btn>
+                            <Btn onClick={() => toggleModal('applyCompany', true)} type="sec" icon={Icons.Lock}>Apply Company</Btn>
                         )}
 
                         {user?.role === 'admin' && (
