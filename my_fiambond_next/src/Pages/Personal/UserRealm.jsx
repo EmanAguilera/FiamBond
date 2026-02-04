@@ -142,26 +142,21 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const { user, premiumDetails, refreshUserData } = context || {};
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
-    // REVISED: Clearer check for access.
-    const hasCompanySubscriptionAccess = useMemo(() => {
+    // ⭐️ FIX: Simplify access check to rely ONLY on the user object flags
+    const isCompanyActive = useMemo(() => {
         if (user?.role === 'admin') return true;
-        if (premiumDetails?.company && premiumDetails.company.expires_at?.toDate() > new Date()) {
-            return true;
-        }
-        return false;
-    }, [user, premiumDetails?.company]);
+        
+        // Rely on the is_premium flag AND the subscription_status set by the Admin
+        return user?.is_premium === true && user?.subscription_status === 'active';
+    }, [user]); 
 
-    const hasFamilySubscriptionAccess = useMemo(() => {
+    // ⭐️ FIX: Simplify access check to rely ONLY on the user object flags
+    const isFamilyActive = useMemo(() => {
         if (user?.role === 'admin') return true;
-        if (premiumDetails?.family && premiumDetails.family.expires_at?.toDate() > new Date()) {
-            return true;
-        }
-        return false;
-    }, [user, premiumDetails?.family]);
-
-    // Update variable names to reflect the new logic clarity
-    const isCompanyActive = hasCompanySubscriptionAccess;
-    const isFamilyActive = hasFamilySubscriptionAccess;
+        
+        // Rely on the is_family_premium flag AND the subscription_status set by the Admin
+        return user?.is_family_premium === true && user?.family_subscription_status === 'active';
+    }, [user]);
 
     const isCompanyPending = user?.subscription_status === 'pending_approval';
     const isFamilyPending = user?.family_subscription_status === 'pending_approval';
@@ -329,7 +324,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                         <Btn onClick={() => { setLoanFlowStep('choice'); toggleModal('recordLoan', true); }} icon={Icons.Plus}>Loan</Btn>
                         <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
 
-                        {/* Families Button Logic */}
+                        {/* Families Button Logic - NOW RELIES ON SIMPLIFIED isFamilyActive */}
                         {isFamilyActive ? (
                             <Btn onClick={() => toggleModal('families', true)} icon={Icons.Users}>Families</Btn>
                         ) : isFamilyPending ? (
@@ -338,7 +333,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                             <Btn onClick={() => toggleModal('applyFamily', true)} type="sec" icon={Icons.Lock}>Apply Family</Btn>
                         )}
 
-                        {/* Company Button Logic */}
+                        {/* Company Button Logic - NOW RELIES ON SIMPLIFIED isCompanyActive */}
                         {isCompanyActive ? (
                             <Btn onClick={() => setShowCompanyRealm(true)} type="comp" icon={Icons.Build}>Company</Btn>
                         ) : isCompanyPending ? (
