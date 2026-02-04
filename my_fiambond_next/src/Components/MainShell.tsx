@@ -1,6 +1,8 @@
+// MainShell.tsx
+
 "use client";
 
-import React, { useContext, useState, useRef, useEffect } from "react"; // Added React import
+import React, { useContext, useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link"; 
 import { usePathname } from "next/navigation";
 import { AppContext } from "../Context/AppContext";
@@ -50,11 +52,11 @@ const AppFooter = () => (
 );
 
 export default function MainShell({ children }: { children: React.ReactNode }) {
-    const { user, handleLogout, premiumDetails }: any = useContext(AppContext);
+    // Renamed premiumDetails to avoid confusion with the derived value
+    const { user, handleLogout, premiumDetails: contextPremiumDetails }: any = useContext(AppContext);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     
-    // Fix for "Property 'contains' does not exist on type 'never'"
     const dropdownRef = useRef<HTMLDivElement>(null); 
     
     const pathname = usePathname();
@@ -71,6 +73,35 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // FIX: Derive premium details from the `user` object.
+    const currentPremiumDetails = useMemo(() => {
+        if (!user) return null;
+
+        const details: any = {};
+        
+        // Company Plan
+        if (user.is_premium) {
+            details.company = {
+                granted_at: user.premium_granted_at,
+                // Assuming 'premium_plan_cycle' exists on user or defaults to 'monthly'
+                plan_cycle: user.premium_plan_cycle || 'monthly' 
+            };
+        }
+
+        // Family Plan
+        if (user.is_family_premium) {
+            details.family = {
+                granted_at: user.family_premium_granted_at,
+                // Assuming 'family_premium_plan_cycle' exists on user or defaults to 'monthly'
+                plan_cycle: user.family_premium_plan_cycle || 'monthly' 
+            };
+        }
+        
+        if (!details.company && !details.family) return null;
+
+        return details;
+    }, [user]);
 
     // --- VIEW A: PUBLIC LAYOUT ---
     if (isPublicLayout) { 
@@ -118,25 +149,25 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                             <div className="hidden md:flex items-center gap-3 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm">
                                 <CheckBadgeIcon className="h-4 w-4 text-indigo-600" />
                                 
-                                {premiumDetails?.company && (
-                                    <div className={`flex items-center gap-1.5 ${premiumDetails?.family ? 'border-r border-gray-200 pr-3' : ''}`}>
+                                {currentPremiumDetails?.company && (
+                                    <div className={`flex items-center gap-1.5 ${currentPremiumDetails?.family ? 'border-r border-gray-200 pr-3' : ''}`}>
                                         <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
                                         <span className="text-[11px] text-emerald-700 font-bold uppercase tracking-tight">
-                                            Co: {formatExpirationDate(premiumDetails.company.granted_at, premiumDetails.company.plan_cycle)}
+                                            Co: {formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}
                                         </span>
                                     </div>
                                 )}
                                 
-                                {premiumDetails?.family && (
+                                {currentPremiumDetails?.family && (
                                     <div className="flex items-center gap-1.5 pl-1">
                                         <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
                                         <span className="text-[11px] text-blue-700 font-bold uppercase tracking-tight">
-                                            Fam: {formatExpirationDate(premiumDetails.family.granted_at, premiumDetails.family.plan_cycle)}
+                                            Fam: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}
                                         </span>
                                     </div>
                                 )}
 
-                                {!premiumDetails?.company && !premiumDetails?.family && (
+                                {!currentPremiumDetails?.company && !currentPremiumDetails?.family && (
                                     <div className="flex items-center gap-2">
                                         <ClockIcon className="h-3 w-3 text-gray-400" />
                                         <span className="text-[11px] font-medium text-gray-400 uppercase">Free Tier</span>
@@ -204,20 +235,20 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
 
                             <div className="space-y-3">
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Active Plans</p>
-                                {premiumDetails?.company && (
+                                {currentPremiumDetails?.company && (
                                     <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
                                         <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
                                             <CheckBadgeIcon className="h-4 w-4" /> Company Plan
                                         </div>
-                                        <span className="text-[10px] text-emerald-600 font-bold">Ends: {formatExpirationDate(premiumDetails.company.granted_at, premiumDetails.company.plan_cycle)}</span>
+                                        <span className="text-[10px] text-emerald-600 font-bold">Ends: {formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}</span>
                                     </div>
                                 )}
-                                {premiumDetails?.family && (
+                                {currentPremiumDetails?.family && (
                                     <div className="flex justify-between items-center p-3 bg-blue-50 border border-blue-100 rounded-xl">
                                         <div className="flex items-center gap-2 text-blue-700 font-bold text-sm">
                                             <CheckBadgeIcon className="h-4 w-4" /> Family Plan
                                         </div>
-                                        <span className="text-[10px] text-blue-600 font-bold">Ends: {formatExpirationDate(premiumDetails.family.granted_at, premiumDetails.family.plan_cycle)}</span>
+                                        <span className="text-[10px] text-blue-600 font-bold">Ends: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}</span>
                                     </div>
                                 )}
                             </div>
