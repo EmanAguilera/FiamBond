@@ -1,3 +1,5 @@
+// CompanyRealm.jsx
+
 'use client'; 
 
 import { useState, Suspense, useContext, useCallback, useEffect } from 'react';
@@ -79,7 +81,8 @@ const formatDataForChart = (transactions) => {
 };
 
 export default function CompanyRealm({ company, onBack, onDataChange }) {
-    const { user } = useContext(AppContext);
+    // ⭐️ FIX: Destructure premiumDetails from AppContext
+    const { user, premiumDetails } = useContext(AppContext);
 
     const [modals, setModals] = useState({
         addTx: false, addGoal: false, manageEmp: false,
@@ -101,7 +104,7 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
         if (!company || !user) return;
         setLoading(true);
         try {
-            // Ensure company exists or create if missing
+            // Ensure company exists or create if missing (omitted for brevity)
             let compRes = await fetch(`${API_BASE_URL}/companies/${company.id}`);
             if (!compRes.ok && compRes.status === 404) {
                 const createRes = await fetch(`${API_BASE_URL}/companies`, {
@@ -181,6 +184,28 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
     useEffect(() => { generateReport(); }, [generateReport, period]);
 
     const handleRefresh = () => { fetchData(); if (onDataChange) onDataChange(); };
+
+    // ⭐️ FIX: Effect to check for access and redirect if access is revoked/not active
+    useEffect(() => {
+        // Only run if the user object and onBack function are available
+        if (!user || !onBack) return;
+
+        // Admins always have access
+        if (user.role === 'admin') return; 
+
+        // Check company access based on premiumDetails
+        const isCompanyActive = premiumDetails?.company?.expires_at?.toDate() > new Date();
+
+        // If not active, or if premiumDetails is explicitly null, go back to UserRealm
+        if (!isCompanyActive) {
+            // Optional: Add a brief timeout to let the UI update before transition
+            const timer = setTimeout(() => {
+                onBack(); // Function passed from UserRealm to switch back to UserRealm view
+            }, 100); 
+
+            return () => clearTimeout(timer); // Cleanup
+        }
+    }, [user, premiumDetails, onBack]); // Re-run whenever user or premiumDetails change
 
     if (loading && !transactions.length) return <div className="p-10 text-center animate-pulse text-slate-500">Entering Corporate Realm...</div>;
 
