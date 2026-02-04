@@ -32,7 +32,7 @@ const formatExpirationDate = (grantedAt: any, planCycle: string | null) => {
     return endDate.toLocaleDateString();
 };
 
-// --- REUSABLE FOOTER ---
+// --- REUSABLE FOOTER (omitted for brevity) ---
 const AppFooter = () => (
     <footer className="bg-white py-12 border-t border-gray-200">
         <div className="max-w-screen-2xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
@@ -155,30 +155,41 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                         {/* Unified Subscription Display (Desktop) */}
                         {user && (
                             <div className="hidden md:flex items-center gap-3 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm">
-                                <CheckBadgeIcon className="h-4 w-4 text-indigo-600" />
-                                
-                                {currentPremiumDetails?.company && (
-                                    <div className={`flex items-center gap-1.5 ${currentPremiumDetails?.family ? 'border-r border-gray-200 pr-3' : ''}`}>
-                                        <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                                        <span className="text-[11px] text-emerald-700 font-bold uppercase tracking-tight">
-                                            Co: {formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}
-                                        </span>
-                                    </div>
-                                )}
-                                
-                                {currentPremiumDetails?.family && (
-                                    <div className="flex items-center gap-1.5 pl-1">
-                                        <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                        <span className="text-[11px] text-blue-700 font-bold uppercase tracking-tight">
-                                            Fam: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}
-                                        </span>
-                                    </div>
-                                )}
-
-                                {!currentPremiumDetails?.company && !currentPremiumDetails?.family && (
+                                {/* ⭐️ FIX: Conditionally display Admin Access when no premium plans are active */}
+                                {(currentPremiumDetails?.company || currentPremiumDetails?.family) ? (
+                                    <>
+                                        <CheckBadgeIcon className="h-4 w-4 text-indigo-600" />
+                                        {currentPremiumDetails?.company && (
+                                            <div className={`flex items-center gap-1.5 ${currentPremiumDetails?.family ? 'border-r border-gray-200 pr-3' : ''}`}>
+                                                <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                                                <span className="text-[11px] text-emerald-700 font-bold uppercase tracking-tight">
+                                                    Co: {formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        
+                                        {currentPremiumDetails?.family && (
+                                            <div className="flex items-center gap-1.5 pl-1">
+                                                <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                                <span className="text-[11px] text-blue-700 font-bold uppercase tracking-tight">
+                                                    Fam: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
                                     <div className="flex items-center gap-2">
-                                        <ClockIcon className="h-3 w-3 text-gray-400" />
-                                        <span className="text-[11px] font-medium text-gray-400 uppercase">Free Tier</span>
+                                        {isAdmin ? (
+                                            <>
+                                                <CheckBadgeIcon className="h-4 w-4 text-purple-600" />
+                                                <span className="text-[11px] font-bold text-purple-600 uppercase">ADMIN ACCESS</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ClockIcon className="h-3 w-3 text-gray-400" />
+                                                <span className="text-[11px] font-medium text-gray-400 uppercase">Free Tier</span>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -192,7 +203,6 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                                     className="flex items-center gap-3 p-1 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none"
                                 >
                                     <div className="text-right mr-1">
-                                        {/* ⭐️ FIX: Display Admin Badge next to name */}
                                         <div className="flex items-center justify-end">
                                             <p className="text-sm font-bold text-gray-800 capitalize tracking-wide">{user.full_name || 'User'}</p>
                                             {isAdmin && <AdminBadge />}
@@ -240,7 +250,6 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                                     {(user?.full_name || 'U')[0].toUpperCase()}
                                 </div>
                                 <div>
-                                    {/* ⭐️ FIX: Display Admin Badge in Mobile Menu */}
                                     <div className="flex items-center">
                                         <div className="text-base font-bold text-gray-900">{user?.full_name || 'User'}</div>
                                         {isAdmin && <AdminBadge />}
@@ -251,21 +260,34 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
 
                             <div className="space-y-3">
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Active Plans</p>
-                                {currentPremiumDetails?.company && (
-                                    <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
-                                            <CheckBadgeIcon className="h-4 w-4" /> Company Plan
+                                
+                                {/* ⭐️ FIX: Conditionally display Admin Access in Mobile Menu */}
+                                {(!currentPremiumDetails?.company && !currentPremiumDetails?.family) && isAdmin ? (
+                                    <div className="flex justify-between items-center p-3 bg-purple-50 border border-purple-100 rounded-xl">
+                                        <div className="flex items-center gap-2 text-purple-700 font-bold text-sm">
+                                            <CheckBadgeIcon className="h-4 w-4" /> System Administrator
                                         </div>
-                                        <span className="text-[10px] text-emerald-600 font-bold">Ends: {formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}</span>
+                                        <span className="text-[10px] text-purple-600 font-bold">LIFETIME ACCESS</span>
                                     </div>
-                                )}
-                                {currentPremiumDetails?.family && (
-                                    <div className="flex justify-between items-center p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                                        <div className="flex items-center gap-2 text-blue-700 font-bold text-sm">
-                                            <CheckBadgeIcon className="h-4 w-4" /> Family Plan
-                                        </div>
-                                        <span className="text-[10px] text-blue-600 font-bold">Ends: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}</span>
-                                    </div>
+                                ) : (
+                                    <>
+                                        {currentPremiumDetails?.company && (
+                                            <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                                                <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
+                                                    <CheckBadgeIcon className="h-4 w-4" /> Company Plan
+                                                </div>
+                                                <span className="text-[10px] text-emerald-600 font-bold">Ends: {formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}</span>
+                                            </div>
+                                        )}
+                                        {currentPremiumDetails?.family && (
+                                            <div className="flex justify-between items-center p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                                                <div className="flex items-center gap-2 text-blue-700 font-bold text-sm">
+                                                    <CheckBadgeIcon className="h-4 w-4" /> Family Plan
+                                                </div>
+                                                <span className="text-[10px] text-blue-600 font-bold">Ends: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}</span>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
 
