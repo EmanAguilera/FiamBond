@@ -32,7 +32,7 @@ const formatExpirationDate = (grantedAt: any, planCycle: string | null) => {
     return endDate.toLocaleDateString();
 };
 
-// --- REUSABLE FOOTER (omitted for brevity) ---
+// --- REUSABLE FOOTER ---
 const AppFooter = () => (
     <footer className="bg-white py-12 border-t border-gray-200">
         <div className="max-w-screen-2xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
@@ -152,13 +152,15 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                     </div>
                     
                     <div className="flex items-center gap-6">
-                        {/* Unified Subscription Display (Desktop) */}
-                        {user && (
+                        {/* Unified Subscription Display (Desktop) 
+                            ⭐️ FIX: Hide this block completely if the user is an Admin
+                        */}
+                        {user && !isAdmin && (
                             <div className="hidden md:flex items-center gap-3 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm">
-                                {/* ⭐️ FIX: Conditionally display Admin Access when no premium plans are active */}
+                                <CheckBadgeIcon className="h-4 w-4 text-indigo-600" />
+                                
                                 {(currentPremiumDetails?.company || currentPremiumDetails?.family) ? (
                                     <>
-                                        <CheckBadgeIcon className="h-4 w-4 text-indigo-600" />
                                         {currentPremiumDetails?.company && (
                                             <div className={`flex items-center gap-1.5 ${currentPremiumDetails?.family ? 'border-r border-gray-200 pr-3' : ''}`}>
                                                 <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
@@ -179,17 +181,8 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                                     </>
                                 ) : (
                                     <div className="flex items-center gap-2">
-                                        {isAdmin ? (
-                                            <>
-                                                <CheckBadgeIcon className="h-4 w-4 text-purple-600" />
-                                                <span className="text-[11px] font-bold text-purple-600 uppercase">ADMIN ACCESS</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <ClockIcon className="h-3 w-3 text-gray-400" />
-                                                <span className="text-[11px] font-medium text-gray-400 uppercase">Free Tier</span>
-                                            </>
-                                        )}
+                                        <ClockIcon className="h-3 w-3 text-gray-400" />
+                                        <span className="text-[11px] font-medium text-gray-400 uppercase">Free Tier</span>
                                     </div>
                                 )}
                             </div>
@@ -261,7 +254,7 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                             <div className="space-y-3">
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Active Plans</p>
                                 
-                                {/* ⭐️ FIX: Conditionally display Admin Access in Mobile Menu */}
+                                {/* Keep the Admin card in the mobile menu when no plans are active for clarity */}
                                 {(!currentPremiumDetails?.company && !currentPremiumDetails?.family) && isAdmin ? (
                                     <div className="flex justify-between items-center p-3 bg-purple-50 border border-purple-100 rounded-xl">
                                         <div className="flex items-center gap-2 text-purple-700 font-bold text-sm">
@@ -270,6 +263,7 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                                         <span className="text-[10px] text-purple-600 font-bold">LIFETIME ACCESS</span>
                                     </div>
                                 ) : (
+                                    // Otherwise, display the actual premium cards
                                     <>
                                         {currentPremiumDetails?.company && (
                                             <div className="flex justify-between items-center p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
@@ -285,6 +279,15 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                                                     <CheckBadgeIcon className="h-4 w-4" /> Family Plan
                                                 </div>
                                                 <span className="text-[10px] text-blue-600 font-bold">Ends: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}</span>
+                                            </div>
+                                        )}
+                                        {/* If no premiums and not admin, show Free Tier status in mobile menu */}
+                                        {!currentPremiumDetails?.company && !currentPremiumDetails?.family && !isAdmin && (
+                                            <div className="flex justify-between items-center p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                                                <div className="flex items-center gap-2 text-gray-700 font-bold text-sm">
+                                                    <ClockIcon className="h-4 w-4 text-gray-400" /> Free Tier
+                                                </div>
+                                                <span className="text-[10px] text-gray-600 font-bold">LIMITED ACCESS</span>
                                             </div>
                                         )}
                                     </>
