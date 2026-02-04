@@ -1,12 +1,13 @@
 // AdminRealm.jsx
 
-'use client'; // Required for all components using state, effects, or context in Next.js App Router
+'use client'; 
 
 import { useEffect, useState, useCallback, Suspense, useContext } from "react";
 import dynamic from "next/dynamic"; 
 import { useRouter } from "next/navigation"; 
 import { AppContext } from '../../Context/AppContext';
-import { collection, getDocs, doc, serverTimestamp, writeBatch, query, where, updateDoc } from "firebase/firestore"; // Added updateDoc
+// ⭐️ Ensure updateDoc is imported
+import { collection, getDocs, doc, serverTimestamp, writeBatch, query, where, updateDoc } from "firebase/firestore";
 import { db } from "../../config/firebase-config";
 import { toast } from "react-hot-toast";
 
@@ -178,30 +179,48 @@ export default function AdminDashboard({ onBack }) {
 
     useEffect(() => { if (user) fetchData(); }, [fetchData, user]);
 
-    // --- ⭐️ THE FIXED BATCH LOGIC ⭐️ ---
+    // ⭐️ THE FIXED BATCH LOGIC with clearing premium ID on revoke ⭐️
     const handleTogglePremium = async (userId, action, type) => {
         try {
-            const batch = writeBatch(db); // INITIALIZE THE BATCH
+            const batch = writeBatch(db); 
             const userRef = doc(db, "users", userId);
             const isGranting = action === 'grant' || action === 'approve';
             const userObj = users.find(u => u.id === userId);
 
             const updates = {};
+            let premiumRef; // Define premiumRef here
+
             if (type === 'company') {
                 updates.is_premium = isGranting;
                 updates.subscription_status = isGranting ? 'active' : 'none';
-                if (isGranting) updates.premium_granted_at = serverTimestamp();
-            } else {
+                if (isGranting) {
+                    updates.premium_granted_at = serverTimestamp();
+                    // ⭐️ FIX: Set active_company_premium_id when granting
+                    premiumRef = doc(collection(db, "premiums"));
+                    updates.active_company_premium_id = premiumRef.id; 
+                } else {
+                    // ⭐️ FIX: CLEAR active_company_premium_id when revoking
+                    updates.active_company_premium_id = null; 
+                }
+            } else { // type === 'family'
                 updates.is_family_premium = isGranting;
                 updates.family_subscription_status = isGranting ? 'active' : 'none';
-                if (isGranting) updates.family_premium_granted_at = serverTimestamp();
+                if (isGranting) {
+                    updates.family_premium_granted_at = serverTimestamp();
+                    // ⭐️ FIX: Set active_family_premium_id when granting
+                    premiumRef = doc(collection(db, "premiums"));
+                    updates.active_family_premium_id = premiumRef.id; 
+                } else {
+                    // ⭐️ FIX: CLEAR active_family_premium_id when revoking
+                    updates.active_family_premium_id = null; 
+                }
             }
 
             batch.update(userRef, updates);
 
             // If approving, also create a record in the premiums collection for finance tracking
             if (isGranting) {
-                const premiumRef = doc(collection(db, "premiums"));
+                // premiumRef is defined and set above for both company and family
                 batch.set(premiumRef, {
                     user_id: userId,
                     email: userObj?.email || "unknown",
@@ -218,8 +237,7 @@ export default function AdminDashboard({ onBack }) {
             // 1. Refresh AdminRealm's local data
             fetchData();
             
-            // 2. ⭐️ FIX: Refresh the global AppContext data (which updates MainShell.tsx)
-            // This is crucial for MainShell.tsx to show the updated premium status.
+            // 2. Refresh the global AppContext data (which updates MainShell.tsx/UserRealm.jsx)
             if (typeof refreshUserData === 'function' && userId === user.id) {
                  refreshUserData();
             }
@@ -234,6 +252,7 @@ export default function AdminDashboard({ onBack }) {
             const q = query(collection(db, "users"), where("email", "==", email));
             const snap = await getDocs(q);
             if (snap.empty) return toast.error("User not found.");
+            // ⭐️ Ensure updateDoc is used correctly
             await updateDoc(doc(db, "users", snap.docs[0].id), { role: 'admin' });
             fetchData();
             toast.success("Admin added!");
