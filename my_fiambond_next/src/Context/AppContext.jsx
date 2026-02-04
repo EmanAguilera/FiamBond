@@ -1,6 +1,8 @@
+// AppContext.jsx
+
 "use client";
 
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "../config/firebase-config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -13,70 +15,82 @@ export default function AppProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // Store detailed premium info (start/end dates)
   const [premiumDetails, setPremiumDetails] = useState({
     company: null,
     family: null
   });
 
+  // ⭐️ FIX: Function to fetch and update user/premium data
+  const fetchAndSetUserData = useCallback(async (currentUser, docSnap) => {
+    if (!currentUser) {
+        setUser(null);
+        setPremiumDetails({ company: null, family: null });
+        setLoading(false);
+        return;
+    }
+    
+    let userData = docSnap?.exists() ? docSnap.data() : {};
+    let companyInfo = null;
+    let familyInfo = null;
+
+    try {
+        // Fetch Company Premium Dates if ID exists
+        if (userData.active_company_premium_id) {
+            const compSnap = await getDoc(doc(db, "premiums", userData.active_company_premium_id));
+            if (compSnap.exists()) companyInfo = compSnap.data();
+        }
+
+        // Fetch Family Premium Dates if ID exists
+        if (userData.active_family_premium_id) {
+            const famSnap = await getDoc(doc(db, "premiums", userData.active_family_premium_id));
+            if (famSnap.exists()) familyInfo = famSnap.data();
+        }
+    } catch (err) {
+        console.error("Error fetching premium details:", err);
+    }
+
+    // SET STATE ALL AT ONCE
+    setPremiumDetails({ company: companyInfo, family: familyInfo });
+    setUser({
+        uid: currentUser.uid,
+        email: currentUser.email,
+        emailVerified: currentUser.emailVerified,
+        ...userData
+    });
+    setLoading(false);
+  }, []);
+
+  // ⭐️ FIX: Manual refresh function exposed to other components
+  const refreshUserData = useCallback(async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    setLoading(true); // Indicate loading start
+    
+    // Manually fetch the user document to get the latest status
+    const docSnap = await getDoc(doc(db, "users", currentUser.uid));
+    await fetchAndSetUserData(currentUser, docSnap);
+    
+  }, [fetchAndSetUserData]);
+
   useEffect(() => {
     let unsubscribeFromFirestore = null;
 
     const unsubscribeFromAuth = onAuthStateChanged(auth, (currentUser) => {
-      // If no user is logged in, reset everything immediately
       if (!currentUser) {
-        setUser(null);
-        setPremiumDetails({ company: null, family: null });
-        setLoading(false);
+        // Clean up on log out
+        fetchAndSetUserData(null, null);
         if (unsubscribeFromFirestore) unsubscribeFromFirestore();
         return;
       }
 
-      // If user exists, listen to their Firestore document
       const userDocRef = doc(db, "users", currentUser.uid);
-      unsubscribeFromFirestore = onSnapshot(userDocRef, async (docSnap) => {
-        if (docSnap.exists()) {
-          const userData = docSnap.data();
-          
-          // Optimization: Prepare these but don't let them block the initial user set if not needed
-          let companyInfo = null;
-          let familyInfo = null;
-
-          try {
-            // Fetch Company Premium Dates if ID exists
-            if (userData.active_company_premium_id) {
-                const compSnap = await getDoc(doc(db, "premiums", userData.active_company_premium_id));
-                if (compSnap.exists()) companyInfo = compSnap.data();
-            }
-
-            // Fetch Family Premium Dates if ID exists
-            if (userData.active_family_premium_id) {
-                const famSnap = await getDoc(doc(db, "premiums", userData.active_family_premium_id));
-                if (famSnap.exists()) familyInfo = famSnap.data();
-            }
-          } catch (err) {
-            console.error("Error fetching premium details:", err);
-          }
-
-          // SET STATE ALL AT ONCE to prevent multiple re-renders
-          setPremiumDetails({ company: companyInfo, family: familyInfo });
-          setUser({
-            uid: currentUser.uid,
-            email: currentUser.email,
-            emailVerified: currentUser.emailVerified,
-            ...userData
-          });
-        } else {
-          // Fallback if document doesn't exist yet
-          setUser({ 
-            uid: currentUser.uid, 
-            email: currentUser.email, 
-            emailVerified: currentUser.emailVerified 
-          });
-        }
-        
-        // Finalize loading
-        setLoading(false);
+      
+      // Use onSnapshot to automatically trigger a refresh when the document changes
+      // NOTE: We wrap the async logic (getDoc) inside the listener, which can cause
+      // brief inconsistency, but is the closest to real-time for simple cases.
+      unsubscribeFromFirestore = onSnapshot(userDocRef, (docSnap) => {
+        // Use the fetched data and trigger the full async fetch and set process
+        fetchAndSetUserData(currentUser, docSnap);
       });
     });
 
@@ -84,11 +98,11 @@ export default function AppProvider({ children }) {
       unsubscribeFromAuth();
       if (unsubscribeFromFirestore) unsubscribeFromFirestore();
     };
-  }, []);
+  }, [fetchAndSetUserData]);
 
   const handleLogout = async () => {
     try {
-      setLoading(true); // Set loading while logging out
+      setLoading(true); 
       await signOut(auth);
       router.push("/login");
     } catch (error) {
@@ -101,7 +115,8 @@ export default function AppProvider({ children }) {
     setUser,
     loading,
     handleLogout,
-    premiumDetails 
+    premiumDetails,
+    refreshUserData // ⭐️ EXPOSED
   };
 
   return (
