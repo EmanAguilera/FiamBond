@@ -1,10 +1,12 @@
+// AdminRealm.jsx
+
 'use client'; // Required for all components using state, effects, or context in Next.js App Router
 
 import { useEffect, useState, useCallback, Suspense, useContext } from "react";
 import dynamic from "next/dynamic"; 
 import { useRouter } from "next/navigation"; 
 import { AppContext } from '../../Context/AppContext';
-import { collection, getDocs, doc, serverTimestamp, writeBatch, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, serverTimestamp, writeBatch, query, where, updateDoc } from "firebase/firestore"; // Added updateDoc
 import { db } from "../../config/firebase-config";
 import { toast } from "react-hot-toast";
 
@@ -29,7 +31,7 @@ const getPlanValue = (plan, type = 'company') => {
     return plan === 'yearly' ? 5000.00 : 500.00;
 };
 
-// --- REUSABLE COMPONENTS ---
+// --- REUSABLE COMPONENTS (omitted for brevity) ---
 const Btn = ({ onClick, type = 'sec', icon, children }) => {
     const styles = {
         admin: "bg-purple-600 text-white hover:bg-purple-700 shadow-sm",
@@ -85,7 +87,8 @@ const ManageTeamWidget = ({ adminUsers, onAddAdmin }) => {
 
 // --- MAIN DASHBOARD ---
 export default function AdminDashboard({ onBack }) {
-    const { user } = useContext(AppContext);
+    // ⭐️ FIX: Destructure refreshUserData from AppContext
+    const { user, refreshUserData } = useContext(AppContext);
     const adminLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'Admin');
 
     const [users, setUsers] = useState([]);
@@ -211,7 +214,15 @@ export default function AdminDashboard({ onBack }) {
 
             await batch.commit();
             toast.success("Access updated successfully!");
+            
+            // 1. Refresh AdminRealm's local data
             fetchData();
+            
+            // 2. ⭐️ FIX: Refresh the global AppContext data (which updates MainShell.tsx)
+            // This is crucial for MainShell.tsx to show the updated premium status.
+            if (typeof refreshUserData === 'function' && userId === user.id) {
+                 refreshUserData();
+            }
         } catch (error) {
             console.error("Batch update failed:", error);
             toast.error("Failed to update user.");
