@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useContext, FormEvent } from 'react';
+import React, { useState, useContext, FormEvent } from 'react'; // Added React to imports
 import { AppContext } from '../../../Context/AppContext';
 import { toast } from 'react-hot-toast';
 import { API_BASE_URL } from '@/src/config/apiConfig';
@@ -23,6 +23,11 @@ export default function CreateCompanyGoalWidget({ company, onSuccess }: Props) {
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         if (!user) return toast.error("Session expired. Please login.");
+
+        // Basic validation for target date not in the past (replicated from CreateGoalWidget logic)
+        if (new Date(formData.target_date) < new Date(new Date().setHours(0,0,0,0))) {
+          return toast.error("Target date cannot be in the past");
+        }
         
         setLoading(true);
 
@@ -32,7 +37,7 @@ export default function CreateCompanyGoalWidget({ company, onSuccess }: Props) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: user.uid,
-                    company_id: company.id,
+                    company_id: company.id, // <-- Company-specific logic
                     name: formData.name,
                     target_amount: parseFloat(formData.target_amount),
                     target_date: new Date(formData.target_date).toISOString(),
@@ -53,13 +58,16 @@ export default function CreateCompanyGoalWidget({ company, onSuccess }: Props) {
         }
     };
 
-    const inputClass = "w-full p-3 border border-slate-200 rounded-xl bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400";
+    // Replicating the input class from CreateGoalWidget.tsx
+    const inputClass = "w-full p-4 border border-slate-200 rounded-xl bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-300 font-medium";
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name */}
+        <form onSubmit={handleSubmit} className="space-y-5"> {/* Replicating space-y-5 */}
+            {/* Name - Replicated UI from CreateGoalWidget */}
             <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Target Name</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
+                    Target Name
+                </label>
                 <input 
                     type="text" 
                     required
@@ -70,9 +78,11 @@ export default function CreateCompanyGoalWidget({ company, onSuccess }: Props) {
                 />
             </div>
 
-            {/* Amount */}
+            {/* Amount - Replicated UI from CreateGoalWidget */}
             <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Target Amount (₱)</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
+                    Target Amount (₱)
+                </label>
                 <input 
                     type="number" 
                     step="0.01"
@@ -84,9 +94,11 @@ export default function CreateCompanyGoalWidget({ company, onSuccess }: Props) {
                 />
             </div>
 
-            {/* Date */}
+            {/* Date - Replicated UI from CreateGoalWidget */}
             <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Deadline</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
+                    Deadline
+                </label>
                 <input 
                     type="date" 
                     required
@@ -96,12 +108,20 @@ export default function CreateCompanyGoalWidget({ company, onSuccess }: Props) {
                 />
             </div>
 
-            {/* Submit Button */}
+            {/* Submit Button - Replicated UI from CreateGoalWidget */}
             <button 
                 disabled={loading} 
-                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100 mt-2"
+                className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all active:scale-[0.98] shadow-lg shadow-indigo-100 mt-2"
             >
-                {loading ? 'Setting Target...' : 'Set Target'}
+                {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Setting Target...
+                    </span>
+                ) : 'Set Target'}
             </button>
         </form>
     );
