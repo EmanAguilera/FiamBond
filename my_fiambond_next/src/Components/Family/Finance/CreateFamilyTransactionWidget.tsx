@@ -105,78 +105,101 @@ export default function CreateFamilyTransactionWidget({ family, onSuccess }: Pro
 
     return (
         <>
-            {/* Conflict Modal */}
+            {/* Conflict Modal - Replicated UI from CreateTransactionWidget */}
             {conflict && (
                 <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                    <div className="bg-white p-6 rounded-2xl text-center max-w-sm shadow-2xl">
-                        <h2 className="text-xl font-bold mb-4">Conflict: <span className="text-indigo-600">{conflict.name}</span></h2>
+                    <div className="bg-white p-6 rounded-2xl text-center max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+                        <h2 className="text-xl font-bold mb-4 text-slate-800">
+                            Conflict: <span className="text-indigo-600">{conflict.name}</span>
+                        </h2>
                         <div className="flex gap-3">
-                            <button onClick={() => setConflict(null)} className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-xl font-bold hover:bg-slate-200 transition-colors">Abandon</button>
-                            <button onClick={() => submit()} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Proceed</button>
+                            <button onClick={() => setConflict(null)} className="flex-1 bg-slate-100 text-slate-600 py-2.5 rounded-xl font-bold hover:bg-slate-200 transition-colors">
+                                Cancel {/* Changed text from 'Abandon' to 'Cancel' for consistency */}
+                            </button>
+                            <button onClick={() => submit()} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors">
+                                Proceed
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            <form onSubmit={submit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={submit} className="space-y-5"> {/* Replicated space-y-5 */}
+                {/* Type Toggle - Replicated UI from CreateTransactionWidget */}
+                <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl">
                     <button 
                         type="button" 
                         onClick={() => setForm({ ...form, type: 'income' })}
-                        className={`py-3 rounded-xl font-bold border-2 transition-all active:scale-95 ${form.type === 'income' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                        className={`py-2.5 rounded-lg font-bold transition-all ${form.type === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
                         + Income
                     </button>
                     <button 
                         type="button" 
                         onClick={() => setForm({ ...form, type: 'expense' })}
-                        className={`py-3 rounded-xl font-bold border-2 transition-all active:scale-95 ${form.type === 'expense' ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                        className={`py-2.5 rounded-lg font-bold transition-all ${form.type === 'expense' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
                         - Expense
                     </button>
                 </div>
 
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Amount (₱)</label>
-                    <input 
-                        type="number" 
-                        step="0.01" 
-                        required 
-                        placeholder="0.00" 
-                        value={form.amt} 
-                        onChange={e => setForm({ ...form, amt: e.target.value })} 
-                        className="w-full p-3 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 text-xl font-mono placeholder:text-slate-200 transition-all" 
-                    />
-                </div>
-                
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Description</label>
-                    <input 
-                        type="text" 
-                        required 
-                        placeholder={form.type === 'income' ? "e.g. Monthly Contribution" : "e.g. Electricity Bill"} 
-                        value={form.desc} 
-                        onChange={e => setForm({ ...form, desc: e.target.value })} 
-                        className="w-full p-3 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 placeholder:text-slate-200 transition-all" 
-                    />
-                </div>
-                
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Receipt <span className="text-slate-400 font-normal">(Optional)</span></label>
-                    <input 
-                        type="file" 
-                        key={file ? "has-file" : "no-file"} 
-                        onChange={handleFileChange} 
-                        accept="image/*,.pdf"
-                        className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border-2 border-slate-100 border-dashed rounded-xl p-2" 
-                    />
+                <div className="space-y-4">
+                    {/* Amount Input */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Amount (₱)</label> {/* Replicated Label style */}
+                        <input 
+                            type="number" 
+                            step="0.01" 
+                            required 
+                            placeholder="0.00" 
+                            value={form.amt} 
+                            onChange={e => setForm({ ...form, amt: e.target.value })} 
+                            // Replicated Input style (p-4, rounded-xl, focus:ring-2, text-2xl font-semibold)
+                            className="w-full p-4 border border-slate-200 rounded-xl outline-none focus:ring-2 ring-indigo-500 text-2xl font-semibold bg-white placeholder:text-slate-300" 
+                        />
+                    </div>
+                    
+                    {/* Description Input */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Description</label> {/* Replicated Label style */}
+                        <input 
+                            type="text" 
+                            required 
+                            placeholder={form.type === 'income' ? "e.g. Monthly Contribution" : "e.g. Electricity Bill"} 
+                            value={form.desc} 
+                            onChange={e => setForm({ ...form, desc: e.target.value })} 
+                            // Replicated Input style (p-4, rounded-xl, focus:ring-2)
+                            className="w-full p-4 border border-slate-200 rounded-xl outline-none focus:ring-2 ring-indigo-500 bg-white placeholder:text-slate-300" 
+                        />
+                    </div>
+                    
+                    {/* File Input */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">
+                            Receipt <span className="text-slate-400 font-normal lowercase">(optional)</span> {/* Replicated Label style */}
+                        </label>
+                        <input 
+                            type="file" 
+                            key={file ? "has-file" : "no-file"} 
+                            onChange={handleFileChange} 
+                            accept="image/*,.pdf"
+                            // Replicated File Input style
+                            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-dashed border-slate-300 rounded-xl p-3 bg-slate-50" 
+                        />
+                    </div>
                 </div>
 
+                {/* Submit Button */}
                 <button 
+                    type="submit"
                     disabled={loading} 
-                    className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+                    // Replicated Button style (py-4, rounded-2xl, shadow-lg, active:scale-[0.98])
+                    className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all active:scale-[0.98] shadow-lg shadow-indigo-100"
                 >
                     {loading ? 'Processing Sync...' : 'Save & Sync Transaction'}
                 </button>
 
+                {/* Ledger Sync Info */}
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[10px] text-center text-slate-400 leading-relaxed italic">
                         <span className="font-bold uppercase not-italic">Ledger Sync:</span> This action records the transaction in the Family account and simultaneously creates an <span className="text-slate-600 font-semibold">expense</span> entry in your personal wallet.
