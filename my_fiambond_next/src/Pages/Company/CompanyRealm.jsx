@@ -18,7 +18,7 @@ const CompanyLedgerListWidget = dynamic(() => import('../../Components/Company/F
 const CompanyEmployeeListWidget = dynamic(() => import('../../Components/Company/Employees/CompanyEmployeeListWidget.jsx'), { ssr: false });
 const CompanyGoalListWidget = dynamic(() => import('../../Components/Company/Goal/CompanyGoalListWidget.jsx'), { ssr: false });
 const CreateCompanyGoalWidget = dynamic(() => import('../../Components/Company/Goal/CreateCompanyGoalWidget.tsx'), { ssr: false });
-const CompanyPayrollWidget = dynamic(() => import('../../Components/Company/Payroll/CompanyPayrollWidget.jsx'), { ssr: false });
+const CompanyPayrollWidget = dynamic(() => import('../../Components/Company/Payroll/CompanyPayrollWidget.tsx'), { ssr: false });
 const PayrollHistoryWidget = dynamic(() => import('../../Components/Company/Payroll/PayrollHistoryWidget.jsx'), { ssr: false });
 
 // --- ICONS ---
