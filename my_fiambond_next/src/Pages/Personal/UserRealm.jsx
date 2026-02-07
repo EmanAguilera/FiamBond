@@ -143,20 +143,20 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
     // ⭐️ FIX: Simplify Company access check to rely on the primary access flag (is_premium)
+    // ⭐️ FIX 1: Ensure the logic for active status is robust and based on the flags set by AdminRealm
     const isCompanyActive = useMemo(() => {
         if (user?.role === 'admin') return true;
-        // Access is granted if the is_premium flag is TRUE (regardless of subscription_status string like 'none')
-        return user?.is_premium === true;
+        // Access is granted if the is_premium flag is TRUE AND subscription_status is 'active'
+        // We rely on 'is_premium' being true since the Admin grants it, but include 'active' for state consistency.
+        return user?.is_premium === true && user?.subscription_status === 'active'; 
     }, [user]); 
 
-    // ⭐️ FIX: Simplify Family access check to rely on the primary access flag (is_family_premium)
+    // ⭐️ FIX 2: Ensure the Family access logic is also robust
     const isFamilyActive = useMemo(() => {
         if (user?.role === 'admin') return true;
-        // Access is granted if the is_family_premium flag is TRUE
-        return user?.is_family_premium === true;
+        return user?.is_family_premium === true && user?.family_subscription_status === 'active';
     }, [user]);
 
-    // Pending checks remain based on the subscription_status string
     const isCompanyPending = user?.subscription_status === 'pending_approval';
     const isFamilyPending = user?.family_subscription_status === 'pending_approval';
 
@@ -334,6 +334,7 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
 
                         {/* Company Button Logic - NOW RELIES ON SIMPLIFIED isCompanyActive */}
                         {isCompanyActive ? (
+                            // ⭐️ FIX 3: This button is now correctly enabled/disabled by isCompanyActive
                             <Btn onClick={() => setShowCompanyRealm(true)} type="comp" icon={Icons.Build}>Company</Btn>
                         ) : isCompanyPending ? (
                             <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
