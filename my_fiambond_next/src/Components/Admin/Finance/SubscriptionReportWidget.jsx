@@ -17,15 +17,24 @@ export default function SubscriptionReportWidget({ transactions }) {
     // --- FILTER LOGIC ---
     const reportData = useMemo(() => {
         // Convert input strings to Date objects for comparison
-        // Set Start to 00:00:00
         const startObj = new Date(startDate);
         startObj.setHours(0, 0, 0, 0);
 
-        // Set End to 23:59:59 (to include the full last day)
         const endObj = new Date(endDate);
         endObj.setHours(23, 59, 59, 999);
 
-        return transactions
+        // Map and clean up data before filtering and sorting
+        const cleanedTransactions = transactions.map(tx => ({
+            ...tx,
+            // Ensure properties exist, provide fallbacks
+            plan: tx.plan || 'N/A',
+            method: tx.method || 'N/A',
+            ref: tx.ref || 'N/A',
+            subscriber: tx.subscriber || 'Unknown',
+        }));
+
+
+        return cleanedTransactions
             .filter(tx => {
                 if (!tx.created_at) return false;
                 // Handle Firebase Timestamp shim (toDate) or raw Date string/object
@@ -51,7 +60,6 @@ export default function SubscriptionReportWidget({ transactions }) {
     // --- 1. PDF GENERATION ---
     const handleGeneratePDF = (e) => {
         e.preventDefault();
-        // ⭐️ Next.js consideration: Use relative path for logo
         const logoUrl = `${window.location.origin}/FiamBond_Logo.png`; 
         const printWindow = window.open('', '_blank', 'width=900,height=900');
 
@@ -105,7 +113,7 @@ export default function SubscriptionReportWidget({ transactions }) {
                                     <div style="font-weight:600; color:#111;">${tx.subscriber}</div>
                                     <div style="font-size:10px; color:#666">${tx.method} - Ref: ${tx.ref}</div>
                                 </td>
-                                <td><span class="plan-badge">${tx.plan}</span></td>
+                                <td><span class="plan-badge">${tx.plan.toUpperCase()}</span></td>
                                 <td class="amount-col">${tx.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                             </tr>`;
                         }).join('')}
@@ -146,7 +154,7 @@ export default function SubscriptionReportWidget({ transactions }) {
                 dateObj.toLocaleDateString(),
                 tx.subscriber,
                 tx.ref,
-                tx.plan,
+                tx.plan.toUpperCase(), // Ensure uppercase
                 tx.amount
             ]);
             row.getCell(5).numFmt = '#,##0.00';
@@ -165,7 +173,7 @@ export default function SubscriptionReportWidget({ transactions }) {
             return [
                 `"${dateObj.toLocaleDateString()}"`,
                 `"${tx.subscriber.replace(/"/g, '""')}"`,
-                `"${tx.plan}"`,
+                `"${tx.plan.toUpperCase()}"`, // Ensure uppercase
                 `"${tx.method}"`,
                 `"${tx.ref}"`,
                 tx.amount.toFixed(2)
@@ -228,6 +236,7 @@ export default function SubscriptionReportWidget({ transactions }) {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{dateObj.toLocaleDateString()}</td>
                                         <td className="px-6 py-4 text-sm text-gray-900 font-medium">
                                             {tx.subscriber}
+                                            {/* ⭐️ FIX: tx.plan and tx.method are now guaranteed to be strings by useMemo */}
                                             <div className="text-xs text-gray-400 font-normal">{tx.plan.toUpperCase()} • {tx.method}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-emerald-600">

@@ -2,7 +2,7 @@
 
 'use client'; 
 
-import { useState, Suspense, useContext, useCallback, useEffect } from 'react';
+import React, { useState, Suspense, useContext, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { AppContext } from '../../Context/AppContext.jsx';
 import { db } from '../../config/firebase-config.js';
@@ -31,7 +31,7 @@ const Icons = {
     Printer: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
 };
 
-// --- REUSABLE BUTTON ---
+// --- REUSABLE BUTTON (omitted for brevity) ---
 const Btn = ({ onClick, type = 'sec', icon, children }) => {
     const styles = {
         pri: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm border border-transparent",
@@ -45,7 +45,7 @@ const Btn = ({ onClick, type = 'sec', icon, children }) => {
     );
 };
 
-// --- DASHBOARD CARD ---
+// --- DASHBOARD CARD (omitted for brevity) ---
 const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorClass }) => (
     <div onClick={onClick} className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 cursor-pointer group transition-shadow hover:shadow-xl flex flex-col">
         <div className="flex justify-between items-start">
@@ -81,8 +81,8 @@ const formatDataForChart = (transactions) => {
 };
 
 export default function CompanyRealm({ company, onBack, onDataChange }) {
-    // ⭐️ FIX: Destructure premiumDetails from AppContext
-    const { user, premiumDetails } = useContext(AppContext);
+    // ⭐️ Destructure user from AppContext
+    const { user } = useContext(AppContext);
 
     const [modals, setModals] = useState({
         addTx: false, addGoal: false, manageEmp: false,
@@ -185,27 +185,28 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
 
     const handleRefresh = () => { fetchData(); if (onDataChange) onDataChange(); };
 
-    // ⭐️ FIX: Effect to check for access and redirect if access is revoked/not active
+    // ⭐️ FIX: Access Check Logic ⭐️
     useEffect(() => {
-        // Only run if the user object and onBack function are available
         if (!user || !onBack) return;
 
-        // Admins always have access
+        // 1. Admins always have access
         if (user.role === 'admin') return; 
 
-        // Check company access based on premiumDetails
-        const isCompanyActive = premiumDetails?.company?.expires_at?.toDate() > new Date();
+        // 2. Non-admin access is determined by the `is_premium` and `subscription_status === 'active'` flags
+        //    (The AdminRealm fixes ensure this status is 'active' upon approval)
+        const hasActiveCompanyAccess = user.is_premium === true && user.subscription_status === 'active';
 
-        // If not active, or if premiumDetails is explicitly null, go back to UserRealm
-        if (!isCompanyActive) {
-            // Optional: Add a brief timeout to let the UI update before transition
+        // 3. If access is NOT active, go back to UserRealm
+        if (!hasActiveCompanyAccess) {
+            // Use a short timeout to prevent instant flicker/re-render issues sometimes caused by state change
             const timer = setTimeout(() => {
-                onBack(); // Function passed from UserRealm to switch back to UserRealm view
+                onBack(); 
             }, 100); 
 
-            return () => clearTimeout(timer); // Cleanup
+            return () => clearTimeout(timer); 
         }
-    }, [user, premiumDetails, onBack]); // Re-run whenever user or premiumDetails change
+        // Dependency array relies only on user and onBack since user update triggers full component refresh
+    }, [user, onBack]); 
 
     if (loading && !transactions.length) return <div className="p-10 text-center animate-pulse text-slate-500">Entering Corporate Realm...</div>;
 
