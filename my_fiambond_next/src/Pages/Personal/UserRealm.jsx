@@ -142,22 +142,21 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
     const { user, premiumDetails, refreshUserData } = context || {};
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
 
-    // ⭐️ FIX: Simplify access check to rely ONLY on the user object flags
+    // ⭐️ FIX: Simplify Company access check to rely on the primary access flag (is_premium)
     const isCompanyActive = useMemo(() => {
         if (user?.role === 'admin') return true;
-        
-        // Rely on the is_premium flag AND the subscription_status set by the Admin
-        return user?.is_premium === true && user?.subscription_status === 'active';
+        // Access is granted if the is_premium flag is TRUE (regardless of subscription_status string like 'none')
+        return user?.is_premium === true;
     }, [user]); 
 
-    // ⭐️ FIX: Simplify access check to rely ONLY on the user object flags
+    // ⭐️ FIX: Simplify Family access check to rely on the primary access flag (is_family_premium)
     const isFamilyActive = useMemo(() => {
         if (user?.role === 'admin') return true;
-        
-        // Rely on the is_family_premium flag AND the subscription_status set by the Admin
-        return user?.is_family_premium === true && user?.family_subscription_status === 'active';
+        // Access is granted if the is_family_premium flag is TRUE
+        return user?.is_family_premium === true;
     }, [user]);
 
+    // Pending checks remain based on the subscription_status string
     const isCompanyPending = user?.subscription_status === 'pending_approval';
     const isFamilyPending = user?.family_subscription_status === 'pending_approval';
 
