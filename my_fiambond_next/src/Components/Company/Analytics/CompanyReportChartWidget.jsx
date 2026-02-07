@@ -12,20 +12,27 @@ const ArrowDownIcon = () => (<svg className="w-5 h-5" fill="none" stroke="curren
 const ScaleIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>);
 const ChartIcon = () => (<svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>);
 
-// --- BUSINESS ANALYST COMPONENT (Kept as is) ---
+// --- BUSINESS ANALYST COMPONENT ---
 const CompanyFinancialAnalysis = ({ report }) => {
-    const { netPosition, transactionCount } = report;
-    const netFormatted = `₱${Math.abs(netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    // Safely use properties with fallback to prevent errors
+    const { netPosition, transactionCount } = report || {};
+    const net = netPosition || 0;
+    const count = transactionCount || 0;
+    const netFormatted = `₱${Math.abs(net).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     let title, narrative, recommendation;
 
-    if (netPosition > 0) {
+    if (net > 0) {
         title = "Profitable Operations";
         narrative = `The company generated a net profit of ${netFormatted}, indicating strong operational efficiency and healthy revenue streams against current expenses.`;
         recommendation = "Consider reinvesting surplus capital into growth strategies, employee bonuses, or reserve funds for future expansion.";
-    } else {
+    } else if (net < 0) {
         title = "Operational Deficit Detected";
-        narrative = `The company's expenses exceeded revenue, resulting in a net operating loss of ${netFormatted} across ${transactionCount} transactions.`;
-        recommendation = `Conduct a thorough audit of the ${transactionCount} expense entries to identify cost-cutting opportunities or strategies to boost short-term revenue.`;
+        narrative = `The company's expenses exceeded revenue, resulting in a net operating loss of ${netFormatted} across ${count} transactions.`;
+        recommendation = `Conduct a thorough audit of the ${count} expense entries to identify cost-cutting opportunities or strategies to boost short-term revenue.`;
+    } else {
+        title = "Neutral Financial Position";
+        narrative = "Revenue perfectly matched expenses, indicating a break-even point for the period. Further transactions are needed for a deeper analysis.";
+        recommendation = "Maintain current monitoring practices, and ensure all transactions are accurately logged to confirm sustained financial stability.";
     }
 
     return (
@@ -44,6 +51,13 @@ const CompanyFinancialAnalysis = ({ report }) => {
 // --- MAIN CHART WIDGET ---
 function CompanyReportChartWidget({ report }) {
     
+    // Safely destructure or use defaults
+    const totalInflow = report?.totalInflow || 0;
+    const totalOutflow = report?.totalOutflow || 0;
+    const netPosition = report?.netPosition || 0;
+    const reportTitle = report?.reportTitle || "No Date Range Selected / Awaiting Data";
+    const chartData = report?.chartData;
+    
     const chartOptions = { 
         responsive: true, 
         maintainAspectRatio: false, 
@@ -57,21 +71,15 @@ function CompanyReportChartWidget({ report }) {
         } 
     };
     
-    if (!report) { 
-        return (
-            <div className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-6 text-center py-10">
-                <p className="text-gray-500 italic">No financial data available.</p>
-            </div>
-        ); 
-    }
-
-    const hasChartData = report.chartData?.datasets?.length > 0 && report.chartData?.labels?.length > 0;
+    // Determine if we have any data to plot
+    const hasChartData = chartData?.datasets?.some(d => d.data.some(val => val > 0)) && chartData?.labels?.length > 0;
 
     return (
+        // Always render the container, even if report is null
         <div className="bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg p-4 sm:p-6">
             <div>
                 <h3 className="text-xl font-bold text-gray-800">Company Financial Overview</h3>
-                <p className="text-sm text-gray-500">{report.reportTitle}</p>
+                <p className="text-sm text-gray-500">{reportTitle}</p>
             </div>
             
             {/* --- STAT CARDS --- */}
@@ -81,7 +89,7 @@ function CompanyReportChartWidget({ report }) {
                     <div className="bg-emerald-100 text-emerald-600 p-2 rounded-lg"><ArrowUpIcon /></div>
                     <div className="ml-3">
                         <p className="text-sm text-emerald-800 font-semibold">Total Revenue</p>
-                        <p className="text-xl font-bold text-emerald-600">₱{parseFloat(report.totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xl font-bold text-emerald-600">₱{parseFloat(totalInflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                     </div>
                 </div>
                 {/* Expenses - Red */}
@@ -89,7 +97,7 @@ function CompanyReportChartWidget({ report }) {
                     <div className="bg-rose-100 text-rose-600 p-2 rounded-lg"><ArrowDownIcon /></div>
                     <div className="ml-3">
                         <p className="text-sm text-rose-800 font-semibold">Total Expenses</p>
-                        <p className="text-xl font-bold text-rose-600">₱{parseFloat(report.totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xl font-bold text-rose-600">₱{parseFloat(totalOutflow).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                     </div>
                 </div>
                 {/* Profit/Loss - Blue/Red */}
@@ -97,8 +105,8 @@ function CompanyReportChartWidget({ report }) {
                     <div className="bg-slate-100 text-slate-600 p-2 rounded-lg"><ScaleIcon /></div>
                     <div className="ml-3">
                         <p className="text-sm text-slate-800 font-semibold">Net Profit/Loss</p>
-                        <p className={`text-xl font-bold ${report.netPosition >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>
-                            ₱{parseFloat(report.netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        <p className={`text-xl font-bold ${netPosition >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>
+                            ₱{parseFloat(netPosition).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </p>
                     </div>
                 </div>
@@ -109,8 +117,9 @@ function CompanyReportChartWidget({ report }) {
                 <h3 className="text-lg font-bold text-gray-800 mb-2">Revenue vs. Expenses</h3>
                 <div className="relative" style={{ height: '300px' }}>
                     {hasChartData ? (
-                        <Bar options={chartOptions} data={report.chartData} />
+                        <Bar options={chartOptions} data={chartData} />
                     ) : (
+                        // This block renders the desired "No Data" message inside the styled chart area
                         <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg">
                             <ChartIcon />
                             <p className="text-gray-500 font-semibold mt-2">Insufficient Data</p>

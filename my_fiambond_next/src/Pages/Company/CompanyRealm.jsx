@@ -248,11 +248,10 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                         <button key={p} onClick={() => setPeriod(p)} className={`px-4 py-1 text-sm rounded-lg capitalize transition ${period === p ? 'bg-white shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-800'}`}>{p}</button>
                     ))}
                 </div>
-                {report ? (
-                    <Suspense fallback={<div className="h-96 bg-slate-100 rounded-lg animate-pulse"/>}>
-                        <CompanyReportChartWidget report={report} />
-                    </Suspense>
-                ) : <div className="h-96 flex items-center justify-center text-slate-400">No report data available</div>}
+                {/* FIX: Simplified conditional rendering to only use Suspense */}
+                <Suspense fallback={<div className="h-96 bg-slate-100 rounded-lg animate-pulse"/>}>
+                    <CompanyReportChartWidget report={report} /> 
+                </Suspense>
             </div>
 
             <Suspense fallback={null}>
