@@ -1,6 +1,8 @@
+// RevenueLedgerWidget.jsx
+
 'use client'; 
 
-import { memo } from 'react';
+import React, { memo } from 'react';
 
 // --- AdminUserRow (Kept exactly as you provided) ---
 const AdminUserRow = memo(({ user, badge, rightContent }) => {
@@ -37,7 +39,7 @@ const RevenueLedgerWidget = ({ premiums, users, currentAdminId }) => {
                     email: p.email || "deleted@user.com" 
                 };
 
-                // ⭐️ IMPROVED DATE HANDLING
+                // Improved date handling
                 const dateVal = p.granted_at;
                 let dateObj;
                 
@@ -46,7 +48,7 @@ const RevenueLedgerWidget = ({ premiums, users, currentAdminId }) => {
                 } else if (dateVal instanceof Date) {
                     dateObj = dateVal;
                 } else {
-                    dateObj = new Date(); // Fallback to current time if pending
+                    dateObj = new Date(); // Fallback to current time
                 }
                 
                 const dateStr = dateObj.toLocaleDateString();
@@ -60,7 +62,7 @@ const RevenueLedgerWidget = ({ premiums, users, currentAdminId }) => {
                     date: dateStr,
                     color: p.access_type === 'family' ? 'text-indigo-600' : 'text-emerald-600',
                     badgeTheme: p.access_type === 'family' ? 'blue' : 'emerald',
-                    timestamp: dateVal?.seconds || Date.now() / 1000 // Ensure valid sort key
+                    timestamp: dateVal?.seconds || Date.now() / 1000 
                 };
             })
             .sort((a, b) => b.timestamp - a.timestamp);

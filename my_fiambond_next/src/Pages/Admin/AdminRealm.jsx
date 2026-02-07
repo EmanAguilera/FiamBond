@@ -6,7 +6,6 @@ import { useEffect, useState, useCallback, Suspense, useContext } from "react";
 import dynamic from "next/dynamic"; 
 import { useRouter } from "next/navigation"; 
 import { AppContext } from '../../Context/AppContext';
-// ⭐️ Ensure updateDoc is imported
 import { collection, getDocs, doc, serverTimestamp, writeBatch, query, where, updateDoc } from "firebase/firestore";
 import { db } from "../../config/firebase-config";
 import { toast } from "react-hot-toast";
@@ -88,7 +87,6 @@ const ManageTeamWidget = ({ adminUsers, onAddAdmin }) => {
 
 // --- MAIN DASHBOARD ---
 export default function AdminDashboard({ onBack }) {
-    // ⭐️ FIX: Destructure refreshUserData from AppContext
     const { user, refreshUserData } = useContext(AppContext);
     const adminLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'Admin');
 
@@ -179,7 +177,7 @@ export default function AdminDashboard({ onBack }) {
 
     useEffect(() => { if (user) fetchData(); }, [fetchData, user]);
 
-    // ⭐️ THE FIXED BATCH LOGIC with clearing premium ID on revoke ⭐️
+    // ⭐️ THE FIXED BATCH LOGIC ⭐️
     const handleTogglePremium = async (userId, action, type) => {
         try {
             const batch = writeBatch(db); 
@@ -188,43 +186,39 @@ export default function AdminDashboard({ onBack }) {
             const userObj = users.find(u => u.id === userId);
 
             const updates = {};
-            let premiumRef; // Define premiumRef here
+            let premiumRef; 
 
             if (type === 'company') {
                 updates.is_premium = isGranting;
-                updates.subscription_status = isGranting ? 'active' : 'none';
+                updates.subscription_status = isGranting ? 'active' : 'none'; // <-- FIX APPLIED HERE
                 if (isGranting) {
                     updates.premium_granted_at = serverTimestamp();
-                    // ⭐️ FIX: Set active_company_premium_id when granting
                     premiumRef = doc(collection(db, "premiums"));
                     updates.active_company_premium_id = premiumRef.id; 
                 } else {
-                    // ⭐️ FIX: CLEAR active_company_premium_id when revoking
-                    updates.active_company_premium_id = null; 
+                    updates.active_company_premium_id = null; // <-- FIX APPLIED HERE
                 }
             } else { // type === 'family'
                 updates.is_family_premium = isGranting;
-                updates.family_subscription_status = isGranting ? 'active' : 'none';
+                updates.family_subscription_status = isGranting ? 'active' : 'none'; // <-- FIX APPLIED HERE
                 if (isGranting) {
                     updates.family_premium_granted_at = serverTimestamp();
-                    // ⭐️ FIX: Set active_family_premium_id when granting
                     premiumRef = doc(collection(db, "premiums"));
                     updates.active_family_premium_id = premiumRef.id; 
                 } else {
-                    // ⭐️ FIX: CLEAR active_family_premium_id when revoking
-                    updates.active_family_premium_id = null; 
+                    updates.active_family_premium_id = null; // <-- FIX APPLIED HERE
                 }
             }
 
             batch.update(userRef, updates);
 
-            // If approving, also create a record in the premiums collection for finance tracking
+            // If granting, also create a record in the premiums collection for finance tracking
             if (isGranting) {
                 // premiumRef is defined and set above for both company and family
                 batch.set(premiumRef, {
                     user_id: userId,
                     email: userObj?.email || "unknown",
-                    amount: getPlanValue('monthly', type),
+                    amount: getPlanValue(userObj?.premium_plan || 'monthly', type), // Use user's requested plan or monthly default
                     access_type: type,
                     granted_at: serverTimestamp(),
                     payment_ref: userObj?.payment_ref || 'ADMIN_GRANT'
@@ -252,7 +246,7 @@ export default function AdminDashboard({ onBack }) {
             const q = query(collection(db, "users"), where("email", "==", email));
             const snap = await getDocs(q);
             if (snap.empty) return toast.error("User not found.");
-            // ⭐️ Ensure updateDoc is used correctly
+            
             await updateDoc(doc(db, "users", snap.docs[0].id), { role: 'admin' });
             fetchData();
             toast.success("Admin added!");
