@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /realm/
+
+Sitemap: https://fiambond.web.app/sitemap.xml

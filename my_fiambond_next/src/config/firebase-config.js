@@ -1,10 +1,8 @@
-// src/config/firebase-config.js (COMPLETE and CORRECTED)
-
 "use client";
 
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,22 +14,16 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// 1. Conditionally initialize the app if the API Key is present (prevents build crash)
-let app = null;
-if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
-    try {
-        // Prevent re-initialization in development hot-reloads (not strictly needed 
-        // with Next.js but good practice)
-        app = initializeApp(firebaseConfig);
-    } catch (e) {
-        // If it fails (e.g., app already initialized), console the error and continue
-        console.error("Firebase initialization failed:", e);
-    }
-}
+// 1. Improved Initialization Logic
+// We use getApps() to check if the app exists already (prevents hot-reload errors)
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// 2. Export modules using the conditional app object.
-// These exports will be null during the problematic build phase, 
-// forcing components to use guard clauses (which we fixed previously).
-export const auth = app ? getAuth(app) : null;
+// 2. Initialize Firestore with Connection Fixes
+// 'experimentalForceLongPolling' solves the "Could not reach backend" error.
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true, 
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+
+export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-export const db = app ? getFirestore(app) : null;
