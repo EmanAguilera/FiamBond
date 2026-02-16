@@ -535,6 +535,24 @@ app.get('/api/reports/personal/:user_id', async (req, res) => {
     }
 });
 
+app.get('/api/users/search', async (req, res) => {
+    try {
+        const { email } = req.query;
+        if (!email) return res.status(400).json({ error: "Email query parameter required" });
+
+        // Search for user by email in MongoDB
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        
+        if (!user) {
+            return res.status(404).json({ error: "User not found in MongoDB" });
+        }
+
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 if (process.env.NODE_ENV !== 'production') {
     app.listen(port, () => {
         console.log(`🚀 Local Server running on port ${port}`);
