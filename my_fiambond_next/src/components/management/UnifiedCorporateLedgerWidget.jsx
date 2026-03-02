@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import ExcelJS from 'exceljs'; 
 // @ts-ignore
 import { saveAs } from 'file-saver'; 
-import UnifiedLoadingWidget from '../../components/ui/UnifiedLoadingWidget';
+import UnifiedLoadingWidget from '@/src/components/ui/UnifiedLoadingWidget';
 
 export default function UnifiedCorporateLedgerWidget({ 
     transactions, 

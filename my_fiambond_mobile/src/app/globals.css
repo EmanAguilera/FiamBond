@@ -1,0 +1,64 @@
+/* 1. Core NativeWind Directives (Mandatory for v4) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 2. Custom Variant for Dark Mode (Fixes the error you just saw) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 3. Base Styles */
+/* Note: body tag isn't native, so we apply base styles to components or via RootLayout */
+
+/* 4. Custom Component Classes */
+@layer components {
+  /* Layout & Nav */
+  .app-header { @apply bg-white border-b border-gray-100; }
+  .top-nav { @apply flex flex-row items-center justify-between h-16 px-4 mx-auto; }
+  .logo { @apply text-3xl font-bold text-indigo-600; }
+  .title { @apply mb-8 text-3xl font-extrabold text-center text-gray-900; }
+  
+  /* Buttons */
+  /* Native UI doesn't support 'transition', 'transform', or 'hover' in standard CSS classes. 
+     These are handled via React Native 'Pressable' components. */
+  .primary-btn { @apply flex flex-row justify-center items-center w-full px-6 py-3 bg-indigo-600 rounded-lg; }
+  .primary-btn-text { @apply text-base font-semibold text-white; }
+  
+  .secondary-btn { @apply flex flex-row justify-center items-center w-full px-6 py-3 bg-indigo-100 rounded-lg; }
+  .secondary-btn-text { @apply text-base font-semibold text-indigo-700; }
+  
+  .primary-btn-sm { @apply px-4 py-2 bg-indigo-600 rounded-md; }
+  .secondary-btn-sm { @apply px-4 py-2 bg-white border border-gray-300 rounded-md; }
+  
+  /* Inputs */
+  .form-group { @apply mb-5; }
+  .form-input { @apply w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900; }
+
+  /* Dashboard Cards */
+  .dashboard-card { @apply bg-white p-8 rounded-xl border border-gray-200 shadow-sm; }
+  .dashboard-card-interactive { @apply bg-white p-6 rounded-lg border border-gray-200 shadow-md; }
+}
+
+/* 5. Utility / Animation Classes */
+/* NativeWind has limited support for @keyframes. 
+   If these don't animate, they must be done in React Native Reanimated. */
+
+.skeleton-shimmer { 
+  background-color: #e2e8f0; 
+  overflow: hidden; 
+}
+
+.financial-loader { 
+  display: flex; 
+  flex-direction: row;
+  justify-content: center; 
+  align-items: center; 
+  height: 80px; 
+}
+
+.financial-loader .bar { 
+  width: 12px; 
+  height: 40px; 
+  background-color: #3b82f6; 
+  border-radius: 4px; 
+  margin: 0 4px;
+}

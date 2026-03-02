@@ -1,20 +1,15 @@
-"use client"; // Always first, as per instructions
+"use client";
 
-import { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { AppContext } from "../../context/AppContext";
 import { useRouter, usePathname } from "next/navigation";
 
 // 🏎️ Simplex Move: Import your unified loader
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "../ui/UnifiedLoadingWidget";
 
-interface RouteGuardProps {
-    children: React.ReactNode;
-    require?: "admin" | "premium" | "auth"; // The level of protection needed
-}
-
-export default function RouteGuard({ children, require = "auth" }: RouteGuardProps) {
+export default function RouteGuard({ children, require = "auth" }) {
     const context = useContext(AppContext) || {};
-    const { user, loading } = context as any;
+    const { user, loading } = context;
     
     const router = useRouter();
     const pathname = usePathname();
@@ -63,7 +58,6 @@ export default function RouteGuard({ children, require = "auth" }: RouteGuardPro
     }, [user, loading, router, pathname, require, mounted]);
 
     // 🛡️ Guard: Show unified fullscreen loader while verifying or before mounting
-    // This removes the "awkward" white screen and replaces it with a branded experience
     if (!mounted || loading) {
         return (
             <UnifiedLoadingWidget 
@@ -80,5 +74,5 @@ export default function RouteGuard({ children, require = "auth" }: RouteGuardPro
     }
 
     // Only render children if all checks passed
-    return <>{children}</>;
+    return <React.Fragment>{children}</React.Fragment>;
 }

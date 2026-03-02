@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import "./globals.css";
-import AppProvider from "../context/AppContext"; 
-import MainShell from "../components/ui/MainShell";
+import AppProvider from "@/src/context/AppContext"; 
+import MainShell from "@/src/components/ui/MainShell";
 
 // This is the "Foundation" - it applies to ALL pages automatically
 export const metadata: Metadata = {

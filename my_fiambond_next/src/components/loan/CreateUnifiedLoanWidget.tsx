@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useContext, FormEvent } from 'react';
-import { AppContext } from '../../context/AppContext';
-import { API_BASE_URL } from '../../config/apiConfig';
+import { AppContext } from '@/src/context/AppContext';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 import { toast } from "react-hot-toast";
 
 // 🏎️ Simplex Move: Import your unified loader
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 interface Member {
   id: string;

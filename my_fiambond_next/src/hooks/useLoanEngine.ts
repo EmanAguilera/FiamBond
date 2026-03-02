@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useContext } from 'react';
-import { AppContext } from '../context/AppContext';
-import { API_BASE_URL } from '../config/apiConfig';
+import { AppContext } from '@/src/context/AppContext';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 import { toast } from 'react-hot-toast';
 
 /**

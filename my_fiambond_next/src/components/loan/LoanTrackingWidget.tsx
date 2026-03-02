@@ -2,17 +2,17 @@
 
 import React, { useContext, useEffect, useState, useCallback, Suspense, ReactNode } from "react";
 import dynamic from "next/dynamic";
-import { AppContext } from "../../context/AppContext";
-import { db } from '../../config/firebase-config';
+import { AppContext } from "@/src/context/AppContext";
+import { db } from '@/src/config/firebase-config';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import { API_BASE_URL } from "@/src/config/apiConfig";
 import { toast } from 'react-hot-toast';
 
 // 🏎️ Simplex Move: Import unified loader
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // --- DYNAMIC IMPORTS ---
-const Modal = dynamic(() => import('../ui/Modal'), { ssr: false });
+const Modal = dynamic(() => import('@/src/components/ui/Modal'), { ssr: false });
 
 const MakeRepaymentWidget = dynamic(
     () => import('./UnifiedLoanManager').then((mod) => mod.MakeRepaymentWidget),

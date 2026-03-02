@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import UnifiedLoadingWidget from '../../components/ui/UnifiedLoadingWidget';
+import UnifiedLoadingWidget from '@/src/components/ui/UnifiedLoadingWidget';
 
 export const Icons = {
     // Basic Actions

@@ -1,4 +1,4 @@
-import LoginPage from '../../../pages/auth/Login';
+import LoginPage from '@/src/pages/auth/Login';
 
 export const metadata = { title: 'Login' }; // Becomes "Login | Fiambond"
 

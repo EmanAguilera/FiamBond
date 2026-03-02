@@ -1,4 +1,4 @@
-import VerifyEmailPage from '../../../pages/auth/VerifyEmail';
+import VerifyEmailPage from '@/src/pages/auth/VerifyEmail';
 
 export const metadata = { title: 'Verify Email' }; // Becomes "Verify Email | Fiambond"
 

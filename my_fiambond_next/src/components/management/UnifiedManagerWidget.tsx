@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useCallback, useContext, useEffect, memo } from 'react';
-import { AppContext } from '../../context/AppContext';
-import { db } from '../../config/firebase-config';
+import { AppContext } from '@/src/context/AppContext';
+import { db } from '@/src/config/firebase-config';
 import { API_BASE_URL } from '@/src/config/apiConfig';
 import { collection, query, where, getDocs, documentId, doc, updateDoc, serverTimestamp, Firestore } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
-import UnifiedLoadingWidget from '../../components/ui/UnifiedLoadingWidget';
+import UnifiedLoadingWidget from '@/src/components/ui/UnifiedLoadingWidget';
 
 // --- TYPES ---
 type RealmType = "family" | "company" | "admin";

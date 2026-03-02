@@ -2,18 +2,18 @@
 
 import React, { useContext, useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { AppContext } from "../../context/AppContext";
-import { API_BASE_URL } from '../../config/apiConfig';
-import { db } from '../../config/firebase-config';
+import { AppContext } from "@/src/context/AppContext";
+import { API_BASE_URL } from '@/src/config/apiConfig';
+import { db } from '@/src/config/firebase-config';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
 // 🏎️ Simplex Loader
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // Dynamic Imports
-const Modal = dynamic(() => import('../ui/Modal'), { ssr: false });
-const CompleteGoalWidget = dynamic(() => import('./UnifiedCompleteGoalWidget'), { ssr: false });
+const Modal = dynamic(() => import('@/src/components/ui/Modal'), { ssr: false });
+const CompleteGoalWidget = dynamic(() => import('@/src/components/goal/UnifiedCompleteGoalWidget'), { ssr: false });
 
 type GoalMode = 'personal' | 'family' | 'company';
 

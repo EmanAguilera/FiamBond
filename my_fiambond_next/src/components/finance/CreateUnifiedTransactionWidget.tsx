@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useContext, FormEvent, ChangeEvent } from "react";
-import { AppContext } from "../../context/AppContext";
+import { AppContext } from "@/src/context/AppContext";
 import { toast } from 'react-hot-toast';
-import { API_BASE_URL } from '../../config/apiConfig';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 
 // 🏎️ Simplex Move: Import your unified loader
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ml_default";

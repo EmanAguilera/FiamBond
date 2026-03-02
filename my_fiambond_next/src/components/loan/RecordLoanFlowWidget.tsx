@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useContext } from 'react';
-import { AppContext } from '../../context/AppContext';
-import UnifiedLoanWidget from './CreateUnifiedLoanWidget'; 
-import { db } from '../../config/firebase-config';
+import { AppContext } from '@/src/context/AppContext';
+import UnifiedLoanWidget from '@/src/components/loan/CreateUnifiedLoanWidget'; 
+import { db } from '@/src/config/firebase-config';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
-import { API_BASE_URL } from '../../config/apiConfig';
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import { API_BASE_URL } from '@/src/config/apiConfig';
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 interface Family {
     id: string;

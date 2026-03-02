@@ -1,22 +1,23 @@
 "use client";
 
 import React, { useEffect, useState, useContext } from "react";
-import { useRouter } from "next/navigation";
-import { AppContext } from "../../context/AppContext";
+// NOTE: Use "next/navigation" for Web/Next.js or "expo-router" for Mobile
+import { useRouter } from "next/navigation"; 
+import { AppContext } from "@/src/context/AppContext";
 
 // 🏎️ Simplex UI: Import the unified loader
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // Bridge to your Pages folder components
-import UserDashboard from "../../pages/realm/UserRealm";
-import FamilyRealm from "../../pages/realm/FamilyRealm";
-import CompanyRealm from "../../pages/realm/CompanyRealm";
-import AdminDashboard from "../../pages/realm/AdminRealm";
+import UserDashboard from "@/src/pages/realm/UserRealm";
+import FamilyRealm from "@/src/pages/realm/FamilyRealm";
+import CompanyRealm from "@/src/pages/realm/CompanyRealm";
+import AdminDashboard from "@/src/pages/realm/AdminRealm";
 
 export default function RealmPage() {
   const router = useRouter();
   
-  // ⭐️ CRITICAL FIX: Safe context access to prevent build-time crashes
+  // ⭐️ CRITICAL FIX: Safe context access
   const context = useContext(AppContext) || {}; 
   const { user, loading, refreshUserData } = context;
   
@@ -28,6 +29,14 @@ export default function RealmPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // 🛡️ AUTH REDIRECT EFFECT
+  // This replaces the "if(mounted) router.push" inside the render body
+  useEffect(() => {
+    if (mounted && !loading && !user) {
+      router.push("/login");
+    }
+  }, [mounted, loading, user, router]);
 
   const enterFamily = (familyData: any) => {
     setActiveData(familyData);
@@ -55,9 +64,8 @@ export default function RealmPage() {
     }
   };
 
-  // 1. 🛡️ Unified Loading Guard
-  // Ipinapakita ang fullscreen loader habang nagve-verify ng auth o naglo-load ang context
-  if (!mounted || loading || !context) {
+  // 1. 🛡️ Loading State: While mounting or fetching user data
+  if (!mounted || loading) {
     return (
       <UnifiedLoadingWidget 
         type="fullscreen" 
@@ -67,10 +75,8 @@ export default function RealmPage() {
     );
   }
 
-  // 2. 🛡️ Auth Guard
+  // 2. 🛡️ Unauthenticated State: Show redirecting message while the useEffect triggers
   if (!user) {
-    if (mounted) router.push("/auth/login");
-    // Habang naghihintay ng redirect, ipakita ang fullscreen loader
     return (
         <UnifiedLoadingWidget 
           type="fullscreen" 
@@ -80,14 +86,11 @@ export default function RealmPage() {
       );
   }
 
+  // 3. ✅ Authenticated State: The "Heart Line" of your dashboard
   return (
     <main className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* Dito pumapasok ang 'Simplex' logic:
-          Ang bawat dashboard ay tinatawag lang kapag ready na ang data.
-        */}
-
         {currentView === 'personal' && (
           <UserDashboard 
             onEnterFamily={enterFamily} 

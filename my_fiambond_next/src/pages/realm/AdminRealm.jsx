@@ -2,31 +2,31 @@
 
 import { useState, Suspense, useContext, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { AppContext } from '../../context/AppContext.jsx';
+import { AppContext } from '@/src/context/AppContext.jsx';
 import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
-import { db } from "../../config/firebase-config.js";
+import { db } from "@/src/config/firebase-config.js";
 import { toast } from 'react-hot-toast';
 
 // --- AUTH & SECURITY ---
-import RouteGuard from "../../components/auth/RouteGuard";
+import RouteGuard from "@/src/components/auth/RouteGuard";
 
 // --- SHARED SYSTEM ---
-import { useRealmData } from "../../hooks/useRealmData.js";
-import { Icons, Btn, DashboardCard } from "../../components/realm/RealmSharedUI.jsx";
+import { useRealmData } from "@/src/hooks/useRealmData.js";
+import { Icons, Btn, DashboardCard } from "@/src/components/realm/RealmSharedUI.jsx";
 
 // ⭐️ INTEGRATION: Using specific UnifiedLoadingWidget
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // --- DYNAMIC WIDGETS ---
-const Modal = dynamic(() => import("../../components/ui/Modal.jsx"), { 
+const Modal = dynamic(() => import("@/src/components/ui/Modal.jsx"), { 
     ssr: false,
     loading: () => <UnifiedLoadingWidget type="section" message="Opening Portal..." />
 });
-const AdminUserTableWidget = dynamic(() => import("../../components/management/AdminUserTableWidget"), { ssr: false });
-const UnifiedTransactionsListWidget = dynamic(() => import("../../components/finance/UnifiedTransactionsListWidget"), { ssr: false });
-const UnifiedReportChartWidget = dynamic(() => import("../../components/analytics/UnifiedReportChartWidget"), { ssr: false });
-const UnifiedCorporateLedgerWidget = dynamic(() => import("../../components/management/UnifiedCorporateLedgerWidget"), { ssr: false });
-const UnifiedManagerWidget = dynamic(() => import("../../components/management/UnifiedManagerWidget"), { ssr: false });
+const AdminUserTableWidget = dynamic(() => import("@/src/components/management/AdminUserTableWidget"), { ssr: false });
+const UnifiedTransactionsListWidget = dynamic(() => import("@/src/components/finance/UnifiedTransactionsListWidget"), { ssr: false });
+const UnifiedReportChartWidget = dynamic(() => import("@/src/components/analytics/UnifiedReportChartWidget"), { ssr: false });
+const UnifiedCorporateLedgerWidget = dynamic(() => import("@/src/components/management/UnifiedCorporateLedgerWidget"), { ssr: false });
+const UnifiedManagerWidget = dynamic(() => import("@/src/components/management/UnifiedManagerWidget"), { ssr: false });
 
 const ADMIN_REPORT_CONFIG = {
     filterFn: () => true,

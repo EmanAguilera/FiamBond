@@ -2,9 +2,9 @@
 
 import { useState, useContext, useRef } from "react";
 import Tesseract from 'tesseract.js';
-import { AppContext } from "../../context/AppContext"; 
+import { AppContext } from "@/src/context/AppContext"; 
 import { toast } from 'react-hot-toast';
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // --- CONFIGURATION ---
 const PAYMENT_PROVIDERS = {

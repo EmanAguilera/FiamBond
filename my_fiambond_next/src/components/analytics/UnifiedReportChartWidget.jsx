@@ -13,7 +13,7 @@ import {
 } from 'chart.js';
 
 // 🏎️ Simplex Move: Import your unified loader
-import UnifiedLoadingWidget from '../../components/ui/UnifiedLoadingWidget';
+import UnifiedLoadingWidget from '@/src/components/ui/UnifiedLoadingWidget';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 

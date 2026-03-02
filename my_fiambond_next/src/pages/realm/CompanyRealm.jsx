@@ -2,33 +2,33 @@
 
 import React, { useState, Suspense, useContext, useCallback, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { AppContext } from '../../context/AppContext.jsx';
-import { db } from '../../config/firebase-config.js';
+import { AppContext } from '@/src/context/AppContext.jsx';
+import { db } from '@/src/config/firebase-config.js';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
-import { API_BASE_URL } from "../../config/apiConfig.js";
+import { API_BASE_URL } from "@/src/config/apiConfig.js";
 
 // Auth & Security
-import RouteGuard from "../../components/auth/RouteGuard";
+import RouteGuard from "@/src/components/auth/RouteGuard";
 
 // DRY Shared Resources
-import { Icons, Btn, DashboardCard } from "../../components/realm/RealmSharedUI.jsx";
-import { useRealmData } from "../../hooks/useRealmData.js";
+import { Icons, Btn, DashboardCard } from "@/src/components/realm/RealmSharedUI.jsx";
+import { useRealmData } from "@/src/hooks/useRealmData.js";
 
 // ⭐️ INTEGRATION: Using UnifiedLoadingWidget
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // Dynamic Widget Imports
-const Modal = dynamic(() => import('../../components/ui/Modal.jsx'), { 
+const Modal = dynamic(() => import('@/src/components/ui/Modal.jsx'), { 
     ssr: false,
     loading: () => <UnifiedLoadingWidget type="section" message="Opening Corporate Portal..." />
 });
-const UnifiedCorporateLedgerWidget = dynamic(() => import('../../components/management/UnifiedCorporateLedgerWidget'), { ssr: false });
-const CreateUnifiedTransactionWidget = dynamic(() => import('../../components/finance/CreateUnifiedTransactionWidget'), { ssr: false });
-const UnifiedTransactionsListWidget = dynamic(() => import('../../components/finance/UnifiedTransactionsListWidget'), { ssr: false });
-const CreateUnifiedGoalWidget = dynamic(() => import("../../components/goal/CreateUnifiedGoalWidget"), { ssr: false });
-const UnifiedGoalListWidget = dynamic(() => import("../../components/goal/UnifiedGoalListWidget"), { ssr: false });
-const UnifiedManagerWidget = dynamic(() => import('../../components/management/UnifiedManagerWidget'), { ssr: false });
-const UnifiedReportChartWidget = dynamic(() => import("../../components/analytics/UnifiedReportChartWidget"), { ssr: false });
+const UnifiedCorporateLedgerWidget = dynamic(() => import('@/src/components/management/UnifiedCorporateLedgerWidget'), { ssr: false });
+const CreateUnifiedTransactionWidget = dynamic(() => import('@/src/components/finance/CreateUnifiedTransactionWidget'), { ssr: false });
+const UnifiedTransactionsListWidget = dynamic(() => import('@/src/components/finance/UnifiedTransactionsListWidget'), { ssr: false });
+const CreateUnifiedGoalWidget = dynamic(() => import("@/src/components/goal/CreateUnifiedGoalWidget"), { ssr: false });
+const UnifiedGoalListWidget = dynamic(() => import("@/src/components/goal/UnifiedGoalListWidget"), { ssr: false });
+const UnifiedManagerWidget = dynamic(() => import('@/src/components/management/UnifiedManagerWidget'), { ssr: false });
+const UnifiedReportChartWidget = dynamic(() => import("@/src/components/analytics/UnifiedReportChartWidget"), { ssr: false });
 
 export default function CompanyRealm({ company, onBack, onDataChange }) {
     const context = useContext(AppContext) || {};

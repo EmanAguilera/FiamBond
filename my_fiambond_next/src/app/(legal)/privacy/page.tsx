@@ -1,4 +1,4 @@
-import PrivacyPolicyPage from '../../../pages/site/PrivacyPolicy';
+import PrivacyPolicyPage from '@/src/pages/site/PrivacyPolicy';
 
 export const metadata = { title: 'Privacy Policy' }; // Becomes "Privacy Policy | Fiambond"
 

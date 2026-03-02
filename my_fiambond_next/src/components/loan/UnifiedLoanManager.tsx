@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useContext, FormEvent } from 'react';
-import { AppContext } from '../../context/AppContext';
-import { LoanService } from '../services/LoanService';
+import { AppContext } from '@/src/context/AppContext';
+import { LoanService } from '@/src/components/services/LoanService';
 import { toast } from 'react-hot-toast';
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // --- 1. LOAN CONFIRMATION WIDGET ---
 export function LoanConfirmationWidget({ loan, onSuccess }: any) {

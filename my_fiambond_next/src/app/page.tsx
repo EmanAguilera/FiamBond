@@ -2,11 +2,11 @@
 
 import { useEffect, useContext, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AppContext } from '../context/AppContext';
-import WelcomePage from '../pages/site/WelcomePage';
+import { AppContext } from '@/src/context/AppContext';
+import WelcomePage from '@/src/pages/site/WelcomePage';
 
 // 🏎️ Unified UI for better Performance scores
-import UnifiedLoadingWidget from '../components/ui/UnifiedLoadingWidget';
+import UnifiedLoadingWidget from '@/src/components/ui/UnifiedLoadingWidget';
 
 export default function Page() {
   // 🛡️ Safe context access to prevent build-time destructuring errors

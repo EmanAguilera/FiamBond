@@ -1,4 +1,4 @@
-import TermsOfServicePage from '../../../pages/site/TermsOfService';
+import TermsOfServicePage from '@/src/pages/site/TermsOfService';
 
 export const metadata = { title: 'Terms of Service' }; // Becomes "Privacy Policy | Fiambond"
 

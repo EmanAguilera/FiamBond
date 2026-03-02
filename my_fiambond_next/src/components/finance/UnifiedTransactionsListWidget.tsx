@@ -1,9 +1,9 @@
 'use client'; 
 
-import { useContext, useEffect, useState, useMemo, memo } from "react";
-import { AppContext } from "../../context/AppContext.jsx";
-import { API_BASE_URL } from '../../config/apiConfig.js';
-import { db } from '../../config/firebase-config.js';
+import { useContext, useEffect, useState, useMemo, memo, useCallback } from "react";
+import { AppContext } from "@/src/context/AppContext";
+import { API_BASE_URL } from '@/src/config/apiConfig';
+import { db } from '@/src/config/firebase-config';
 import { 
     collection, 
     query, 
@@ -15,8 +15,8 @@ import {
 } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
-// 🏎️ Simplex Move: Import your unified loader
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+// Custom Loader
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // --- TYPES ---
 type Realm = 'personal' | 'company' | 'family' | 'admin';
@@ -86,7 +86,7 @@ const TransactionItem = ({ transaction, realm }: { transaction: Transaction, rea
                     {!isShared && <p className="text-xs text-slate-400">{timeDisplay}</p>}
                     
                     {transaction.attachment_url && (
-                        <a href={transaction.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-indigo-500 uppercase">Receipt</a>
+                        <a href={transaction.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-indigo-500 uppercase hover:underline">Receipt</a>
                     )}
                 </div>
             </div>
@@ -107,79 +107,79 @@ export const UnifiedTransactionsListWidget = ({ companyData, familyData, adminMo
 
   const realm: Realm = adminMode ? 'admin' : companyData ? 'company' : familyData ? 'family' : 'personal';
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!user || !db) return;
+    setLoading(true);
     
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            let results: Transaction[] = [];
+    try {
+        let results: Transaction[] = [];
 
-            if (realm === 'admin') {
-                const q = query(collection(db as Firestore, "premiums"), orderBy("granted_at", "desc"));
-                const snap = await getDocs(q);
-                const rawPremiums = snap.docs.filter(d => d.data().user_id !== user.uid);
+        if (realm === 'admin') {
+            const q = query(collection(db as Firestore, "premiums"), orderBy("granted_at", "desc"));
+            const snap = await getDocs(q);
+            const rawPremiums = snap.docs.filter(d => d.data().user_id !== user.uid);
 
-                if (rawPremiums.length > 0) {
-                    const userIds = [...new Set(rawPremiums.map(d => d.data().user_id))];
-                    const usersMap: Record<string, any> = {};
-                    const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", userIds.slice(0, 10))));
-                    uSnap.forEach(d => { usersMap[d.id] = d.data(); });
+            if (rawPremiums.length > 0) {
+                const userIds = [...new Set(rawPremiums.map(d => d.data().user_id))];
+                const usersMap: Record<string, any> = {};
+                const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", userIds.slice(0, 10))));
+                uSnap.forEach(d => { usersMap[d.id] = d.data(); });
 
-                    results = rawPremiums.map(d => {
-                        const data = d.data();
-                        return {
-                            id: d.id,
-                            user_id: data.user_id,
-                            description: `Premium Subscription Inflow`,
-                            amount: data.amount || 0,
-                            type: 'income',
-                            created_at: data.granted_at,
-                            user: usersMap[data.user_id] || { full_name: "Unknown User" },
-                            adminMeta: {
-                                plan: String(data.plan_cycle || 'Monthly').toUpperCase(),
-                                accessType: String(data.access_type || 'Company').toUpperCase()
-                            }
-                        };
-                    });
-                }
-            } else {
-                let apiUrl = `${API_BASE_URL}/transactions?user_id=${user.uid}`;
-                if (realm === 'company') apiUrl = `${API_BASE_URL}/transactions?company_id=${companyData?.id}`;
-                if (realm === 'family') apiUrl = `${API_BASE_URL}/transactions?family_id=${familyData?.id}`;
-
-                const res = await fetch(apiUrl);
-                if (!res.ok) throw new Error();
-                const raw = await res.json();
-                
-                let mapped = raw.map((tx: any) => ({
-                    ...tx,
-                    id: tx._id,
-                    created_at: { toDate: () => new Date(tx.created_at) }
-                }));
-
-                if (realm === 'personal') mapped = mapped.filter((tx: any) => !tx.family_id && !tx.company_id);
-
-                if (realm !== 'personal' && mapped.length > 0) {
-                    const uIds = [...new Set(mapped.map((tx: any) => tx.user_id))];
-                    const usersMap: Record<string, any> = {};
-                    const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", uIds.slice(0, 10))));
-                    uSnap.forEach(d => { usersMap[d.id] = d.data(); });
-                    mapped = mapped.map((tx: any) => ({ ...tx, user: usersMap[tx.user_id] }));
-                }
-                results = mapped;
+                results = rawPremiums.map(d => {
+                    const data = d.data();
+                    return {
+                        id: d.id,
+                        user_id: data.user_id,
+                        description: `Premium Subscription Inflow`,
+                        amount: data.amount || 0,
+                        type: 'income',
+                        created_at: data.granted_at,
+                        user: usersMap[data.user_id] || { full_name: "Unknown User" },
+                        adminMeta: {
+                            plan: String(data.plan_cycle || 'Monthly').toUpperCase(),
+                            accessType: String(data.access_type || 'Company').toUpperCase()
+                        }
+                    };
+                });
             }
-            
-            setTransactions(results);
-        } catch (err) {
-            toast.error("Failed to load transactions.");
-        } finally {
-            setLoading(false);
-        }
-    };
+        } else {
+            let apiUrl = `${API_BASE_URL}/transactions?user_id=${user.uid}`;
+            if (realm === 'company') apiUrl = `${API_BASE_URL}/transactions?company_id=${companyData?.id}`;
+            if (realm === 'family') apiUrl = `${API_BASE_URL}/transactions?family_id=${familyData?.id}`;
 
-    fetchData();
+            const res = await fetch(apiUrl);
+            if (!res.ok) throw new Error();
+            const raw = await res.json();
+            
+            let mapped = raw.map((tx: any) => ({
+                ...tx,
+                id: tx._id,
+                created_at: { toDate: () => new Date(tx.created_at) }
+            }));
+
+            if (realm === 'personal') mapped = mapped.filter((tx: any) => !tx.family_id && !tx.company_id);
+
+            if (realm !== 'personal' && mapped.length > 0) {
+                const uIds = [...new Set(mapped.map((tx: any) => tx.user_id))];
+                const usersMap: Record<string, any> = {};
+                const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", uIds.slice(0, 10))));
+                uSnap.forEach(d => { usersMap[d.id] = d.data(); });
+                mapped = mapped.map((tx: any) => ({ ...tx, user: usersMap[tx.user_id] }));
+            }
+            results = mapped;
+        }
+        
+        setTransactions(results);
+    } catch (err) {
+        toast.error("Failed to load transactions.");
+    } finally {
+        setLoading(false);
+    }
   }, [user, realm, companyData?.id, familyData?.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const grouped = useMemo(() => {
     return transactions.reduce((acc, tx) => {
@@ -190,21 +190,16 @@ export const UnifiedTransactionsListWidget = ({ companyData, familyData, adminMo
     }, {} as Record<string, Transaction[]>);
   }, [transactions]);
   
-  // 🛡️ Loading Guard: Unified section loader instead of pulse skeletons
-  if (loading) return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden min-h-[400px]">
-        <UnifiedLoadingWidget 
-            type="section" 
-            message="Fetching transaction matrix..." 
-            variant="slate" 
-        />
-    </div>
-  );
+  // ⭐️ PRINCIPLE: LOOK AND FEEL
+  // Matches the GoalListWidget loading exactly (No box, Indigo variant, same message)
+  if (loading && transactions.length === 0) {
+    return <UnifiedLoadingWidget type="section" message="Syncing Ledger..." variant="indigo" />;
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         {Object.keys(grouped).length > 0 ? (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto custom-scrollbar">
                 {Object.keys(grouped)
                     .sort((a,b) => new Date(b).getTime() - new Date(a).getTime())
                     .map(dateKey => (
@@ -221,7 +216,9 @@ export const UnifiedTransactionsListWidget = ({ companyData, familyData, adminMo
                     ))}
             </div>
         ) : (
-            <div className="p-16 text-center text-slate-400 italic text-sm">No transactions found.</div>
+            <div className="p-16 text-center text-slate-400 italic text-sm">
+                No transaction records found.
+            </div>
         )}
     </div>
   );

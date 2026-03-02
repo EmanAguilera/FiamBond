@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useEffect, useState, useMemo } from 'react';
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // --- CONFIGURATION ---
 const TEST_MODE = false; 

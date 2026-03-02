@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "../config/firebase-config";
-import { API_BASE_URL } from "../config/apiConfig";
+import { db } from "@/src/config/firebase-config";
+import { API_BASE_URL } from "@/src/config/apiConfig";
 
 /**
  * useRealmData Hook

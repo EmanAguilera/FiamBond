@@ -2,37 +2,37 @@
 
 import { useContext, useState, useMemo, Suspense, useEffect } from "react";
 import dynamic from 'next/dynamic';
-import { AppContext } from "../../context/AppContext.jsx";
+import { AppContext } from "@/src/context/AppContext.jsx";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../../config/firebase-config.js";
+import { db } from "@/src/config/firebase-config.js";
 
 // Guard & Shared Resources
-import RouteGuard from "../../components/auth/RouteGuard.tsx"; 
-import { Icons, Btn, DashboardCard } from "../../components/realm/RealmSharedUI.jsx";
-import { useRealmData } from "../../hooks/useRealmData.js";
+import RouteGuard from "@/src/components/auth/RouteGuard"; 
+import { Icons, Btn, DashboardCard } from "@/src/components/realm/RealmSharedUI.jsx";
+import { useRealmData } from "@/src/hooks/useRealmData.js";
 
 // ⭐️ INTEGRATION: Using UnifiedLoadingWidget
-import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
+import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // Additional Icon for Admin
 const AdminIcon = <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>;
 
 // Dynamic Imports with Section Loading
-const Modal = dynamic(() => import("../../components/ui/Modal.jsx"), { 
+const Modal = dynamic(() => import("@/src/components/ui/Modal.jsx"), { 
     ssr: false,
     loading: () => <UnifiedLoadingWidget type="section" message="Preparing view..." />
 });
-const LoanTrackingWidget = dynamic(() => import("../../components/loan/LoanTrackingWidget.tsx"), { ssr: false });
-const RecordLoanFlowWidget = dynamic(() => import("../../components/loan/RecordLoanFlowWidget.tsx"), { ssr: false });
-const FamilyRealm = dynamic(() => import("./FamilyRealm.jsx"), { ssr: false });
-const CompanyRealm = dynamic(() => import("./CompanyRealm.jsx"), { ssr: false });
-const ApplyPremiumWidget = dynamic(() => import("../../components/management/ApplyPremiumWidget"), { ssr: false });
-const CreateUnifiedTransactionWidget = dynamic(() => import('../../components/finance/CreateUnifiedTransactionWidget.tsx'), { ssr: false });
-const CreateUnifiedGoalWidget = dynamic(() => import("../../components/goal/CreateUnifiedGoalWidget.tsx"), { ssr: false });
-const UnifiedTransactionsListWidget = dynamic(() => import('../../components/finance/UnifiedTransactionsListWidget.tsx'), { ssr: false });
-const UnifiedGoalListWidget = dynamic(() => import("../../components/goal/UnifiedGoalListWidget.tsx"), { ssr: false });
-const UnifiedManagerWidget = dynamic(() => import("../../components/management/UnifiedManagerWidget.tsx"), { ssr: false });
-const UnifiedReportChartWidget = dynamic(() => import("../../components/analytics/UnifiedReportChartWidget.jsx"), { ssr: false });
+const LoanTrackingWidget = dynamic(() => import("@/src/components/loan/LoanTrackingWidget.tsx"), { ssr: false });
+const RecordLoanFlowWidget = dynamic(() => import("@/src/components/loan/RecordLoanFlowWidget.tsx"), { ssr: false });
+const FamilyRealm = dynamic(() => import("@/src/pages/realm/FamilyRealm.jsx"), { ssr: false });
+const CompanyRealm = dynamic(() => import("@/src/pages/realm/CompanyRealm.jsx"), { ssr: false });
+const ApplyPremiumWidget = dynamic(() => import("@/src/components/management/ApplyPremiumWidget"), { ssr: false });
+const CreateUnifiedTransactionWidget = dynamic(() => import('@/src/components/finance/CreateUnifiedTransactionWidget.tsx'), { ssr: false });
+const CreateUnifiedGoalWidget = dynamic(() => import("@/src/components/goal/CreateUnifiedGoalWidget.tsx"), { ssr: false });
+const UnifiedTransactionsListWidget = dynamic(() => import('@/src/components/finance/UnifiedTransactionsListWidget.tsx'), { ssr: false });
+const UnifiedGoalListWidget = dynamic(() => import("@/src/components/goal/UnifiedGoalListWidget.tsx"), { ssr: false });
+const UnifiedManagerWidget = dynamic(() => import("@/src/components/management/UnifiedManagerWidget.tsx"), { ssr: false });
+const UnifiedReportChartWidget = dynamic(() => import("@/src/components/analytics/UnifiedReportChartWidget.jsx"), { ssr: false });
 
 export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAdmin }) {
     // ⭐️ FIX 1: Defensive Context Access

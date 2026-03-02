@@ -1,5 +1,5 @@
 // src/components/loans/LoanService.ts
-import { API_BASE_URL } from '../../config/apiConfig';
+import { API_BASE_URL } from '@/src/config/apiConfig';
 
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dzcnbrgjy";
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ml_default";

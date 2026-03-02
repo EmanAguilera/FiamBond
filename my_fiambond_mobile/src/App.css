@@ -1,0 +1,392 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        font-family: "Poppins", sans-serif;
+        @apply bg-gray-50 text-gray-800;
+    }
+}
+
+@layer components {
+    /* --- GENERAL COMPONENTS --- */
+    .app-header {
+        @apply sticky top-0 z-10 bg-white shadow-sm border-b border-gray-100;
+    }
+    .top-nav {
+        @apply flex items-center justify-between h-16 max-w-screen-2xl p-4 mx-auto;
+    }
+    .logo {
+        @apply text-3xl font-extrabold tracking-tight text-indigo-600;
+    }
+    .title {
+        @apply mb-8 text-3xl font-extrabold leading-9 text-center text-gray-900;
+    }
+    .error {
+        @apply mt-2 text-sm text-red-600;
+    }
+    .avatar {
+        @apply object-cover object-center w-8 h-8 overflow-hidden rounded-full;
+    }
+
+    /* --- BUTTONS & LINKS --- */
+    .primary-btn {
+        @apply flex justify-center w-full sm:w-auto px-6 py-3 text-base font-semibold leading-6 text-white bg-indigo-600 rounded-lg shadow-md whitespace-nowrap disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-105;
+    }
+    .secondary-btn {
+        @apply flex justify-center w-full sm:w-auto px-6 py-3 text-base font-semibold leading-6 text-indigo-700 bg-indigo-100 rounded-lg shadow-md whitespace-nowrap disabled:cursor-not-allowed disabled:bg-gray-400 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 ease-in-out transform hover:scale-105;
+    }
+    .primary-btn-sm {
+        @apply px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-md shadow-sm hover:bg-indigo-700 transition-colors;
+    }
+    .secondary-btn-sm {
+        @apply px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 transition-colors;
+    }
+    .danger-btn-sm {
+        @apply px-4 py-2 text-xs font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed transition-colors;
+    }
+    .success-btn-sm {
+        @apply px-4 py-2 text-xs font-semibold text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors;
+    }
+    .text-link {
+        @apply font-semibold text-indigo-600 hover:text-indigo-500 transition duration-200 ease-in-out;
+    }
+    .round-btn {
+        @apply w-8 h-8 overflow-auto bg-slate-100 rounded-full focus:outline-none focus:ring-1 focus:ring-slate-100 focus:ring-offset-2 focus:ring-offset-slate-800;
+    }
+
+    /* --- NAVIGATION --- */
+    .nav-link {
+        @apply flex items-center px-3 py-2 text-sm font-medium text-gray-600 transition duration-200 ease-in-out rounded-md hover:bg-gray-100 hover:text-indigo-600;
+    }
+    .nav-link.active {
+        @apply bg-indigo-50 text-indigo-700;
+    }
+    .logout-link {
+        @apply text-red-600 hover:bg-red-50 hover:text-red-700;
+    }
+
+    /* --- GENERAL FORMS (Non-Login) --- */
+    .form-group {
+        @apply mb-5;
+    }
+    label {
+        @apply block mb-2 text-sm font-medium leading-6 text-gray-700;
+    }
+    input[type="text"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    textarea {
+        @apply block w-full p-3.5 bg-white rounded-lg border border-gray-300 text-slate-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm transition duration-200 ease-in-out;
+    }
+    input[type="email"],
+    input[type="password"] {
+        @apply block w-full p-3.5 bg-white rounded-lg border border-gray-300 text-slate-900 shadow-sm focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm transition duration-200 ease-in-out;
+    }
+    input:focus {
+        @apply ring-indigo-600;
+    }
+
+    /* --- TABLES --- */
+    table {
+        @apply w-full mb-6 overflow-hidden text-sm text-left bg-white rounded-lg shadow-lg table-auto;
+    }
+    thead {
+        @apply text-xs font-medium uppercase border-b bg-gray-50 text-slate-600 border-slate-200;
+    }
+    tbody tr {
+        @apply hover:bg-slate-50;
+    }
+    th, td {
+        @apply px-6 py-4 border-b border-slate-200;
+    }
+
+    /* --- SIDEBAR --- */
+    .sidebar {
+        @apply hidden md:flex flex-col w-64 min-h-[calc(100vh-80px)] p-5 bg-white border-r border-gray-200 shadow-sm;
+    }
+    .sidebar-nav ul {
+        @apply pt-6 space-y-2;
+    }
+    .sidebar-nav-link {
+        @apply flex items-center px-4 py-2 font-medium text-gray-700 transition duration-200 ease-in-out rounded-md hover:bg-indigo-50 hover:text-indigo-700;
+    }
+    .sidebar-nav-link.active {
+        @apply bg-indigo-100 text-indigo-800;
+    }
+
+    /* --- MAIN CONTENT AREA --- */
+    .main-content-with-sidebar {
+        @apply max-w-screen-xl p-4 md:p-10 mx-auto;
+    }
+
+    /* --- AUTHENTICATION PAGES --- */
+    .login-wrapper {
+        @apply flex items-center justify-center min-h-screen bg-gray-100 p-4;
+    }
+    .login-card {
+        @apply w-full max-w-md p-8 sm:p-10 bg-white rounded-2xl shadow-xl;
+    }
+    .login-card .form-group {
+        @apply relative mb-6;
+    }
+    .login-card input[type="email"],
+    .login-card input[type="password"] {
+        @apply block w-full px-4 py-3 text-gray-900 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300;
+    }
+    .login-card .form-group label {
+        @apply absolute left-4 -top-3 text-sm text-gray-600 bg-white px-1 transition-all duration-300;
+    }
+    .user-info {
+        @apply flex items-center space-x-4;
+    }
+
+    /* --- HERO SECTION --- */
+    .hero-section {
+        @apply flex items-center justify-center min-h-[calc(100vh-80px)] px-4 py-16 bg-gradient-to-br from-indigo-50 to-white sm:px-6 lg:px-8 md:py-20;
+    }
+    .hero-content {
+        @apply grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 items-center max-w-screen-xl mx-auto;
+    }
+    .hero-text {
+        @apply text-center md:text-left;
+    }
+    .hero-headline {
+        @apply mb-6 text-4xl font-black leading-tight text-gray-900 sm:text-5xl lg:text-7xl;
+    }
+    .hero-subheadline {
+        @apply max-w-lg mb-10 text-lg sm:text-xl text-gray-600 mx-auto md:mx-0;
+    }
+    .hero-cta {
+        @apply flex flex-col sm:flex-row items-center justify-center md:justify-start gap-6;
+    }
+    .hero-visual img {
+        @apply rounded-xl shadow-2xl;
+    }
+
+    /* --- DASHBOARD --- */
+
+    .dashboard-card {
+        @apply bg-white p-8 rounded-xl shadow-lg border border-gray-200;
+    }
+
+    .dashboard-card-header {
+        @apply border-b border-gray-200 pb-6 mb-8;
+    }
+
+    .dashboard-card-title {
+        @apply text-xl font-bold text-gray-800;
+    }
+
+    .dashboard-section {
+        @apply mb-12;
+    }
+    .dashboard-header {
+        @apply flex flex-col items-start md:flex-row md:items-center md:justify-between mb-8 gap-4;
+    }
+    .dashboard-title {
+        @apply text-2xl sm:text-3xl font-extrabold text-gray-900;
+    }
+    
+    .dashboard-card-interactive {
+        @apply bg-white p-6 rounded-lg shadow-md transition-all duration-300 ease-in-out cursor-pointer hover:shadow-xl hover:-translate-y-1 border-2 border-transparent hover:border-indigo-400;
+    }
+
+    .form-label {
+        @apply block text-sm font-medium text-gray-700 mb-2;
+    }
+    
+    .form-input {
+        @apply block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150 ease-in-out;
+    }
+
+    .error-message {
+        @apply text-red-600 text-sm mt-1;
+    }
+
+    .success-message {
+        @apply text-green-600 text-sm mt-4 p-3 bg-green-50 rounded-lg;
+    }
+    
+    .balance-amount {
+        @apply text-4xl sm:text-5xl font-extrabold;
+    }
+    .transaction-item {
+        @apply flex items-center justify-between p-4 transition duration-200 ease-in-out rounded-md hover:bg-gray-50;
+    }
+    .transaction-description {
+        @apply text-lg font-semibold;
+    }
+    .transaction-date {
+        @apply mt-1 text-xs text-gray-500;
+    }
+    .transaction-amount {
+        @apply text-lg font-bold;
+    }
+    .period-btn {
+        @apply px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
+    }
+    .active-period-btn {
+        @apply px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
+    }
+
+    /* --- CONTENT CARD --- */
+    .content-card {
+        @apply w-full max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-lg mb-8;
+    }
+    .content-card-title {
+        @apply font-bold text-xl mb-4 text-gray-800;
+    }
+    
+    /* --- FAMILY LIST ITEM --- */
+    .family-list-item {
+        @apply flex justify-between items-center p-4 bg-white border border-gray-200 rounded-md transition-shadow duration-200 hover:shadow-sm;
+    }
+
+    /* --- PAGINATION --- */
+    .pagination-btn {
+        @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    }
+    .pagination-text {
+        @apply text-sm font-medium text-gray-700;
+    }
+}
+
+/* --- Shimmering Skeleton Loader CSS --- */
+
+.skeleton-shimmer {
+  background-color: #e2e8f0; /* slate-200 in Tailwind */
+  position: relative;
+  overflow: hidden;
+}
+
+/* The shimmering pseudo-element */
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* The animation keyframes */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* --- Custom Financial Bar Loader --- */
+
+.financial-loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: 80px; /* Give it some space */
+}
+
+.financial-loader .bar {
+  width: 12px;
+  height: 10px;
+  background-color: #3b82f6; /* A nice blue */
+  border-radius: 4px;
+  animation: bar-wave 1.2s infinite ease-in-out;
+}
+
+/* Stagger the animation delay for each bar */
+.financial-loader .bar:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.financial-loader .bar:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+@keyframes bar-wave {
+  0%, 40%, 100% {
+    transform: scaleY(0.4);
+  }
+  20% {
+    transform: scaleY(1);
+  }
+}
+
+/* --- Content Fade-In Animation --- */
+.content-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px); /* Optional: slight vertical move */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  animation: slideIn 0.3s ease-out, slideOut 0.3s ease-in 4.5s forwards;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-left: 4px solid #4ade80; /* green-400 */
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: #22c55e; /* green-500 */
+  margin-right: 12px;
+}
+
+.toast-message {
+  font-size: 0.875rem; /* 14px */
+  color: #374151; /* gray-700 */
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
