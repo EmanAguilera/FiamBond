@@ -84,7 +84,7 @@ export const Btn = ({ onClick, type = 'sec', icon, children, className = '', dis
 // --- DASHBOARD CARD COMPONENT ---
 export const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, colorClass, isAlert = false, isLoading = false }) => {
     // colorClass here should ideally be a text color hex or Tailwind class like 'text-indigo-600'
-    const iconColor = isAlert ? "#92400e" : "#4f46e5"; // Amber-800 or Indigo-600
+    const IconComponent = icon;
 
     return (
         <TouchableOpacity 
@@ -104,8 +104,7 @@ export const DashboardCard = ({ title, value, subtext, linkText, onClick, icon, 
                     {title}
                 </Text>
                 <View className="flex-shrink-0">
-                    {/* Pass the color to the icon component if needed */}
-                    {icon}
+                    {IconComponent && <IconComponent className={colorClass} />}
                 </View>
             </View>
 

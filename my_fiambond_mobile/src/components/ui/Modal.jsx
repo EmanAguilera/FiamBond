@@ -20,20 +20,13 @@ export default function Modal({ isOpen, onClose, title, children }) {
       visible={isOpen}
       transparent={true}
       animationType="fade"
-      onRequestClose={onClose} // Handles Android back button (equivalent to Escape)
+      onRequestClose={onClose}
     >
-      {/* Background Overlay: bg-black/70 
-          We use a TouchableOpacity with activeOpacity={1} and no feedback 
-          to detect background clicks.
-      */}
       <TouchableOpacity 
         style={styles.overlay} 
         activeOpacity={1} 
         onPress={onClose}
       >
-        {/* Modal Container: We use stopPropagation logic by wrapping the 
-            inner view in a TouchableWithoutFeedback or just a View. 
-        */}
         <View 
           className="bg-white rounded-3xl shadow-2xl w-[90%] max-w-2xl overflow-hidden"
           style={{ maxHeight: SCREEN_HEIGHT * 0.8 }}
@@ -59,10 +52,14 @@ export default function Modal({ isOpen, onClose, title, children }) {
             showsVerticalScrollIndicator={true}
             contentContainerStyle={{ paddingBottom: 20 }}
           >
+            {/* 
+               SPECIFIC FIX: 
+               Changed the wrapper below from <Text> to <View>. 
+               This allows the 'children' (Transactions/Goals) to use flexbox 
+               alignment, matching your Next.js centered layout perfectly.
+            */}
             <View onStartShouldSetResponder={() => true}>
-              <Text className="text-slate-600 leading-6 text-base">
                 {children}
-              </Text>
             </View>
           </ScrollView>
         </View>
@@ -74,8 +71,8 @@ export default function Modal({ isOpen, onClose, title, children }) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Your bg-black/70 equivalent
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center', // Centers the modal vertically
+    alignItems: 'center',     // Centers the modal horizontally
   },
 });

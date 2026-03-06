@@ -1,33 +1,22 @@
 "use client";
 
 import React from 'react';
-import { Stack, useRouter } from 'expo-router';
-// Bridge to your converted Mobile Settings component
+import { View, ScrollView } from 'react-native';
+// Bridge to your Settings component
 import Settings from "@/pages/realm/Settings";
 
 /**
- * MOBILE CONVERSION: Settings Page
- * FIX: Added the 'onBack' prop required by the Settings component.
+ * WEB/MOBILE CONVERSION: Settings Page
+ * Logic: Removed 'onBack' dependency to treat Settings as a top-level Realm view.
  */
 export default function Page() {
-    const router = useRouter();
-
     return (
-        <>
-            <Stack.Screen 
-                options={{ 
-                    title: 'Settings',
-                    headerShown: true,
-                    headerTitleStyle: {
-                        fontWeight: '600',
-                    },
-                }} 
-            />
-            
-            {/* FIX: We pass router.back() to the onBack prop.
-               This satisfies the TypeScript error 'Property onBack is missing'.
+        <View className="flex-1 bg-white">
+            {/* If your 'Settings' component has an internal back button 
+                that triggers based on the 'onBack' prop, passing nothing 
+                (or an empty fragment) will effectively disable/hide it.
             */}
-            <Settings onBack={() => router.back()} />
-        </>
+            <Settings onBack={null} />
+        </View>
     );
 }

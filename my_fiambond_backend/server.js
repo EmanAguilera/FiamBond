@@ -8,16 +8,16 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// 2. CORS CONFIGURATION
+// 2. UPDATED CORS CONFIGURATION
 const allowedOrigins = [
     'https://fiambond.web.app', 
     'https://fiam-bond.vercel.app', 
     'http://localhost:5173', 
     'http://localhost:3000',
-    /^https:\/\/\d+-firebase-fiambond-1769270722588\.cluster-osvg2nzmmzhzqqjio6oojllbg4\.cloudworkstations\.dev$/,
-    'https://42795-firebase-fiambond-1769270722588.cluster-osvg2nzmmzhzqqjio6oojllbg4.cloudworkstations.dev',
-    /\.vercel\.app$/,
-    /\.github\.dev$/
+    'http://localhost:8081',
+    /\.cloudworkstations\.dev$/, 
+    /\.vercel\.app$/,            
+    /\.github\.dev$/             
 ];
 
 app.use(cors({
@@ -41,7 +41,9 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
 
+// FIXED LINE: Use Regex instead of '*' to avoid the PathError
 app.options(/(.*)/, cors());
+
 app.use(express.json());
 
 // 3. DATABASE CONNECTION
@@ -79,7 +81,6 @@ app.use(async (req, res, next) => {
         await connectToDatabase();
         next();
     } catch (error) {
-        console.error("Database Middleware Error:", error);
         res.status(500).json({ error: "Database connection failed." });
     }
 });
@@ -530,7 +531,6 @@ app.get('/api/reports/personal/:user_id', async (req, res) => {
             transactions: periodTxs.length
         });
     } catch (err) {
-        console.error("Report generation failed:", err);
         res.status(500).json({ error: err.message || "Failed to generate report." });
     }
 });
@@ -540,12 +540,8 @@ app.get('/api/users/search', async (req, res) => {
         const { email } = req.query;
         if (!email) return res.status(400).json({ error: "Email query parameter required" });
 
-        // Search for user by email in MongoDB
         const user = await User.findOne({ email: email.toLowerCase().trim() });
-        
-        if (!user) {
-            return res.status(404).json({ error: "User not found in MongoDB" });
-        }
+        if (!user) return res.status(404).json({ error: "User not found" });
 
         res.json(user);
     } catch (err) {
@@ -558,4 +554,5 @@ if (process.env.NODE_ENV !== 'production') {
         console.log(`🚀 Local Server running on port ${port}`);
     });
 }
+
 module.exports = app;

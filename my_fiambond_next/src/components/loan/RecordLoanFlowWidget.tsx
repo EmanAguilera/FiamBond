@@ -35,13 +35,12 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
     const [familyMembers, setFamilyMembers] = useState<Member[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // 1. Fetch Families the user belongs to
+    // 1. Fetch Families
     useEffect(() => {
         const fetchFamilies = async () => {
             if (!user?.uid) return;
             
             setFlowState('loadingFamilies');
-            setError(null);
             try {
                 const response = await fetch(`${API_BASE_URL}/families?user_id=${user.uid}`);
                 if (!response.ok) throw new Error('Failed to fetch families');
@@ -55,14 +54,13 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
 
                 setFamilies(formattedFamilies);
 
-                // Smart Redirect: Kung 1 lang ang family, auto-select agad para bawas clicks
+                // Auto-select if only one exists
                 if (formattedFamilies.length === 1) {
                     setSelectedFamily(formattedFamilies[0]);
                 } else {
                     setFlowState('selecting');
                 }
             } catch (err) {
-                console.error("Family fetch error:", err);
                 setError("Could not load your families.");
                 setFlowState('selecting');
             }
@@ -70,33 +68,24 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
         fetchFamilies();
     }, [user]);
 
-    // 2. Fetch Detailed Member Profiles once a family is selected
+    // 2. Fetch Detailed Member Profiles
     useEffect(() => {
         const fetchMembers = async () => {
             if (!selectedFamily) return;
 
             setFlowState('loadingMembers');
-            setError(null);
             
-            if (!db) {
-                setError("Database connection lost.");
-                setFlowState('selecting');
-                return;
-            }
-
             try {
                 const memberIds = selectedFamily.member_ids || [];
-
                 if (memberIds.length === 0) {
                     setFamilyMembers([]);
                     setFlowState('lending');
                     return;
                 }
 
+                // Firestore query for member details
                 const usersRef = collection(db, "users");
-                // Limit to 10 per Firestore 'in' query safety
                 const safeIds = memberIds.slice(0, 10); 
-                
                 const q = query(usersRef, where(documentId(), "in", safeIds));
                 const querySnapshot = await getDocs(q);
                 
@@ -105,46 +94,42 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
                     ...doc.data()
                 })) as Member[];
                 
-                // I-filter out ang sarili para hindi mautangan ang sarili
                 const otherMembers = formattedMembers.filter(m => m.id !== user?.uid);
                 
                 setFamilyMembers(otherMembers);
+                // ⭐️ CRITICAL: Move to lending state after members are loaded
                 setFlowState('lending');
                 
             } catch (err) {
-                console.error("Member fetch error:", err);
+                console.error(err);
                 toast.error("Could not load family members.");
-                setError("Could not load family members.");
                 setFlowState('selecting');
             }
         };
 
-        if (selectedFamily) {
-            fetchMembers();
-        }
+        fetchMembers();
     }, [selectedFamily, user?.uid]); 
 
-    const handleFamilySelect = (familyId: string) => {
-        const family = families.find(f => f.id === familyId);
-        if (family) setSelectedFamily(family);
+    // ⭐️ FIX: Handle selection and ensure flowState updates
+    const handleFamilySelect = (family: Family) => {
+        setSelectedFamily(family);
     };
 
-    // --- RENDER STATES ---
+    // ⭐️ FIX: Clear selected family when going back to list
+    const handleBackToSelect = () => {
+        setSelectedFamily(null);
+        setFlowState('selecting');
+    };
 
-    if (flowState === 'loadingFamilies') {
-        return <UnifiedLoadingWidget type="section" message="Loading your families..." />;
-    }
-
-    if (flowState === 'loadingMembers') {
-        return <UnifiedLoadingWidget type="section" message="Finding members..." />;
-    }
+    if (flowState === 'loadingFamilies') return <UnifiedLoadingWidget type="section" message="Loading your families..." />;
+    if (flowState === 'loadingMembers') return <UnifiedLoadingWidget type="section" message="Finding members..." />;
 
     if (flowState === 'lending' && selectedFamily) {
         return (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex items-center justify-between px-2 bg-slate-50 p-3 rounded-2xl border border-slate-100">
                     <button 
-                        onClick={() => setFlowState('selecting')}
+                        onClick={handleBackToSelect}
                         className="text-xs font-black text-indigo-600 hover:bg-indigo-100 px-3 py-1 rounded-full transition-colors uppercase"
                     >
                         &larr; Switch Family
@@ -171,19 +156,12 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
                 <p className="text-sm text-slate-500 font-medium">Which group's ledger should this loan belong to?</p>
             </div>
             
-            {error && (
-                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
-                    <p className="text-rose-600 text-xs font-bold">{error}</p>
-                    <button onClick={() => window.location.reload()} className="mt-2 text-[10px] underline uppercase font-black text-rose-400">Retry Connection</button>
-                </div>
-            )}
-            
             {families.length > 0 ? (
                 <div className="grid gap-3">
                     {families.map(family => (
                         <button
                             key={family.id}
-                            onClick={() => handleFamilySelect(family.id)}
+                            onClick={() => handleFamilySelect(family)}
                             className="w-full text-left p-5 bg-white border-2 border-slate-100 rounded-3xl flex justify-between items-center group hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-100/20 transition-all active:scale-[0.98]"
                         >
                             <div className="flex items-center gap-4">
@@ -203,19 +181,9 @@ export default function RecordLoanFlowWidget({ onSuccess, onRequestCreateFamily 
                 </div>
             ) : (
                 <div className="text-center p-10 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2.5rem] space-y-4">
-                    <div className="w-16 h-16 bg-white rounded-3xl shadow-sm mx-auto flex items-center justify-center text-slate-300 text-3xl">
-                        🏘️
-                    </div>
-                    <div className="space-y-1">
-                        <p className="text-slate-800 font-black">No Families Found</p>
-                        <p className="text-slate-500 text-xs font-medium px-6">You need to be part of a family group to record collective loans.</p>
-                    </div>
-                    <button 
-                        onClick={onRequestCreateFamily} 
-                        className="w-full py-4 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"
-                    >
-                        Create Your First Family
-                    </button>
+                    <div className="w-16 h-16 bg-white rounded-3xl shadow-sm mx-auto flex items-center justify-center text-slate-300 text-3xl">🏘️</div>
+                    <p className="text-slate-800 font-black">No Families Found</p>
+                    <button onClick={onRequestCreateFamily} className="w-full py-4 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl">Create Your First Family</button>
                 </div>
             )}
         </div>

@@ -1,128 +1,80 @@
 "use client";
 
-import React, { useState, useEffect, useContext } from "react";
-import { View, Text, ScrollView, SafeAreaView, ActivityIndicator } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import React, { useEffect, useContext, useState } from "react";
+import { View, ScrollView, SafeAreaView, ActivityIndicator, useWindowDimensions } from "react-native";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { AppContext } from "@/context/AppContext";
 
-// Import components and cast to 'any' to stop the Prop-mismatch errors
+// 1. Import Raw and cast to 'any' immediately to ignore prop mismatch
 import UserDashboardViewRaw from "@/pages/realm/UserRealm";
 import FamilyRealmViewRaw from "@/pages/realm/FamilyRealm";
 import CompanyRealmViewRaw from "@/pages/realm/CompanyRealm";
 import AdminRealmViewRaw from "@/pages/realm/AdminRealm";
 
-const UserDashboardView = UserDashboardViewRaw as any;
-const FamilyRealmView = FamilyRealmViewRaw as any;
-const CompanyRealmView = CompanyRealmViewRaw as any;
-const AdminRealmView = AdminRealmViewRaw as any;
-
-// 1. Define the interface
-interface AppContextType {
-  user: any;
-  loading: boolean;
-  refreshUserData: () => void;
-}
+const UserDashboard: any = UserDashboardViewRaw;
+const FamilyRealm: any = FamilyRealmViewRaw;
+const CompanyRealm: any = CompanyRealmViewRaw;
+const AdminRealm: any = AdminRealmViewRaw;
 
 export default function RealmPage() {
   const router = useRouter();
-  
-  // 2. Fix the "null to AppContextType" error using 'unknown' as a bridge
-  const contextValue = useContext(AppContext);
-  const context = (contextValue as unknown) as AppContextType; 
-  
-  // 3. Provide safety fallbacks
+  const params = useLocalSearchParams();
+  const { width } = useWindowDimensions();
+  const isDesktop = width > 1024;
+
+  const context = useContext(AppContext) as any;
   const user = context?.user;
   const loading = context?.loading;
-  const refreshUserData = context?.refreshUserData || (() => {});
   
-  const [currentView, setCurrentView] = useState<'personal' | 'family' | 'company' | 'admin'>('personal');
-  const [activeData, setActiveData] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted && !loading && !user) {
-      router.replace("/login");
-    }
-  }, [mounted, loading, user, router]);
-
-  const enterFamily = (familyData: any) => {
-    setActiveData(familyData);
-    setCurrentView('family');
-  };
-
-  const enterCompany = (companyData: any) => {
-    setActiveData(companyData);
-    setCurrentView('company');
-  };
-
-  const enterAdmin = () => {
-    setActiveData(null);
-    setCurrentView('admin');
-  };
-
-  const handleBack = () => {
-    setActiveData(null);
-    setCurrentView('personal');
-  };
+    if (mounted && !loading && !user) router.replace("/login");
+  }, [mounted, loading, user]);
 
   if (!mounted || loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" color="#4F46E5" />
-        <Text className="mt-4 text-slate-500 font-semibold">Authenticating...</Text>
       </View>
     );
   }
 
   if (!user) return null;
 
+  const contentWidthClass = isDesktop ? "w-full max-w-[1440px] px-10" : "w-full px-0";
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
-      <Stack.Screen 
-        options={{ 
-          headerShown: currentView !== 'personal',
-          title: activeData?.name || 'Manage Realm',
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: '#f8fafc' }
-        }} 
-      />
+      <Stack.Screen options={{ headerShown: false }} />
 
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="p-4 md:p-8">
-        <View className="max-w-xl mx-auto w-full">
+      <ScrollView 
+        contentContainerStyle={{ flexGrow: 1, alignItems: 'center' }} 
+        className="flex-1"
+        showsVerticalScrollIndicator={isDesktop} 
+      >
+        <View className={contentWidthClass}>
           
-          {currentView === 'personal' && (
-            <UserDashboardView 
-              onEnterFamily={enterFamily} 
-              onEnterCompany={enterCompany} 
-              onEnterAdmin={enterAdmin} 
-            />
+          {/* 2. Passive Pass-through: 
+              We send the data. If the component uses it, fine. 
+              If not, it doesn't break the bridge. 
+          */}
+          
+          {(!params.view || params.view === 'personal') && (
+            <UserDashboard user={user} params={params} router={router} />
           )}
 
-          {currentView === 'family' && activeData && (
-            <FamilyRealmView 
-              family={activeData} 
-              onBack={handleBack} 
-              onDataChange={refreshUserData}
-              onFamilyUpdate={refreshUserData} 
-            />
+          {params.view === 'family' && (
+            <FamilyRealm user={user} params={params} router={router} />
           )}
 
-          {currentView === 'company' && activeData && (
-            <CompanyRealmView 
-              company={activeData} 
-              onBack={handleBack} 
-              onDataChange={refreshUserData} 
-            />
+          {params.view === 'company' && (
+            <CompanyRealm user={user} params={params} router={router} />
           )}
 
-          {currentView === 'admin' && (
-            <AdminRealmView 
-              onBack={handleBack} 
-            />
+          {params.view === 'admin' && (
+            <AdminRealm user={user} params={params} router={router} />
           )}
 
         </View>

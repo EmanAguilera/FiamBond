@@ -1,29 +1,19 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
-import { 
-  Chart as ChartJS, 
-  CategoryScale, 
-  LinearScale, 
-  BarElement, 
-  Title, 
-  Tooltip, 
-  Legend, 
-} from 'chart.js';
-
-// 🏎️ Simplex Move: Import your unified loader
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import UnifiedLoadingWidget from '@/src/components/ui/UnifiedLoadingWidget';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-// --- UNIVERSAL ICONS ---
+// --- YOUR ICONS PRESERVED ---
 const ArrowUpIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>);
 const ArrowDownIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>);
 const ScaleIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>);
 const ChartIcon = () => (<svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>);
 
-// --- REUSABLE STAT CARD ---
+// --- YOUR STAT CARD PRESERVED ---
 const StatCard = ({ label, value, colorClass, icon }) => (
     <div className={`${colorClass} p-4 rounded-lg border flex items-center`}>
         <div className="p-2 rounded-lg opacity-80">{icon}</div>
@@ -36,11 +26,10 @@ const StatCard = ({ label, value, colorClass, icon }) => (
     </div>
 );
 
-// --- DYNAMIC ANALYST SUMMARY ---
+// --- YOUR ANALYSIS PRESERVED ---
 const UnifiedAnalysis = ({ report, realm }) => {
     const { totalInflow, netPosition, transactionCount } = report;
     const netFormatted = `₱${Math.abs(netPosition || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    
     let config = { title: "", narrative: "", recommendation: "" };
 
     switch (realm) {
@@ -78,32 +67,47 @@ const UnifiedAnalysis = ({ report, realm }) => {
     );
 };
 
-// --- MAIN WIDGET ---
 function UnifiedReportChartWidget({ report, realm, period, setPeriod }) {
+    // ⭐️ LOGIC INJECTION: Generate dynamic labels for the Chart axis
+    const dynamicChartData = useMemo(() => {
+        if (!report || !report.chartData) return null;
+        
+        const now = new Date();
+        let labels = [];
+
+        if (period === 'weekly') {
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(); d.setDate(now.getDate() - i);
+                labels.push(d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }));
+            }
+        } else if (period === 'monthly') {
+            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            for (let i = 1; i <= daysInMonth; i++) labels.push(`${i}`);
+        } else {
+            labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        }
+
+        // Return original chart data structure but with the new dynamic labels
+        return {
+            ...report.chartData,
+            labels: labels
+        };
+    }, [report, period]);
+
     const chartOptions = { 
         responsive: true, 
         maintainAspectRatio: false, 
-        plugins: { 
-            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } } 
-        }, 
-        scales: { 
-            y: { grid: { drawBorder: false } }, 
-            x: { grid: { display: false } } 
-        } 
+        plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } } }, 
+        scales: { y: { grid: { drawBorder: false } }, x: { grid: { display: false } } } 
     };
 
-    // 🛡️ Guard Clause: Gagamitin ang Unified Widget para sa mas magandang Performance score
     if (!report) return (
-        <div className="dashboard-section bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg overflow-hidden">
-             <UnifiedLoadingWidget 
-                type="section" 
-                message={`Calculating ${realm} insights...`} 
-                variant="indigo" 
-             />
+        <div className="dashboard-section bg-white/60 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg">
+             <UnifiedLoadingWidget type="section" message={`Updating ${period} data...`} variant="indigo" />
         </div>
     );
 
-    const hasChartData = report.chartData?.datasets?.some(d => d.data.some(val => val > 0));
+    const hasChartData = report.chartData?.datasets?.some(d => d.data?.some(val => val > 0));
 
     const labels = {
         inflow: realm === 'admin' ? "Total Revenue" : (realm === 'company' ? "Total Revenue" : "Total Inflow"),
@@ -112,14 +116,15 @@ function UnifiedReportChartWidget({ report, realm, period, setPeriod }) {
 
     return (
         <div className="dashboard-section">
+            {/* BUTTONS - YOUR ORIGINAL UI PRESERVED */}
             {setPeriod && (
-                <div className="flex justify-center gap-2 mb-6 bg-slate-100 p-1 rounded-xl w-fit mx-auto">
+                <div className="flex justify-center gap-2 mb-6 bg-slate-100 p-1 rounded-xl w-fit mx-auto border border-slate-200">
                     {['weekly', 'monthly', 'yearly'].map((p) => (
                         <button
                             key={p}
                             onClick={() => setPeriod(p)}
-                            className={`px-4 py-1 text-sm rounded-lg capitalize transition ${
-                                period === p ? 'bg-white shadow-sm font-semibold text-slate-800' : 'text-slate-500 hover:text-slate-800'
+                            className={`px-4 py-1.5 text-sm rounded-lg capitalize transition-all ${
+                                period === p ? 'bg-white shadow-md font-bold text-indigo-600' : 'text-slate-500 hover:text-slate-800'
                             }`}
                         >
                             {p}
@@ -144,11 +149,11 @@ function UnifiedReportChartWidget({ report, realm, period, setPeriod }) {
                     <h3 className="text-lg font-bold text-gray-800 mb-2">Visual Performance</h3>
                     <div className="relative" style={{ height: '300px' }}>
                         {hasChartData ? (
-                            <Bar options={chartOptions} data={report.chartData} />
+                            <Bar options={chartOptions} data={dynamicChartData} />
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full bg-gray-50 rounded-lg border border-dashed">
+                            <div className="flex flex-col items-center justify-center h-full bg-gray-50/50 rounded-lg border border-dashed border-slate-300">
                                 <ChartIcon />
-                                <p className="text-gray-500 font-semibold mt-2 text-sm text-center px-4">Insufficient data to visualize performance.</p>
+                                <p className="text-gray-500 font-semibold mt-2 text-sm text-center px-4">No data for this {period}.</p>
                             </div>
                         )}
                     </div>
