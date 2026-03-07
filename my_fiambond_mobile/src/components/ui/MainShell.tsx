@@ -12,7 +12,7 @@ import {
   Platform
 } from "react-native";
 import { useRouter } from "expo-router";
-import { AppContext } from "@/context/AppContext";
+import { AppContext } from "../../context/AppContext";
 import { 
   LogOut, 
   Settings as CogIcon, 

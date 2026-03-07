@@ -38,7 +38,7 @@ const ApplyPremiumWidget = lazy(() => import("../../components/management/ApplyP
 const UnifiedReportChartWidget = lazy(() => import("../../components/analytics/UnifiedReportChartWidget.jsx"));
 
 export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFamily }) {
-    const { user, refreshUserData } = useContext(AppContext) || {};
+    const { user, refreshUserData } = useContext(AppContext);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => { setMounted(true); }, []);
@@ -146,13 +146,6 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
                                         color="bg-white border border-slate-200" 
                                         textColor="text-slate-600"
                                         onPress={() => toggleModal('createGoal', true)} 
-                                    />
-                                     <ActionBtn 
-                                        label="Loan" 
-                                        icon={<Plus size={16} color="#475569" />} 
-                                        color="bg-white border border-slate-200" 
-                                        textColor="text-slate-600"
-                                        onPress={() => toggleModal('recordLoan', true)} 
                                     />
                                     
                                     {/* Vertical Divider Pipe */}
