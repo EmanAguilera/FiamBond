@@ -17,6 +17,7 @@ jobs:
           npm run build
         working-directory: my_fiambond_next
         env: # Injecting NEXT_PUBLIC_ variables required for Next.js build prerender step
+          NODE_OPTIONS: "--max-old-space-size=4096"
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
           NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }} # Assuming you have a Cloudinary secret
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}

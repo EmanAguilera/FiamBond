@@ -294,7 +294,7 @@ const DashboardCard = ({ title, value, subtext, linkText, color, icon: IconCompo
         className="flex-1 bg-white p-7 rounded-[30px] border border-slate-100 shadow-sm min-w-[280px]"
     >
         <View className="flex-row justify-between items-start mb-4">
-            <Text className="text-slate-500 font-bold text-xs tracking-widest uppercase">{title}</Text>
+            <Text className="text-slate-500 font-bold text-xs tracking-widest">{title}</Text>
             {IconComponent && <IconComponent size={24} color={iconColor} />}
         </View>
 

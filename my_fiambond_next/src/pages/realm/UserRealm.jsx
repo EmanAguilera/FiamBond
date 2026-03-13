@@ -20,8 +20,6 @@ const AdminIcon = <svg className="w-4 h-4" fill="none" stroke="currentColor" vie
 // Dynamic Imports
 const Modal = dynamic(() => import("@/src/components/ui/Modal.jsx"), { ssr: false });
 const LoanTrackingWidget = dynamic(() => import("@/src/components/loan/LoanTrackingWidget.tsx"), { ssr: false });
-const FamilyRealm = dynamic(() => import("@/src/pages/realm/FamilyRealm.jsx"), { ssr: false });
-const CompanyRealm = dynamic(() => import("@/src/pages/realm/CompanyRealm.jsx"), { ssr: false });
 const ApplyPremiumWidget = dynamic(() => import("@/src/components/management/ApplyPremiumWidget"), { ssr: false });
 const CreateUnifiedTransactionWidget = dynamic(() => import('@/src/components/finance/CreateUnifiedTransactionWidget.tsx'), { ssr: false });
 const CreateUnifiedGoalWidget = dynamic(() => import("@/src/components/goal/CreateUnifiedGoalWidget.tsx"), { ssr: false });
@@ -33,9 +31,13 @@ const CreateUnifiedLoanWidget = dynamic(() => import("@/src/components/loan/Crea
 const RecordLoanChoiceWidget = dynamic(() => import("@/src/components/loan/RecordLoanChoiceWidget.tsx"), { ssr: false });
 const RecordLoanFlowWidget = dynamic(() => import("@/src/components/loan/RecordLoanFlowWidget.tsx"), { ssr: false });
 
-export default function UserDashboard({ onEnterAdmin }) {
-    const context = useContext(AppContext) || {};
-    const { user, refreshUserData } = context;
+/**
+ * UserDashboard Component
+ * Fixed: Added onEnterFamily and onEnterCompany to props to resolve TypeScript build errors.
+ */
+export default function UserDashboard({ onEnterAdmin, onEnterFamily, onEnterCompany }) {
+    const context = useContext(AppContext);
+    const { user, refreshUserData } = context || { user: null, refreshUserData: () => {} };
     
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
@@ -45,12 +47,11 @@ export default function UserDashboard({ onEnterAdmin }) {
         createTx: false, createGoal: false, applyCompany: false, applyFamily: false,
         recordLoanChoice: false, recordLoanPersonal: false, recordLoanFamily: false
     });
-    
-    const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
-    const [showCompanyRealm, setShowCompanyRealm] = useState(false);
 
     const { 
-        summaryData = { netPosition: 0 }, activeGoalsCount = 0, outstandingLending = 0, 
+        summaryData = { netPosition: 0 }, 
+        activeGoalsCount = 0, 
+        outstandingLending = 0, 
         report, period, setPeriod, error, refresh 
     } = useRealmData(user, 'personal', user?.uid);
 
@@ -99,13 +100,14 @@ export default function UserDashboard({ onEnterAdmin }) {
         return <UnifiedLoadingWidget type="fullscreen" message="Syncing Personal Realm..." variant="indigo" />;
     }
 
-    if (activeFamilyRealm) return <Suspense fallback={<UnifiedLoadingWidget type="fullscreen" message="Entering Family Realm..." />}><FamilyRealm family={activeFamilyRealm} onBack={() => setActiveFamilyRealm(null)} onDataChange={refresh} /></Suspense>;
-    if (showCompanyRealm) return <Suspense fallback={<UnifiedLoadingWidget type="fullscreen" message="Entering Company Realm..." />}><CompanyRealm company={{ id: user?.uid, name: "Company" }} onBack={() => setShowCompanyRealm(false)} onDataChange={refresh} /></Suspense>;
-
     return (
         <RouteGuard require="auth">
             <div className="w-full">
-                {error && <div className="mb-4 p-3 bg-rose-100 text-rose-700 rounded-xl text-xs font-bold text-center border border-rose-200">⚠️ Connection Error: Ensure backend is running.</div>}
+                {error && (
+                    <div className="mb-4 p-3 bg-rose-100 text-rose-700 rounded-xl text-xs font-bold text-center border border-rose-200">
+                        ⚠️ Connection Error: {error}
+                    </div>
+                )}
 
                 <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 text-left">
                     <div className="flex items-center gap-4">
@@ -118,13 +120,32 @@ export default function UserDashboard({ onEnterAdmin }) {
 
                     <div className="w-full md:w-auto">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:flex md:items-center">
+                            {/* Admin Link */}
                             {isAdmin && <Btn onClick={onEnterAdmin} type="pri" icon={AdminIcon} className="bg-purple-600 hover:bg-purple-700 border-purple-500 shadow-purple-200">Admin Realm</Btn>}
+                            
                             <Btn onClick={() => toggleModal('createTx', true)} type="pri" icon={Icons.Plus}>Transaction</Btn>
                             <Btn onClick={() => toggleModal('createGoal', true)} icon={Icons.Plus}>Goal</Btn>
                             <Btn onClick={() => toggleModal('recordLoanChoice', true)} icon={Icons.Plus}>Loan</Btn>
+                            
                             <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
-                            {isFamilyActive ? <Btn onClick={() => toggleModal('families', true)} icon={Icons.Users}>Families</Btn> : isFamilyPending ? <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn> : <Btn onClick={() => toggleModal('applyFamily', true)} icon={Icons.Lock}>Apply Family</Btn>}
-                            {isCompanyActive ? <Btn onClick={() => setShowCompanyRealm(true)} type="comp" icon={Icons.Build}>Company</Btn> : isCompanyPending ? <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn> : <Btn onClick={() => toggleModal('applyCompany', true)} icon={Icons.Lock}>Apply Company</Btn>}
+                            
+                            {/* Family Link: Uses parent's onEnterFamily via the Manager Widget */}
+                            {isFamilyActive ? (
+                                <Btn onClick={() => toggleModal('families', true)} icon={Icons.Users}>Families</Btn>
+                            ) : isFamilyPending ? (
+                                <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
+                            ) : (
+                                <Btn onClick={() => toggleModal('applyFamily', true)} icon={Icons.Lock}>Apply Family</Btn>
+                            )}
+
+                            {/* Company Link: Calls parent's onEnterCompany */}
+                            {isCompanyActive ? (
+                                <Btn onClick={() => onEnterCompany({ id: user?.uid, name: "Company" })} type="comp" icon={Icons.Build}>Company</Btn>
+                            ) : isCompanyPending ? (
+                                <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
+                            ) : (
+                                <Btn onClick={() => toggleModal('applyCompany', true)} icon={Icons.Lock}>Apply Company</Btn>
+                            )}
                         </div>
                     </div>
                 </header>
@@ -143,12 +164,21 @@ export default function UserDashboard({ onEnterAdmin }) {
                 <Suspense fallback={null}>
                     {modals.transactions && <Modal isOpen={modals.transactions} onClose={() => toggleModal('transactions', false)} title="Personal Transactions"><UnifiedTransactionsListWidget /></Modal>}
                     {modals.goals && <Modal isOpen={modals.goals} onClose={() => toggleModal('goals', false)} title="Personal Goals"><UnifiedGoalListWidget mode="personal" entityId={user?.uid} onDataChange={refresh} /></Modal>}
-                    {modals.families && <Modal isOpen={modals.families} onClose={() => toggleModal('families', false)} title="Families Management"><UnifiedManagerWidget type="family" onEnterRealm={setActiveFamilyRealm} /></Modal>}
+                    
+                    {/* Families Manager passes the data back to the parent via onEnterFamily */}
+                    {modals.families && (
+                        <Modal isOpen={modals.families} onClose={() => toggleModal('families', false)} title="Families Management">
+                            <UnifiedManagerWidget type="family" onEnterRealm={(familyData) => {
+                                toggleModal('families', false);
+                                onEnterFamily(familyData);
+                            }} />
+                        </Modal>
+                    )}
+
                     {modals.lending && <Modal isOpen={modals.lending} onClose={() => toggleModal('lending', false)} title="Loan Management"><LoanTrackingWidget onDataChange={refresh} /></Modal>}
                     {modals.createTx && <Modal isOpen={modals.createTx} onClose={() => toggleModal('createTx', false)} title="New Transaction"><CreateUnifiedTransactionWidget onSuccess={() => { toggleModal('createTx', false); refresh(); }} /></Modal>}
                     {modals.createGoal && <Modal isOpen={modals.createGoal} onClose={() => toggleModal('createGoal', false)} title="New Goal Target"><CreateUnifiedGoalWidget mode="personal" entityId={user?.uid} onSuccess={() => { toggleModal('createGoal', false); refresh(); }} /></Modal>}
                     
-                    {/* Loan Flow Modals */}
                     {modals.recordLoanChoice && (
                         <Modal isOpen={modals.recordLoanChoice} onClose={() => toggleModal('recordLoanChoice', false)} title="Record a New Loan">
                             <RecordLoanChoiceWidget onSelectPersonalLoan={openPersonalLoan} onSelectFamilyLoan={openFamilyLoan} />
