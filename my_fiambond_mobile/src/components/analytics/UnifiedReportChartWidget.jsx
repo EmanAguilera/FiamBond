@@ -10,15 +10,15 @@ import UnifiedLoadingWidget from '../../components/ui/UnifiedLoadingWidget';
 
 // --- REUSABLE STAT CARD (MATCHES NEXT.JS FACE VALUE) ---
 const StatCard = ({ label, value, colorClass, icon: Icon, iconColor, textColor }) => (
-    <View className={`p-4 rounded-xl border flex-row items-center mb-3 ${colorClass}`}>
+    <View className={`p-4 rounded-xl border flex-row items-center md:flex-1 ${colorClass}`}>
         <View className="p-2 rounded-lg bg-white/50">
             <Icon size={20} color={iconColor} />
         </View>
-        <View className="ml-3 flex-1">
-            <p className={`text-[10px] font-bold opacity-70 uppercase tracking-wider ${textColor}`}>{label}</p>
-            <p className={`text-xl font-black ${textColor}`}>
+        <View className="ml-3">
+            <Text className={`text-[10px] font-bold opacity-70 uppercase tracking-wider ${textColor}`}>{label}</Text>
+            <Text className={`text-xl font-black ${textColor}`}>
                 ₱{parseFloat(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </p>
+            </Text>
         </View>
     </View>
 );
@@ -153,7 +153,7 @@ function UnifiedReportChartWidget({ report, realm, period, setPeriod }) {
                 </View>
 
                 {/* Stat Cards Grid (Matching the Background Tints) */}
-                <View className="flex-col">
+                <View className="flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-2 mb-4">
                     <StatCard 
                         label={labels.inflow} 
                         value={report.totalInflow} 

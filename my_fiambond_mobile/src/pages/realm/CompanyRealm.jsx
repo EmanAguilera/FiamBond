@@ -1,32 +1,59 @@
-"use client";
+'use client';
 
-import React, { useState, useContext, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView, RefreshControl, Alert } from 'react-native';
-import { AppContext } from '../../context/AppContext';
-import { db } from '../../config/firebase-config';
-import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
-import { API_BASE_URL } from "../../config/apiConfig";
+import React, { useContext, useState, useEffect, Suspense, lazy, useCallback, useMemo } from "react";
+import {
+    View,
+    Text,
+    ScrollView,
+    SafeAreaView,
+    TouchableOpacity,
+    useWindowDimensions,
+    Alert
+} from "react-native";
+import { 
+    Building2, 
+    Plus, 
+    Users, 
+    ArrowLeft, 
+    Wallet, 
+    Flag, 
+    Printer,
+    Target
+} from "lucide-react-native";
 
-// System & UI Components
-import { Icons, Btn, DashboardCard } from "../../components/realm/RealmSharedUI";
-import { useRealmData } from "../../hooks/useRealmData";
+// Context & Logic
+import { AppContext } from "../../context/AppContext";
+import { db } from "../../config/firebase-config.js";
+import { collection, query, where, getDocs, documentId } from "firebase/firestore";
+import { API_BASE_URL } from "../../config/apiConfig.js";
+import { useRealmData } from "../../hooks/useRealmData.js";
+import RouteGuard from "../../components/auth/RouteGuard";
+
+// UI Components
 import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
-import Modal from "../../components/ui/Modal";
+import { Icons } from "../../components/realm/RealmSharedUI";
 
-// Widgets
-import UnifiedCorporateLedgerWidget from '../../components/management/UnifiedCorporateLedgerWidget';
-import CreateUnifiedTransactionWidget from '../../components/finance/CreateUnifiedTransactionWidget';
-import UnifiedTransactionsListWidget from '../../components/finance/UnifiedTransactionsListWidget';
-import CreateUnifiedGoalWidget from "../../components/goal/CreateUnifiedGoalWidget";
-import UnifiedGoalListWidget from "../../components/goal/UnifiedGoalListWidget";
-import UnifiedManagerWidget from '../../components/management/UnifiedManagerWidget';
-import UnifiedReportChartWidget from "../../components/analytics/UnifiedReportChartWidget";
+// Lazy Loaded Widgets
+const Modal = lazy(() => import("../../components/ui/Modal.jsx"));
+const UnifiedCorporateLedgerWidget = lazy(() => import('../../components/management/UnifiedCorporateLedgerWidget'));
+const CreateUnifiedTransactionWidget = lazy(() => import('../../components/finance/CreateUnifiedTransactionWidget.tsx'));
+const UnifiedTransactionsListWidget = lazy(() => import('../../components/finance/UnifiedTransactionsListWidget.tsx'));
+const CreateUnifiedGoalWidget = lazy(() => import("../../components/goal/CreateUnifiedGoalWidget.tsx"));
+const UnifiedGoalListWidget = lazy(() => import("../../components/goal/UnifiedGoalListWidget.tsx"));
+const UnifiedManagerWidget = lazy(() => import("../../components/management/UnifiedManagerWidget.tsx"));
+const UnifiedReportChartWidget = lazy(() => import("../../components/analytics/UnifiedReportChartWidget.jsx"));
 
-export default function CompanyRealmScreen({ company, onBack, onDataChange }) {
-    const context = useContext(AppContext);
-    const user = context?.user;
+export default function CompanyRealm({ company, onBack, onDataChange }) {
+    const { user } = useContext(AppContext);
+    const { width } = useWindowDimensions();
+    const isMobile = width < 768;
+    const [mounted, setMounted] = useState(false);
 
-    // Modal States
+    // Corporate State
+    const [members, setMembers] = useState([]);
+    const [payrollCount, setPayrollCount] = useState(0);
+
+    // Modal State - Replicating UserRealm pattern
     const [modals, setModals] = useState({
         accounting: false, 
         addGoal: false, 
@@ -35,32 +62,29 @@ export default function CompanyRealmScreen({ company, onBack, onDataChange }) {
         viewGoals: false,
         payrollHistory: false
     });
-    
-    const toggle = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
 
-    const [members, setMembers] = useState([]);
-    const [payrollCount, setPayrollCount] = useState(0);
+    const toggleModal = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
 
-    const { 
-        transactions = [], 
-        summaryData = { netPosition: 0 }, 
-        activeGoalsCount = 0, 
-        report, 
-        period, 
-        setPeriod, 
-        loading,
-        refreshing,
-        error, 
-        refresh 
-    } = useRealmData(user, 'company', company?.id);
-
+    // Logic: Corporate Display Name (Matches Next.js logic)
     const corporateDisplayName = useMemo(() => {
         if (!company) return "";
         const isGeneric = company.name?.toLowerCase() === 'company' || company.name?.toLowerCase() === 'my company';
-        const userLastName = user?.full_name ? user.full_name.split(' ').pop() : '';
-        return isGeneric && userLastName ? `${userLastName} ` : company.name;
+        const userLastName = user?.full_name ? user.full_name.trim().split(' ').pop() : '';
+        return isGeneric && userLastName ? `${userLastName} Corporate` : (company.name || "Company");
     }, [company, user]);
 
+    // Data Hook - Scoped to Company
+    const {
+        transactions = [],
+        summaryData = { netPosition: 0 },
+        activeGoalsCount = 0,
+        report,
+        period,
+        setPeriod,
+        refresh
+    } = useRealmData(user, 'company', company?.id);
+
+    // Payroll Configuration (Ported from Next.js)
     const companyPayrollConfig = useMemo(() => ({
         filterFn: (tx) => 
             (tx.category === 'Payroll' || tx.category === 'Cash Advance') || 
@@ -70,13 +94,26 @@ export default function CompanyRealmScreen({ company, onBack, onDataChange }) {
         getSubLabel: (tx) => tx.category || "General Payroll",
     }), []);
 
+    // Initialize Company Data via API (Ported from Next.js)
     const initCompanyData = useCallback(async () => {
         if (!company?.id) return;
         try {
             let compRes = await fetch(`${API_BASE_URL}/companies/${company.id}`);
+            
+            // Auto-create company if 404 (Logic from Next.js)
+            if (!compRes.ok && compRes.status === 404) {
+                await fetch(`${API_BASE_URL}/companies`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ owner_id: company.id, name: company.name })
+                });
+                compRes = await fetch(`${API_BASE_URL}/companies/${company.id}`);
+            }
+
             if (compRes.ok) {
                 const companyData = await compRes.json();
                 const memberIds = companyData.member_ids || [];
+                
                 if (memberIds.length > 0) {
                     const snap = await getDocs(query(collection(db, "users"), where(documentId(), "in", memberIds.slice(0, 10))));
                     setMembers(snap.docs.map(d => ({ 
@@ -91,146 +128,226 @@ export default function CompanyRealmScreen({ company, onBack, onDataChange }) {
                     setPayrollCount(txs.filter(companyPayrollConfig.filterFn).length);
                 }
             }
-        } catch (e) { console.error("Company Init Error:", e); }
-    }, [company?.id, companyPayrollConfig]);
+        } catch (e) {
+            console.error("Company Init Error:", e);
+        }
+    }, [company, companyPayrollConfig]);
 
-    useEffect(() => { initCompanyData(); }, [initCompanyData]);
+    useEffect(() => { 
+        setMounted(true);
+        initCompanyData(); 
+    }, [initCompanyData]);
 
     const handleRefresh = () => {
-        if (refresh) refresh(); 
-        initCompanyData(); 
+        refresh();
+        initCompanyData();
         if (onDataChange) onDataChange();
     };
 
-    if (loading && !refreshing) {
-        return <UnifiedLoadingWidget type="fullscreen" message="Loading Corporate Assets..." variant="indigo" />;
-    }
+    if (!mounted || !company) return <UnifiedLoadingWidget type="fullscreen" message="Accessing Corporate Assets..." />;
 
     return (
-        <SafeAreaView className="flex-1 bg-slate-50">
-            <ScrollView 
-                className="flex-1 px-4 pt-4"
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#4F46E5" />
-                }
-            >
-                {error && (
-                    <View className="mb-4 p-3 bg-rose-100 border border-rose-200 rounded-2xl">
-                        <Text className="text-rose-700 text-center font-bold text-[10px]">⚠️ CORPORATE API OFFLINE</Text>
-                    </View>
-                )}
+        <RouteGuard require="premium">
+            <SafeAreaView className="flex-1 bg-slate-50">
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+                    <View className="w-full px-6 md:px-10 pt-6">
+                        
+                        {/* --- BACK NAVIGATION --- */}
+                        <TouchableOpacity 
+                            onPress={onBack}
+                            className="flex-row items-center mb-6 bg-white self-start px-3 py-2 rounded-xl border border-slate-200 shadow-sm"
+                        >
+                            <ArrowLeft size={16} color="#475569" />
+                            <Text className="ml-2 text-slate-600 font-bold text-xs">Back to Personal</Text>
+                        </TouchableOpacity>
 
-                {/* --- HEADER --- */}
-                <View className="mb-8">
-                    <TouchableOpacity 
-                        onPress={onBack} 
-                        className="flex-row items-center bg-white border border-slate-200 px-3 py-2 rounded-xl w-32 mb-6"
-                    >
-                        <Text className="text-slate-500 mr-2">{Icons.Back}</Text>
-                        <Text className="text-slate-500 font-bold text-xs uppercase">Personal</Text>
-                    </TouchableOpacity>
+                        {/* --- HEADER (Matches UserRealm Face) --- */}
+                        <View className="flex-col md:flex-row md:justify-between md:items-end mb-10 gap-y-8">
+                            
+                            <View className="flex-row items-center">
+                                <View className="w-1.5 h-12 bg-indigo-600 rounded-full mr-4 opacity-80 shadow-sm" />
+                                <View>
+                                    <Text className="text-4xl font-black text-slate-800 tracking-tighter">
+                                        {corporateDisplayName}
+                                    </Text>
+                                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[3px] mt-1">
+                                        COMPANY REALM
+                                    </Text>
+                                </View>
+                            </View>
 
-                    <View className="flex-row items-center justify-between">
-                        <View className="flex-row items-center">
-                            <View className="w-1.5 h-12 bg-indigo-600 rounded-full mr-4 shadow-lg shadow-indigo-300" />
-                            <View>
-                                <Text className="text-3xl font-black text-slate-900 tracking-tighter">
-                                    {corporateDisplayName}
-                                </Text>
-                                <Text className="text-slate-500 font-black text-[10px] uppercase tracking-[2px]">
-                                    Company Realm
-                                </Text>
+                            <View className="w-full md:w-auto">
+                                <View className="flex-row flex-wrap justify-between md:justify-end items-center gap-y-3 md:gap-x-3">
+                                    <ActionBtn 
+                                        label="Accounting" 
+                                        icon={<Plus size={16} color="white" />} 
+                                        color="bg-indigo-600" 
+                                        onPress={() => toggleModal('accounting', true)} 
+                                    />
+                                    <ActionBtn 
+                                        label="Strategic Goal" 
+                                        icon={<Plus size={16} color="#475569" />} 
+                                        color="bg-white border border-slate-200" 
+                                        textColor="text-slate-600"
+                                        onPress={() => toggleModal('addGoal', true)} 
+                                    />
+                                    
+                                    {!isMobile && <View className="w-[1px] h-10 bg-slate-200 mx-1" />}
+
+                                    <ActionBtn 
+                                        label="Employees"
+                                        icon={<Users size={16} color="white" />}
+                                        color="bg-indigo-600"
+                                        textColor="text-white"
+                                        onPress={() => toggleModal('manageEmp', true)} 
+                                    />
+                                </View>
                             </View>
                         </View>
-                    </View>
-                </View>
 
-                {/* --- ACTION BUTTONS --- */}
-                <View className="flex-row flex-wrap gap-2 mb-8">
-                    <TouchableOpacity 
-                        onPress={() => toggle('accounting', true)}
-                        className="flex-1 bg-indigo-600 py-4 rounded-2xl items-center flex-row justify-center"
-                    >
-                        <Text className="text-white font-bold mr-2">{Icons.Plus}</Text>
-                        <Text className="text-white font-bold">Accounting</Text>
-                    </TouchableOpacity>
+                        {/* --- DASHBOARD CARDS --- */}
+                        <View className="flex-col md:flex-row gap-6 mb-10">
+                            <DashboardCard
+                                title="Company Funds"
+                                value={`₱${(summaryData?.netPosition || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                                subtext="Available Balance"
+                                linkText="View Transactions →"
+                                color="text-emerald-600"
+                                icon={Icons.Wallet}
+                                iconColor="#059669"
+                                onPress={() => toggleModal('viewTx', true)}
+                            />
+                            <DashboardCard
+                                title="Active Goals"
+                                value={activeGoalsCount}
+                                subtext="Corporate Targets"
+                                linkText="View Goals →"
+                                color="text-rose-600"
+                                icon={Icons.Flag}
+                                iconColor="#e11d48"
+                                onPress={() => toggleModal('viewGoals', true)}
+                            />
+                            <DashboardCard
+                                title="Payroll Reports"
+                                value={`${payrollCount} Records`}
+                                subtext="Disbursement History"
+                                linkText="Manage Reports →"
+                                color="text-indigo-600"
+                                icon={Icons.Printer}
+                                iconColor="#4f46e5"
+                                onPress={() => toggleModal('payrollHistory', true)}
+                            />
+                        </View>
+
+                        {/* --- ANALYTICS --- */}
+                        <Suspense fallback={<UnifiedLoadingWidget type="section" />}>
+                            <UnifiedReportChartWidget 
+                                report={report} 
+                                realm="company" 
+                                period={period} 
+                                setPeriod={setPeriod} 
+                            />
+                        </Suspense>
+
+                    </View>
+                </ScrollView>
+
+                {/* MODALS */}
+                <Suspense fallback={null}>
+                    {modals.accounting && (
+                        <Modal isOpen={modals.accounting} onClose={() => toggleModal('accounting', false)} title="Corporate Accounting">
+                            <CreateUnifiedTransactionWidget 
+                                companyData={company.id} 
+                                members={members} 
+                                onSuccess={() => { toggleModal('accounting', false); handleRefresh(); }} 
+                            />
+                        </Modal>
+                    )}
                     
-                    <TouchableOpacity 
-                        onPress={() => toggle('manageEmp', true)}
-                        className="bg-white border border-slate-200 px-6 py-4 rounded-2xl items-center flex-row"
-                    >
-                        <Text className="text-slate-600 mr-2">{Icons.Users}</Text>
-                        <Text className="text-slate-600 font-bold">Staff</Text>
-                    </TouchableOpacity>
-                </View>
+                    {modals.addGoal && (
+                        <Modal isOpen={modals.addGoal} onClose={() => toggleModal('addGoal', false)} title="Set Strategic Target">
+                            <CreateUnifiedGoalWidget mode="company" entityId={company.id} onSuccess={() => { toggleModal('addGoal', false); handleRefresh(); }} />
+                        </Modal>
+                    )}
 
-                {/* --- DASHBOARD CARDS --- */}
-                <View className="flex-row flex-wrap justify-between mb-6">
-                    <View className="w-full mb-4">
-                        <DashboardCard 
-                            title="Company Funds" 
-                            value={`₱${(summaryData?.netPosition || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
-                            subtext="Available Balance" 
-                            onClick={() => toggle('viewTx', true)} 
-                            icon={Icons.Wallet} 
-                            colorClass="text-emerald-600" 
-                        />
-                    </View>
-                    <View className="w-[48%]">
-                        <DashboardCard 
-                            title="Goals" 
-                            value={activeGoalsCount} 
-                            subtext="Targets" 
-                            onClick={() => toggle('viewGoals', true)} 
-                            icon={Icons.Flag} 
-                            colorClass="text-rose-600" 
-                        />
-                    </View>
-                    <View className="w-[48%]">
-                        <DashboardCard 
-                            title="Payroll" 
-                            value={payrollCount} 
-                            subtext="Records" 
-                            onClick={() => toggle('payrollHistory', true)} 
-                            icon={Icons.Printer} 
-                            colorClass="text-indigo-600" 
-                        />
-                    </View>
-                </View>
+                    {modals.manageEmp && (
+                        <Modal isOpen={modals.manageEmp} onClose={() => toggleModal('manageEmp', false)} title="Manage Employee Access">
+                            <UnifiedManagerWidget 
+                                type="company" 
+                                mode="members" 
+                                realmData={company} 
+                                members={members} 
+                                onUpdate={() => { handleRefresh(); }} 
+                            />
+                        </Modal>
+                    )}
+                    
+                    {modals.viewTx && (
+                        <Modal isOpen={modals.viewTx} onClose={() => toggleModal('viewTx', false)} title="Corporate Ledger">
+                            <UnifiedTransactionsListWidget companyData={company} />
+                        </Modal>
+                    )}
+                    
+                    {modals.viewGoals && (
+                        <Modal isOpen={modals.viewGoals} onClose={() => toggleModal('viewGoals', false)} title="Strategic Goals">
+                            <UnifiedGoalListWidget mode="company" entityId={company.id} onDataChange={handleRefresh} />
+                        </Modal>
+                    )}
 
-                {/* --- ANALYTICS --- */}
-                <View className="mb-10">
-                    <UnifiedReportChartWidget 
-                        report={report} 
-                        realm="company" 
-                        period={period} 
-                        setPeriod={setPeriod} 
-                    />
-                </View>
-            </ScrollView>
-
-            {/* --- MODALS --- */}
-            <Modal isOpen={modals.accounting} onClose={() => toggle('accounting', false)} title="Accounting">
-                <CreateUnifiedTransactionWidget 
-                    companyData={company?.id} 
-                    members={members} 
-                    onSuccess={() => { toggle('accounting', false); handleRefresh(); }} 
-                />
-            </Modal>
-            
-            <Modal isOpen={modals.viewTx} onClose={() => toggle('viewTx', false)} title="Corporate Ledger">
-                <UnifiedTransactionsListWidget companyData={company} onDataChange={handleRefresh} />
-            </Modal>
-
-            <Modal isOpen={modals.manageEmp} onClose={() => toggle('manageEmp', false)} title="Employee Access">
-                <UnifiedManagerWidget 
-                    type="company" 
-                    mode="members" 
-                    realmData={company} 
-                    members={members} 
-                    onUpdate={handleRefresh} 
-                />
-            </Modal>
-        </SafeAreaView>
+                    {modals.payrollHistory && (
+                        <Modal isOpen={modals.payrollHistory} onClose={() => toggleModal('payrollHistory', false)} title="Payroll Ledger">
+                            <UnifiedCorporateLedgerWidget 
+                                transactions={transactions}
+                                config={companyPayrollConfig}
+                                brandName={company.name}
+                                reportType="Corporate Payroll Ledger"
+                                filenamePrefix={`${company.name}_Payroll`}
+                                themeColor="indigo"
+                            />
+                        </Modal>
+                    )}
+                </Suspense>
+            </SafeAreaView>
+        </RouteGuard>
     );
 }
+
+// --- SUB-COMPONENTS (Replicated from UserRealm) ---
+
+const ActionBtn = ({ label, icon, onPress, color, textColor = "text-white" }) => (
+    <TouchableOpacity 
+        onPress={onPress} 
+        activeOpacity={0.8}
+        className={`${color} flex-row items-center justify-center px-4 py-4 rounded-2xl active:scale-95 shadow-sm w-[48.5%] md:w-auto md:px-6 md:py-3.5`}
+    >
+        {icon && <View className="mr-2">{icon}</View>}
+        <Text className={`${textColor} font-black text-[11px] md:text-[12px] tracking-tight`}>
+            {label}
+        </Text>
+    </TouchableOpacity>
+);
+
+const DashboardCard = ({ title, value, subtext, linkText, color, icon: IconComponent, iconColor, onPress }) => (
+    <TouchableOpacity 
+        onPress={onPress} 
+        activeOpacity={0.9} 
+        className="flex-1 bg-white p-7 rounded-[30px] border border-slate-100 shadow-sm min-w-[280px]"
+    >
+        <View className="flex-row justify-between items-start mb-4">
+            <Text className="text-slate-500 font-bold text-xs tracking-widest uppercase">{title}</Text>
+            {IconComponent && <IconComponent size={24} color={iconColor} />}
+        </View>
+
+        <Text className={`text-4xl font-black tracking-tighter ${color} mb-1`}>
+            {value}
+        </Text>
+        
+        <Text className="text-slate-400 text-[11px] font-medium mb-6">
+            {subtext}
+        </Text>
+
+        <Text className="text-indigo-500 font-bold text-xs">
+            {linkText}
+        </Text>
+    </TouchableOpacity>
+);

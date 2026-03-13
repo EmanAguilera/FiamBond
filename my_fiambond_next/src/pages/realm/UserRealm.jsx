@@ -1,6 +1,6 @@
-'use client'; 
+'use client';
 
-import { useContext, useState, useMemo, Suspense, useEffect } from "react";
+import { useContext, useState, Suspense, useEffect } from "react";
 import dynamic from 'next/dynamic';
 import { AppContext } from "@/src/context/AppContext.jsx";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -11,19 +11,15 @@ import RouteGuard from "@/src/components/auth/RouteGuard";
 import { Icons, Btn, DashboardCard } from "@/src/components/realm/RealmSharedUI.jsx";
 import { useRealmData } from "@/src/hooks/useRealmData.js";
 
-// ⭐️ INTEGRATION: Using UnifiedLoadingWidget
+// Widgets
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // Additional Icon for Admin
 const AdminIcon = <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>;
 
-// Dynamic Imports with Section Loading
-const Modal = dynamic(() => import("@/src/components/ui/Modal.jsx"), { 
-    ssr: false,
-    loading: () => <UnifiedLoadingWidget type="section" message="Preparing view..." />
-});
+// Dynamic Imports
+const Modal = dynamic(() => import("@/src/components/ui/Modal.jsx"), { ssr: false });
 const LoanTrackingWidget = dynamic(() => import("@/src/components/loan/LoanTrackingWidget.tsx"), { ssr: false });
-const RecordLoanFlowWidget = dynamic(() => import("@/src/components/loan/RecordLoanFlowWidget.tsx"), { ssr: false });
 const FamilyRealm = dynamic(() => import("@/src/pages/realm/FamilyRealm.jsx"), { ssr: false });
 const CompanyRealm = dynamic(() => import("@/src/pages/realm/CompanyRealm.jsx"), { ssr: false });
 const ApplyPremiumWidget = dynamic(() => import("@/src/components/management/ApplyPremiumWidget"), { ssr: false });
@@ -33,45 +29,37 @@ const UnifiedTransactionsListWidget = dynamic(() => import('@/src/components/fin
 const UnifiedGoalListWidget = dynamic(() => import("@/src/components/goal/UnifiedGoalListWidget.tsx"), { ssr: false });
 const UnifiedManagerWidget = dynamic(() => import("@/src/components/management/UnifiedManagerWidget.tsx"), { ssr: false });
 const UnifiedReportChartWidget = dynamic(() => import("@/src/components/analytics/UnifiedReportChartWidget.jsx"), { ssr: false });
+const CreateUnifiedLoanWidget = dynamic(() => import("@/src/components/loan/CreateUnifiedLoanWidget.tsx"), { ssr: false });
+const RecordLoanChoiceWidget = dynamic(() => import("@/src/components/loan/RecordLoanChoiceWidget.tsx"), { ssr: false });
+const RecordLoanFlowWidget = dynamic(() => import("@/src/components/loan/RecordLoanFlowWidget.tsx"), { ssr: false });
 
-export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAdmin }) {
-    // ⭐️ FIX 1: Defensive Context Access
+export default function UserDashboard({ onEnterAdmin }) {
     const context = useContext(AppContext) || {};
-    const { user, refreshUserData, loading: authLoading } = context;
+    const { user, refreshUserData } = context;
     
-    // ⭐️ FIX 2: Mounted Guard
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
 
-    // State management
     const [modals, setModals] = useState({
         transactions: false, goals: false, families: false, lending: false,
-        createTx: false, createGoal: false, recordLoan: false, applyCompany: false, applyFamily: false
+        createTx: false, createGoal: false, applyCompany: false, applyFamily: false,
+        recordLoanChoice: false, recordLoanPersonal: false, recordLoanFamily: false
     });
     
     const [activeFamilyRealm, setActiveFamilyRealm] = useState(null);
     const [showCompanyRealm, setShowCompanyRealm] = useState(false);
 
-    // Realm Data Hook
     const { 
-        summaryData = { netPosition: 0 }, 
-        activeGoalsCount = 0, 
-        outstandingLending = 0, 
-        report, 
-        period, 
-        setPeriod, 
-        error, 
-        refresh 
+        summaryData = { netPosition: 0 }, activeGoalsCount = 0, outstandingLending = 0, 
+        report, period, setPeriod, error, refresh 
     } = useRealmData(user, 'personal', user?.uid);
 
     const userLastName = user?.last_name || (user?.full_name ? user.full_name.trim().split(' ').pop() : 'User');
     const toggleModal = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
 
-    // Access Logic
     const isAdmin = user?.role === 'admin';
     const isCompanyActive = isAdmin || (user?.is_premium && user?.subscription_status === 'active'); 
     const isFamilyActive = isAdmin || (user?.is_family_premium && user?.family_subscription_status === 'active'); 
-    
     const isCompanyPending = user?.subscription_status === 'pending_approval';
     const isFamilyPending = user?.family_subscription_status === 'pending_approval';
 
@@ -81,15 +69,11 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             const userRef = doc(db, "users", user.uid);
             const isFamily = paymentData.targetAccess === 'family';
             const updates = isFamily ? {
-                family_subscription_status: 'pending_approval',
-                family_payment_ref: paymentData.paymentRef,
-                family_premium_plan: paymentData.plan,
-                family_request_date: serverTimestamp()
+                family_subscription_status: 'pending_approval', family_payment_ref: paymentData.paymentRef,
+                family_premium_plan: paymentData.plan, family_request_date: serverTimestamp()
             } : {
-                subscription_status: 'pending_approval',
-                payment_ref: paymentData.paymentRef,
-                premium_plan: paymentData.plan,
-                request_date: serverTimestamp()
+                subscription_status: 'pending_approval', payment_ref: paymentData.paymentRef,
+                premium_plan: paymentData.plan, request_date: serverTimestamp()
             };
             await updateDoc(userRef, updates);
             toggleModal(isFamily ? 'applyFamily' : 'applyCompany', false);
@@ -97,16 +81,22 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
             if (refreshUserData) refreshUserData();
         } catch (err) { alert("Failed to submit request."); }
     };
+    
+    const openPersonalLoan = () => {
+        toggleModal('recordLoanChoice', false);
+        toggleModal('recordLoanPersonal', true);
+    }
+    const openFamilyLoan = () => {
+        toggleModal('recordLoanChoice', false);
+        toggleModal('recordLoanFamily', true);
+    }
+    const handleCreateFamilyRequest = () => {
+        toggleModal('recordLoanFamily', false);
+        toggleModal('applyFamily', true);
+    }
 
-    // ⭐️ Updated Loading State using UnifiedLoadingWidget
     if (!mounted || !user) {
-        return (
-            <UnifiedLoadingWidget 
-                type="fullscreen" 
-                message="Syncing Personal Realm..." 
-                variant="indigo" 
-            />
-        );
+        return <UnifiedLoadingWidget type="fullscreen" message="Syncing Personal Realm..." variant="indigo" />;
     }
 
     if (activeFamilyRealm) return <Suspense fallback={<UnifiedLoadingWidget type="fullscreen" message="Entering Family Realm..." />}><FamilyRealm family={activeFamilyRealm} onBack={() => setActiveFamilyRealm(null)} onDataChange={refresh} /></Suspense>;
@@ -127,62 +117,22 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                     </div>
 
                     <div className="w-full md:w-auto">
-                        <div className="grid grid-cols-2 gap-3 md:flex md:items-center">
-                            {isAdmin && (
-                                <Btn 
-                                    onClick={onEnterAdmin} 
-                                    type="pri" 
-                                    icon={AdminIcon} 
-                                    className="bg-purple-600 hover:bg-purple-700 border-purple-500 shadow-purple-200"
-                                >
-                                    Admin Realm
-                                </Btn>
-                            )}
-
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:flex md:items-center">
+                            {isAdmin && <Btn onClick={onEnterAdmin} type="pri" icon={AdminIcon} className="bg-purple-600 hover:bg-purple-700 border-purple-500 shadow-purple-200">Admin Realm</Btn>}
                             <Btn onClick={() => toggleModal('createTx', true)} type="pri" icon={Icons.Plus}>Transaction</Btn>
                             <Btn onClick={() => toggleModal('createGoal', true)} icon={Icons.Plus}>Goal</Btn>
-                            
+                            <Btn onClick={() => toggleModal('recordLoanChoice', true)} icon={Icons.Plus}>Loan</Btn>
                             <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
-
-                            {isFamilyActive ? <Btn onClick={() => toggleModal('families', true)} icon={Icons.Users}>Families</Btn>
-                            : isFamilyPending ? <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
-                            : <Btn onClick={() => toggleModal('applyFamily', true)} icon={Icons.Lock}>Apply Family</Btn>}
-
-                            {isCompanyActive ? <Btn onClick={() => setShowCompanyRealm(true)} type="comp" icon={Icons.Build}>Company</Btn>
-                            : isCompanyPending ? <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
-                            : <Btn onClick={() => toggleModal('applyCompany', true)} icon={Icons.Lock}>Apply Company</Btn>}
+                            {isFamilyActive ? <Btn onClick={() => toggleModal('families', true)} icon={Icons.Users}>Families</Btn> : isFamilyPending ? <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn> : <Btn onClick={() => toggleModal('applyFamily', true)} icon={Icons.Lock}>Apply Family</Btn>}
+                            {isCompanyActive ? <Btn onClick={() => setShowCompanyRealm(true)} type="comp" icon={Icons.Build}>Company</Btn> : isCompanyPending ? <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn> : <Btn onClick={() => toggleModal('applyCompany', true)} icon={Icons.Lock}>Apply Company</Btn>}
                         </div>
                     </div>
                 </header>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-left">
-                    <DashboardCard 
-                        title="Personal Funds" 
-                        value={`₱${(summaryData?.netPosition || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
-                        subtext="Available Balance" 
-                        linkText="View Transactions" 
-                        onClick={() => toggleModal('transactions', true)} 
-                        icon={Icons.Wallet} 
-                        colorClass="text-emerald-600" 
-                    />
-                    <DashboardCard 
-                        title="Active Goals" 
-                        value={activeGoalsCount} 
-                        subtext="Targets in Progress" 
-                        linkText="View Goals" 
-                        onClick={() => toggleModal('goals', true)} 
-                        icon={Icons.Flag} 
-                        colorClass="text-rose-600" 
-                    />
-                    <DashboardCard 
-                        title="Outstanding Loans" 
-                        value={`₱${(outstandingLending || 0).toLocaleString()}`} 
-                        subtext="Total Receivables" 
-                        linkText="Manage Lending" 
-                        onClick={() => toggleModal('lending', true)} 
-                        icon={Icons.Gift} 
-                        colorClass="text-amber-600" 
-                    />
+                    <DashboardCard title="Personal Funds" value={`₱${(summaryData?.netPosition || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} subtext="Available Balance" linkText="View Transactions" onClick={() => toggleModal('transactions', true)} icon={Icons.Wallet} colorClass="text-emerald-600" />
+                    <DashboardCard title="Active Goals" value={activeGoalsCount} subtext="Targets in Progress" linkText="View Goals" onClick={() => toggleModal('goals', true)} icon={Icons.Flag} colorClass="text-rose-600" />
+                    <DashboardCard title="Outstanding Loans" value={`₱${(outstandingLending || 0).toLocaleString()}`} subtext="Total Receivables" linkText="Manage Lending" onClick={() => toggleModal('lending', true)} icon={Icons.Gift} colorClass="text-amber-600" />
                 </div>
 
                 <Suspense fallback={<UnifiedLoadingWidget type="section" message="Generating Insight Report..." />}>
@@ -198,9 +148,20 @@ export default function UserDashboard({ onEnterFamily, onEnterCompany, onEnterAd
                     {modals.createTx && <Modal isOpen={modals.createTx} onClose={() => toggleModal('createTx', false)} title="New Transaction"><CreateUnifiedTransactionWidget onSuccess={() => { toggleModal('createTx', false); refresh(); }} /></Modal>}
                     {modals.createGoal && <Modal isOpen={modals.createGoal} onClose={() => toggleModal('createGoal', false)} title="New Goal Target"><CreateUnifiedGoalWidget mode="personal" entityId={user?.uid} onSuccess={() => { toggleModal('createGoal', false); refresh(); }} /></Modal>}
                     
-                    {modals.recordLoan && (
-                        <Modal isOpen={modals.recordLoan} onClose={() => toggleModal('recordLoan', false)} title="Record New Loan">
-                            <RecordLoanFlowWidget onSuccess={() => { toggleModal('recordLoan', false); refresh(); }} />
+                    {/* Loan Flow Modals */}
+                    {modals.recordLoanChoice && (
+                        <Modal isOpen={modals.recordLoanChoice} onClose={() => toggleModal('recordLoanChoice', false)} title="Record a New Loan">
+                            <RecordLoanChoiceWidget onSelectPersonalLoan={openPersonalLoan} onSelectFamilyLoan={openFamilyLoan} />
+                        </Modal>
+                    )}
+                    {modals.recordLoanPersonal && (
+                        <Modal isOpen={modals.recordLoanPersonal} onClose={() => toggleModal('recordLoanPersonal', false)} title="Record New Personal Loan">
+                            <CreateUnifiedLoanWidget mode="personal" entityId={user?.uid} onSuccess={() => { toggleModal('recordLoanPersonal', false); refresh(); }} />
+                        </Modal>
+                    )}
+                    {modals.recordLoanFamily && (
+                        <Modal isOpen={modals.recordLoanFamily} onClose={() => toggleModal('recordLoanFamily', false)} title="Record New Family Loan">
+                            <RecordLoanFlowWidget onSuccess={() => { toggleModal('recordLoanFamily', false); refresh(); }} onRequestCreateFamily={handleCreateFamilyRequest} />
                         </Modal>
                     )}
 

@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useContext, useState, useEffect, Suspense, lazy } from "react";
-import { 
-    View, 
-    Text, 
-    ScrollView, 
-    SafeAreaView, 
-    TouchableOpacity, 
+import {
+    View,
+    Text,
+    ScrollView,
+    SafeAreaView,
+    TouchableOpacity,
     Alert,
-    Platform
+    useWindowDimensions
 } from "react-native";
 import { Shield, Plus, Users, Building2 } from "lucide-react-native";
 
@@ -36,9 +36,13 @@ const CreateUnifiedTransactionWidget = lazy(() => import('../../components/finan
 const CreateUnifiedGoalWidget = lazy(() => import("../../components/goal/CreateUnifiedGoalWidget.tsx"));
 const ApplyPremiumWidget = lazy(() => import("../../components/management/ApplyPremiumWidget"));
 const UnifiedReportChartWidget = lazy(() => import("../../components/analytics/UnifiedReportChartWidget.jsx"));
+const CreateUnifiedLoanWidget = lazy(() => import("../../components/loan/CreateUnifiedLoanWidget.tsx"));
+const RecordLoanChoiceWidget = lazy(() => import("../../components/loan/RecordLoanChoiceWidget.tsx"));
 
-export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFamily }) {
+export default function UserDashboard({ onEnterAdmin }) {
     const { user, refreshUserData } = useContext(AppContext);
+    const { width } = useWindowDimensions();
+    const isMobile = width < 768;
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => { setMounted(true); }, []);
@@ -50,7 +54,9 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
     // Modal State
     const [modals, setModals] = useState({
         transactions: false, goals: false, families: false, lending: false,
-        createTx: false, createGoal: false, recordLoan: false, applyCompany: false, applyFamily: false
+        createTx: false, createGoal: false, recordLoanChoice: false, 
+        recordLoanPersonal: false, recordLoanFamily: false, 
+        applyCompany: false, applyFamily: false
     });
 
     // Data Hook
@@ -61,7 +67,6 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
         report,
         period,
         setPeriod,
-        error,
         refresh
     } = useRealmData(user, 'personal', user?.uid);
 
@@ -94,38 +99,51 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
             Alert.alert("Success", "Request Submitted.");
         } catch (err) { Alert.alert("Error", "Submission failed."); }
     };
+    
+    const openPersonalLoan = () => {
+        toggleModal('recordLoanChoice', false);
+        toggleModal('recordLoanPersonal', true);
+    }
+    const openFamilyLoan = () => {
+        toggleModal('recordLoanChoice', false);
+        toggleModal('recordLoanFamily', true);
+    }
+    const handleCreateFamilyRequest = () => {
+        toggleModal('recordLoanFamily', false);
+        toggleModal('applyFamily', true);
+    }
 
     if (!mounted || !user) return <UnifiedLoadingWidget type="fullscreen" message="Syncing Personal Realm..." />;
 
-    // Navigation Switches
     if (activeFamilyRealm) return <Suspense fallback={<UnifiedLoadingWidget type="fullscreen" />}><FamilyRealm family={activeFamilyRealm} onBack={() => setActiveFamilyRealm(null)} onDataChange={refresh} /></Suspense>;
-    if (showCompanyRealm) return <Suspense fallback={<UnifiedLoadingWidget type="fullscreen" />}><CompanyRealm company={{ id: user?.uid, name: "Personal Company" }} onBack={() => setShowCompanyRealm(false)} onDataChange={refresh} /></Suspense>;
+    if (showCompanyRealm) return <Suspense fallback={<UnifiedLoadingWidget type="fullscreen" />}><CompanyRealm company={{ id: user?.uid, name: "Company" }} onBack={() => setShowCompanyRealm(false)} onDataChange={refresh} /></Suspense>;
 
     return (
         <RouteGuard require="auth">
-            <SafeAreaView className="flex-1 bg-white">
+            <SafeAreaView className="flex-1 bg-slate-50">
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-                    <View className="w-full px-8 pt-12">
+                    <View className="w-full px-6 md:px-10 pt-10">
                         
-                        {/* --- HEADER & BUTTON ROW (FIXED ALIGNMENT) --- */}
-                        <View className="flex-row justify-between items-center mb-10">
+                        {/* --- ORGANIZED HEADER --- */}
+                        <View className="flex-col md:flex-row md:justify-between md:items-end mb-10 gap-y-8">
                             
                             {/* Left Side: Header */}
                             <View className="flex-row items-center">
-                                <View className="w-1.5 h-12 bg-indigo-600 rounded-full mr-4" />
+                                <View className="w-1.5 h-12 bg-indigo-600 rounded-full mr-4 opacity-80 shadow-sm" />
                                 <View>
-                                    <Text className="text-4xl font-black text-slate-900 tracking-tighter">
+                                    <Text className="text-4xl font-black text-slate-800 tracking-tighter">
                                         {userLastName}
                                     </Text>
-                                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[2px]">
+                                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[3px] mt-1">
                                         PERSONAL REALM
                                     </Text>
                                 </View>
                             </View>
 
-                            {/* Right Side: Action Buttons */}
-                            <View className="flex-row items-center">
-                                <View className="flex-row items-center gap-2">
+                            {/* Right Side: Action Buttons Grid */}
+                            <View className="w-full md:w-auto">
+                                <View className="flex-row flex-wrap justify-between md:justify-end items-center gap-y-3 md:gap-x-3">
+                                    
                                     {isAdmin && (
                                         <ActionBtn 
                                             label="Admin Realm" 
@@ -147,20 +165,27 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
                                         textColor="text-slate-600"
                                         onPress={() => toggleModal('createGoal', true)} 
                                     />
+                                    <ActionBtn 
+                                        label="Loan" 
+                                        icon={<Plus size={16} color="#475569" />} 
+                                        color="bg-white border border-slate-200" 
+                                        textColor="text-slate-600"
+                                        onPress={() => toggleModal('recordLoanChoice', true)} 
+                                    />
                                     
-                                    {/* Vertical Divider Pipe */}
-                                    <View className="w-[1px] h-8 bg-slate-200 mx-2" />
+                                    {/* Vertical Divider (Desktop Only) */}
+                                    {!isMobile && <View className="w-[1px] h-10 bg-slate-200 mx-1" />}
 
                                     <ActionBtn 
-                                        label={isFamilyActive ? "Families" : (isFamilyPending ? "Pending" : "Apply Family")} 
-                                        icon={<Users size={16} color={isFamilyActive ? "white" : "#475569"} />}
-                                        color={isFamilyActive ? "bg-white border border-slate-200" : "bg-white border border-slate-200"}
+                                        label={isFamilyActive ? "Families" : (isFamilyPending ? "Pending" : "Apply Family")}
+                                        icon={<Users size={16} color="#475569" />}
+                                        color="bg-white border border-slate-200"
                                         textColor="text-slate-600"
                                         onPress={() => isFamilyActive ? toggleModal('families', true) : (!isFamilyPending && toggleModal('applyFamily', true))} 
                                     />
 
                                     <ActionBtn 
-                                        label={isCompanyActive ? "Company" : (isCompanyPending ? "Pending" : "Apply Company")} 
+                                        label={isCompanyActive ? "Company" : (isCompanyPending ? "Pending" : "Apply Company")}
                                         icon={<Building2 size={16} color="white" />}
                                         color="bg-indigo-600"
                                         textColor="text-white"
@@ -171,7 +196,7 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
                         </View>
 
                         {/* --- DASHBOARD CARDS --- */}
-                        <View className="flex-col md:flex-row gap-6">
+                        <View className="flex-col md:flex-row gap-6 mb-10">
                             <DashboardCard
                                 title="Personal Funds"
                                 value={`₱${(summaryData?.netPosition || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
@@ -205,16 +230,14 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
                         </View>
 
                         {/* --- ANALYTICS --- */}
-                        <View className="mt-12 bg-slate-50 p-6 rounded-[40px] border border-slate-100 shadow-sm">
-                            <Suspense fallback={<View className="p-10 items-center"><Text>Loading Analytics...</Text></View>}>
-                                <UnifiedReportChartWidget report={report} realm="personal" period={period} setPeriod={setPeriod} />
-                            </Suspense>
-                        </View>
+                        <Suspense fallback={<UnifiedLoadingWidget type="section" />}>
+                            <UnifiedReportChartWidget report={report} realm="personal" period={period} setPeriod={setPeriod} />
+                        </Suspense>
 
                     </View>
                 </ScrollView>
 
-                {/* --- MODALS --- */}
+                {/* MODALS (Lazy Loaded) */}
                 <Suspense fallback={null}>
                     {modals.transactions && <Modal isOpen={modals.transactions} onClose={() => toggleModal('transactions', false)} title="History"><UnifiedTransactionsListWidget /></Modal>}
                     {modals.goals && <Modal isOpen={modals.goals} onClose={() => toggleModal('goals', false)} title="Personal Goals"><UnifiedGoalListWidget mode="personal" entityId={user?.uid} onDataChange={refresh} /></Modal>}
@@ -222,7 +245,23 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
                     {modals.lending && <Modal isOpen={modals.lending} onClose={() => toggleModal('lending', false)} title="Lending Ledger"><LoanTrackingWidget onDataChange={refresh} /></Modal>}
                     {modals.createTx && <Modal isOpen={modals.createTx} onClose={() => toggleModal('createTx', false)} title="New Transaction"><CreateUnifiedTransactionWidget onSuccess={() => { toggleModal('createTx', false); refresh(); }} /></Modal>}
                     {modals.createGoal && <Modal isOpen={modals.createGoal} onClose={() => toggleModal('createGoal', false)} title="New Goal"><CreateUnifiedGoalWidget mode="personal" entityId={user?.uid} onSuccess={() => { toggleModal('createGoal', false); refresh(); }} /></Modal>}
-                    {modals.recordLoan && <Modal isOpen={modals.recordLoan} onClose={() => toggleModal('recordLoan', false)} title="Record Loan"><RecordLoanFlowWidget onSuccess={() => { toggleModal('recordLoan', false); refresh(); }} /></Modal>}
+                    
+                    {modals.recordLoanChoice && (
+                        <Modal isOpen={modals.recordLoanChoice} onClose={() => toggleModal('recordLoanChoice', false)} title="Record a New Loan">
+                            <RecordLoanChoiceWidget onSelectPersonalLoan={openPersonalLoan} onSelectFamilyLoan={openFamilyLoan} />
+                        </Modal>
+                    )}
+                    {modals.recordLoanPersonal && (
+                        <Modal isOpen={modals.recordLoanPersonal} onClose={() => toggleModal('recordLoanPersonal', false)} title="Record New Personal Loan">
+                            <CreateUnifiedLoanWidget mode="personal" entityId={user?.uid} onSuccess={() => { toggleModal('recordLoanPersonal', false); refresh(); }} />
+                        </Modal>
+                    )}
+                    {modals.recordLoanFamily && (
+                        <Modal isOpen={modals.recordLoanFamily} onClose={() => toggleModal('recordLoanFamily', false)} title="Record New Family Loan">
+                            <RecordLoanFlowWidget onSuccess={() => { toggleModal('recordLoanFamily', false); refresh(); }} onRequestCreateFamily={handleCreateFamilyRequest} />
+                        </Modal>
+                    )}
+
                     {modals.applyCompany && <Modal isOpen={modals.applyCompany} onClose={() => toggleModal('applyCompany', false)} title="Unlock Company"><ApplyPremiumWidget targetAccess="company" onClose={() => toggleModal('applyCompany', false)} onUpgradeSuccess={handleUpgradeSubmit} /></Modal>}
                     {modals.applyFamily && <Modal isOpen={modals.applyFamily} onClose={() => toggleModal('applyFamily', false)} title="Unlock Family"><ApplyPremiumWidget targetAccess="family" onClose={() => toggleModal('applyFamily', false)} onUpgradeSuccess={handleUpgradeSubmit} /></Modal>}
                 </Suspense>
@@ -231,16 +270,20 @@ export default function UserDashboard({ onEnterAdmin, onEnterCompany, onEnterFam
     );
 }
 
-// --- REFINED SUB-COMPONENTS ---
+// --- SUB-COMPONENTS FOR ORGANIZED UI ---
 
 const ActionBtn = ({ label, icon, onPress, color, textColor = "text-white" }) => (
     <TouchableOpacity 
         onPress={onPress} 
         activeOpacity={0.8}
-        className={`${color} flex-row items-center px-5 py-3 rounded-2xl active:scale-95 shadow-sm`}
+        // w-[48.5%] ensures a perfect 2-column grid on mobile
+        // rounded-2xl creates the modern "not quite round" look from Image 1 & 2
+        className={`${color} flex-row items-center justify-center px-4 py-4 rounded-2xl active:scale-95 shadow-sm w-[48.5%] md:w-auto md:px-6 md:py-3.5`}
     >
         {icon && <View className="mr-2">{icon}</View>}
-        <Text className={`${textColor} font-black text-[11px] tracking-tight`}>{label}</Text>
+        <Text className={`${textColor} font-black text-[11px] md:text-[12px] tracking-tight`}>
+            {label}
+        </Text>
     </TouchableOpacity>
 );
 
@@ -251,7 +294,7 @@ const DashboardCard = ({ title, value, subtext, linkText, color, icon: IconCompo
         className="flex-1 bg-white p-7 rounded-[30px] border border-slate-100 shadow-sm min-w-[280px]"
     >
         <View className="flex-row justify-between items-start mb-4">
-            <Text className="text-slate-600 font-bold text-sm tracking-tight">{title}</Text>
+            <Text className="text-slate-500 font-bold text-xs tracking-widest uppercase">{title}</Text>
             {IconComponent && <IconComponent size={24} color={iconColor} />}
         </View>
 
@@ -263,7 +306,7 @@ const DashboardCard = ({ title, value, subtext, linkText, color, icon: IconCompo
             {subtext}
         </Text>
 
-        <Text className="text-indigo-500 font-semibold text-xs">
+        <Text className="text-indigo-500 font-bold text-xs">
             {linkText}
         </Text>
     </TouchableOpacity>

@@ -8,7 +8,7 @@ import { API_BASE_URL } from "@/src/config/apiConfig";
 /**
  * useRealmData Hook
  * Centralizes data fetching for Admin, Personal, and Company realms.
- * Returns 'loading' to allow UI components to render UnifiedLoadingWidget.
+ * Fixed: Added resilient fetching to handle backend connectivity issues.
  */
 export function useRealmData(user, realmType, entityId = null) {
     const [loading, setLoading] = useState(true);
@@ -32,12 +32,12 @@ export function useRealmData(user, realmType, entityId = null) {
 
     const fetchData = useCallback(async () => {
         if (!user) return;
-        setLoading(true); // 🟢 Start Loading
+        setLoading(true);
         setError(null);
 
         try {
             if (realmType === 'admin') {
-                // --- ADMIN FETCH LOGIC (Firestore) ---
+                // --- ADMIN FETCH LOGIC (Firestore - Always works if Firebase is up) ---
                 const [uSnap, pSnap] = await Promise.all([
                     getDocs(collection(db, "users")),
                     getDocs(collection(db, "premiums"))
@@ -57,18 +57,34 @@ export function useRealmData(user, realmType, entityId = null) {
                 setTotalFunds(total);
 
             } else {
-                // --- PERSONAL/COMPANY FETCH LOGIC (API) ---
+                // --- PERSONAL/COMPANY FETCH LOGIC (External API) ---
                 const queryParam = realmType === 'personal' ? `user_id=${user.uid}` : `${realmType}_id=${entityId}`;
                 
-                const [txRes, gRes, lRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/transactions?${queryParam}`),
-                    fetch(`${API_BASE_URL}/goals?${queryParam}`),
-                    fetch(`${API_BASE_URL}/loans?${queryParam}`)
+                /**
+                 * Helper function to handle individual fetch failures.
+                 * This prevents one failed API call from stopping the whole app.
+                 */
+                const safeFetch = async (endpoint) => {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/${endpoint}`);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return await response.json();
+                    } catch (e) {
+                        console.error(`Fetch error for ${endpoint}:`, e);
+                        return null; // Return null if server is down or route fails
+                    }
+                };
+
+                // Execute all fetches in parallel
+                const [txData, goalsData, loansData] = await Promise.all([
+                    safeFetch(`transactions?${queryParam}`),
+                    safeFetch(`goals?${queryParam}`),
+                    safeFetch(`loans?${queryParam}`)
                 ]);
 
-                if (txRes.ok) {
-                    const txs = await txRes.json();
-                    const filtered = realmType === 'personal' ? txs.filter(tx => !tx.family_id) : txs;
+                // 1. Process Transactions
+                if (txData) {
+                    const filtered = realmType === 'personal' ? txData.filter(tx => !tx.family_id) : txData;
                     setTransactions(filtered);
                     
                     let balance = 0;
@@ -76,15 +92,15 @@ export function useRealmData(user, realmType, entityId = null) {
                     setSummaryData({ netPosition: balance });
                 }
 
-                if (gRes.ok) {
-                    const goals = await gRes.json();
-                    setActiveGoalsCount(goals.filter(g => g.status === 'active').length);
+                // 2. Process Goals
+                if (goalsData) {
+                    setActiveGoalsCount(goalsData.filter(g => g.status === 'active').length);
                 }
 
-                if (lRes.ok) {
-                    const loans = await lRes.json();
+                // 3. Process Loans
+                if (loansData) {
                     let out = 0;
-                    loans.forEach(l => {
+                    loansData.forEach(l => {
                         const isCreditor = realmType === 'personal' ? l.creditor_id === user.uid : true;
                         if (isCreditor && (l.status === 'outstanding' || l.status === 'pending_confirmation')) {
                             out += ((l.total_owed || l.amount) - (l.repaid_amount || 0));
@@ -92,12 +108,17 @@ export function useRealmData(user, realmType, entityId = null) {
                     });
                     setOutstandingLending(out);
                 }
+
+                // If ALL API calls returned null, the backend server is likely offline
+                if (!txData && !goalsData && !loansData) {
+                    setError("Backend Unreachable: Is the API server running?");
+                }
             }
         } catch (e) {
-            console.error("Data Fetch Error:", e);
-            setError("Sync Error: Please check connection");
+            console.error("Critical Data Fetch Error:", e);
+            setError("Sync Error: Please check your internet or backend connection.");
         } finally {
-            setLoading(false); // 🟢 Stop Loading
+            setLoading(false);
         }
     }, [user, realmType, entityId]);
 
@@ -138,7 +159,10 @@ export function useRealmData(user, realmType, entityId = null) {
                 transactionCount: premiums.length
             });
         } else {
-            if (transactions.length === 0) return;
+            if (transactions.length === 0) {
+                setReport(null);
+                return;
+            }
             const chartGroups = {};
             let inflow = 0, outflow = 0;
             transactions.forEach(tx => {
@@ -152,8 +176,8 @@ export function useRealmData(user, realmType, entityId = null) {
                 chartData: {
                     labels,
                     datasets: [
-                        { label: 'Inflow (₱)', data: labels.map(l => chartGroups[l].income), backgroundColor: 'rgba(75, 192, 192, 0.5)' },
-                        { label: 'Outflow (₱)', data: labels.map(l => chartGroups[l].expense), backgroundColor: 'rgba(255, 99, 132, 0.5)' }
+                        { label: 'Inflow (₱)', data: labels.map(l => chartGroups[l].income), backgroundColor: 'rgba(75, 192, 192, 0.5)', borderColor: 'rgb(75, 192, 192)', borderWidth: 1 },
+                        { label: 'Outflow (₱)', data: labels.map(l => chartGroups[l].expense), backgroundColor: 'rgba(255, 99, 132, 0.5)', borderColor: 'rgb(255, 99, 132)', borderWidth: 1 }
                     ]
                 },
                 totalInflow: inflow, totalOutflow: outflow, netPosition: inflow - outflow,

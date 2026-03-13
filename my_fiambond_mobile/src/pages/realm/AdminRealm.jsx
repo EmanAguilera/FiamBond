@@ -1,45 +1,66 @@
-"use client";
+'use client';
 
-import React, { useState, useContext, useMemo } from "react";
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
-  SafeAreaView, 
-  RefreshControl,
-  Alert 
+import React, { useContext, useState, useEffect, Suspense, lazy, useMemo } from "react";
+import {
+    View,
+    Text,
+    ScrollView,
+    SafeAreaView,
+    TouchableOpacity,
+    useWindowDimensions,
+    Alert
 } from "react-native";
-import { AppContext } from '../../context/AppContext';
+import { 
+    Shield, 
+    Plus, 
+    Users, 
+    ArrowLeft, 
+    Wallet, 
+    FileText, 
+    Printer,
+    Users2,
+    Activity
+} from "lucide-react-native";
+
+// Context & Logic
+import { AppContext } from "../../context/AppContext";
+import { db } from "../../config/firebase-config.js";
 import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
-import { db } from "../../config/firebase-config";
+import { useRealmData } from "../../hooks/useRealmData.js";
+import RouteGuard from "../../components/auth/RouteGuard";
 
-// --- SYSTEM ---
-import { useRealmData } from "../../hooks/useRealmData";
-import { Icons, Btn, DashboardCard } from "../../components/realm/RealmSharedUI";
+// UI Components
 import UnifiedLoadingWidget from "../../components/ui/UnifiedLoadingWidget";
-import Modal from "../../components/ui/Modal";
+import { Icons } from "../../components/realm/RealmSharedUI";
 
-// --- DYNAMIC WIDGETS ---
-import AdminUserTableWidget from "../../components/management/AdminUserTableWidget";
-import UnifiedTransactionsListWidget from "../../components/finance/UnifiedTransactionsListWidget";
-import UnifiedReportChartWidget from "../../components/analytics/UnifiedReportChartWidget";
-import UnifiedCorporateLedgerWidget from "../../components/management/UnifiedCorporateLedgerWidget";
-import UnifiedManagerWidget from "../../components/management/UnifiedManagerWidget";
+// Lazy Loaded Widgets
+const Modal = lazy(() => import("../../components/ui/Modal.jsx"));
+const AdminUserTableWidget = lazy(() => import("../../components/management/AdminUserTableWidget"));
+const UnifiedTransactionsListWidget = lazy(() => import("../../components/finance/UnifiedTransactionsListWidget.tsx"));
+const UnifiedReportChartWidget = lazy(() => import("../../components/analytics/UnifiedReportChartWidget.jsx"));
+const UnifiedCorporateLedgerWidget = lazy(() => import("../../components/management/UnifiedCorporateLedgerWidget"));
+const UnifiedManagerWidget = lazy(() => import("../../components/management/UnifiedManagerWidget.tsx"));
+
+// Constants from Next.js version
+const ADMIN_REPORT_CONFIG = {
+    filterFn: () => true,
+    columnLabels: ["Subscriber", "Plan / Method"],
+    getMainLabel: (tx) => tx.subscriber || "Unknown",
+    getSubLabel: (tx) => `${String(tx.plan).toUpperCase()} • ${tx.method} • Ref: ${tx.ref}`,
+};
 
 const getPlanValue = (plan, type = 'company') => {
     if (type === 'company') return plan === 'yearly' ? 15000.00 : 1500.00;
     return plan === 'yearly' ? 5000.00 : 500.00;
 };
 
-export default function AdminDashboardScreen({ onBack }) {
-    // Standard JSX Context access
-    const context = useContext(AppContext);
-    
-    // Use optional chaining to prevent crashes if context is null
-    const user = context?.user;
-    const refreshUserData = context?.refreshUserData;
+export default function AdminRealm({ onBack }) {
+    const { user, refreshUserData } = useContext(AppContext);
+    const { width } = useWindowDimensions();
+    const isMobile = width < 768;
+    const [mounted, setMounted] = useState(false);
 
+    // Modal State
     const [modals, setModals] = useState({ 
         revenue: false, 
         entities: false, 
@@ -47,11 +68,13 @@ export default function AdminDashboardScreen({ onBack }) {
         manageTeam: false 
     });
 
+    const toggleModal = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
+
+    // Data Hook - Scoped to Admin
     const { 
         users = [], 
         premiums = [], 
         loading, 
-        refreshing,
         totalFunds = 0, 
         pendingCount = 0, 
         report, 
@@ -60,11 +83,15 @@ export default function AdminDashboardScreen({ onBack }) {
         refresh 
     } = useRealmData(user, 'admin');
 
+    useEffect(() => { setMounted(true); }, []);
+
+    // Branding logic consistent with web
     const adminDisplayName = useMemo(() => {
         const lastName = user?.full_name ? user.full_name.trim().split(' ').pop() : 'Admin';
         return `${lastName}`;
     }, [user]);
 
+    // Firestore Logic (Ported from Next.js)
     const handleTogglePremium = async (userId, action, type) => {
         try {
             const batch = writeBatch(db);
@@ -95,7 +122,7 @@ export default function AdminDashboardScreen({ onBack }) {
 
             batch.update(userRef, updates);
 
-            if (isGranting && premiumRef) {
+            if (isGranting) {
                 batch.set(premiumRef, {
                     user_id: userId,
                     email: userObj?.email || "unknown",
@@ -111,145 +138,206 @@ export default function AdminDashboardScreen({ onBack }) {
             await batch.commit();
             Alert.alert("Success", "System Access Updated");
             if (refresh) refresh(); 
-            if (userId === user?.uid && refreshUserData) refreshUserData();
+            if (userId === user?.id && refreshUserData) refreshUserData();
         } catch (error) {
             console.error(error);
-            Alert.alert("Error", "Critical: Failed to update access rights");
+            Alert.alert("Error", "Failed to update access rights");
         }
     };
 
-    if (loading && !refreshing) return (
-        <UnifiedLoadingWidget 
-            type="fullscreen" 
-            message="Syncing Admin Realm Matrix..." 
-            variant="indigo" 
-        />
-    );
+    if (!mounted || loading) return <UnifiedLoadingWidget type="fullscreen" message="Syncing Admin Matrix..." />;
 
     return (
-        <SafeAreaView className="flex-1 bg-slate-50">
-            <ScrollView 
-                className="flex-1 px-4 pt-4"
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#4F46E5" />
-                }
-            >
-                {/* --- HEADER --- */}
-                <View className="mb-6">
-                    <TouchableOpacity 
-                        onPress={onBack} 
-                        className="flex-row items-center bg-white border border-slate-200 px-3 py-2 rounded-xl w-32 mb-6"
-                    >
-                        <Text className="text-slate-500 mr-2">{Icons.Back}</Text>
-                        <Text className="text-slate-500 font-bold text-xs">EXIT REALM</Text>
-                    </TouchableOpacity>
+        <RouteGuard require="admin">
+            <SafeAreaView className="flex-1 bg-slate-50">
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+                    <View className="w-full px-6 md:px-10 pt-6">
+                        
+                        {/* --- BACK NAVIGATION --- */}
+                        <TouchableOpacity 
+                            onPress={onBack}
+                            className="flex-row items-center mb-6 bg-white self-start px-3 py-2 rounded-xl border border-slate-200 shadow-sm"
+                        >
+                            <ArrowLeft size={16} color="#475569" />
+                            <Text className="ml-2 text-slate-600 font-bold text-xs">Back to Personal</Text>
+                        </TouchableOpacity>
 
-                    <View className="flex-row items-center justify-between">
-                        <View className="flex-row items-center">
-                            <View className="w-1.5 h-12 bg-purple-600 rounded-full mr-4 shadow-lg shadow-purple-300" />
-                            <View>
-                                <Text className="text-3xl font-black text-slate-900 tracking-tighter">
-                                    {adminDisplayName}
-                                </Text>
-                                <Text className="text-purple-600 font-black text-[10px] uppercase tracking-[2px]">
-                                    System Administrator
-                                </Text>
+                        {/* --- HEADER --- */}
+                        <View className="flex-col md:flex-row md:justify-between md:items-end mb-10 gap-y-8">
+                            
+                            <View className="flex-row items-center">
+                                {/* Purple Accent for Admin */}
+                                <View className="w-1.5 h-12 bg-purple-600 rounded-full mr-4 opacity-80 shadow-sm" />
+                                <View>
+                                    <Text className="text-4xl font-black text-slate-800 tracking-tighter">
+                                        {adminDisplayName}
+                                    </Text>
+                                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[3px] mt-1">
+                                        ADMIN REALM
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View className="w-full md:w-auto">
+                                <View className="flex-row flex-wrap justify-between md:justify-end items-center gap-y-3 md:gap-x-3">
+                                    <ActionBtn 
+                                        label="Manage Team" 
+                                        icon={<Users size={16} color="white" />} 
+                                        color="bg-purple-600" 
+                                        onPress={() => toggleModal('manageTeam', true)} 
+                                    />
+                                    {/* Placeholder for future admin quick actions to maintain 2x2 grid if needed */}
+                                    <ActionBtn 
+                                        label="System Log" 
+                                        icon={<Activity size={16} color="#475569" />} 
+                                        color="bg-white border border-slate-200" 
+                                        textColor="text-slate-600"
+                                        onPress={() => Alert.alert("Logs", "System activity is stable.")} 
+                                    />
+                                </View>
                             </View>
                         </View>
-                        
-                        <TouchableOpacity 
-                            onPress={() => setModals({ ...modals, manageTeam: true })}
-                            className="bg-purple-100 p-3 rounded-2xl"
-                        >
-                            <Text className="text-purple-700 font-bold text-xs">TEAM</Text>
-                        </TouchableOpacity>
+
+                        {/* --- DASHBOARD CARDS --- */}
+                        <View className="flex-col md:flex-row gap-6 mb-10">
+                            <DashboardCard
+                                title="Admin Funds"
+                                value={`₱${(totalFunds || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                                subtext="Total System Inflow"
+                                linkText="View Transactions →"
+                                color="text-emerald-600"
+                                icon={Icons.Money}
+                                iconColor="#059669"
+                                onPress={() => toggleModal('revenue', true)}
+                            />
+                            <DashboardCard
+                                title="User Access"
+                                value={users.length}
+                                subtext={pendingCount > 0 ? `⚠️ ${pendingCount} PENDING` : "System Stable"}
+                                linkText="Review Access →"
+                                color={pendingCount > 0 ? "text-amber-600" : "text-indigo-600"}
+                                icon={Icons.Entities}
+                                iconColor={pendingCount > 0 ? "#d97706" : "#4f46e5"}
+                                onPress={() => toggleModal('entities', true)}
+                            />
+                            <DashboardCard
+                                title="Revenue Reports"
+                                value="Export"
+                                subtext="Subscription Ledger"
+                                linkText="Manage Reports →"
+                                color="text-emerald-600"
+                                icon={Icons.Report}
+                                iconColor="#059669"
+                                onPress={() => toggleModal('reports', true)}
+                            />
+                        </View>
+
+                        {/* --- ANALYTICS --- */}
+                        <Suspense fallback={<UnifiedLoadingWidget type="section" />}>
+                            <UnifiedReportChartWidget 
+                                report={report} 
+                                realm="admin" 
+                                period={period} 
+                                setPeriod={setPeriod} 
+                            />
+                        </Suspense>
+
                     </View>
-                </View>
+                </ScrollView>
 
-                {/* --- DASHBOARD CARDS --- */}
-                <View className="flex-row flex-wrap justify-between mb-6">
-                    <View className="w-[48%] mb-4">
-                        <DashboardCard 
-                            title="Admin Funds" 
-                            value={`₱${(totalFunds || 0).toLocaleString()}`} 
-                            subtext="Total Inflow" 
-                            onClick={() => setModals({ ...modals, revenue: true })} 
-                            icon={Icons.Money} 
-                            colorClass="text-emerald-600" 
-                        />
-                    </View>
-                    <View className="w-[48%] mb-4">
-                        <DashboardCard 
-                            title="User Access" 
-                            value={users.length} 
-                            subtext={pendingCount > 0 ? `⚠️ ${pendingCount} PENDING` : "Stable"} 
-                            onClick={() => setModals({ ...modals, entities: true })} 
-                            icon={Icons.Entities} 
-                            colorClass={pendingCount > 0 ? "text-amber-600" : "text-indigo-600"} 
-                            isAlert={pendingCount > 0} 
-                        />
-                    </View>
-                    <View className="w-full">
-                        <DashboardCard 
-                            title="Revenue Reports" 
-                            value="Ledger" 
-                            subtext="Subscription Tracking" 
-                            onClick={() => setModals({ ...modals, reports: true })} 
-                            icon={Icons.Report} 
-                            colorClass="text-emerald-600" 
-                        />
-                    </View>
-                </View>
+                {/* MODALS */}
+                <Suspense fallback={null}>
+                    {modals.revenue && (
+                        <Modal isOpen={modals.revenue} onClose={() => toggleModal('revenue', false)} title="Revenue Ledger">
+                            <UnifiedTransactionsListWidget adminMode={true} />
+                        </Modal>
+                    )}
+                    
+                    {modals.entities && (
+                        <Modal isOpen={modals.entities} onClose={() => toggleModal('entities', false)} title="Entity Management">
+                            <AdminUserTableWidget 
+                                users={users} 
+                                type="entity" 
+                                onTogglePremium={handleTogglePremium} 
+                                headerText={pendingCount > 0 ? "⚠️ Approval Needed" : "Manage Access Rights"} 
+                            />
+                        </Modal>
+                    )}
+                    
+                    {modals.reports && (
+                        <Modal isOpen={modals.reports} onClose={() => toggleModal('reports', false)} title="Financial Reports">
+                            <UnifiedCorporateLedgerWidget 
+                                transactions={premiums.map(p => {
+                                    const u = users.find(usr => usr.id === p.user_id);
+                                    return { 
+                                        ...p, 
+                                        created_at: p.granted_at, 
+                                        subscriber: u?.full_name || u?.email || "Unknown", 
+                                        plan: p.plan_cycle || 'monthly', 
+                                        method: p.payment_method || 'System',
+                                        ref: p.payment_ref || 'N/A'
+                                    };
+                                })} 
+                                config={ADMIN_REPORT_CONFIG}
+                                brandName="FiamBond Admin"
+                                reportType="Revenue Report"
+                                filenamePrefix="Revenue_Ledger"
+                                themeColor="emerald" 
+                            />
+                        </Modal>
+                    )}
 
-                {/* --- ANALYTICS WIDGET --- */}
-                <View className="mb-10">
-                    <UnifiedReportChartWidget 
-                        report={report} 
-                        realm="admin" 
-                        period={period} 
-                        setPeriod={setPeriod} 
-                    />
-                </View>
-            </ScrollView>
-
-            {/* --- MODALS --- */}
-            <Modal 
-                isOpen={modals.revenue} 
-                onClose={() => setModals({ ...modals, revenue: false })} 
-                title="Revenue Ledger"
-            >
-                <UnifiedTransactionsListWidget adminMode={true} />
-            </Modal>
-
-            <Modal 
-                isOpen={modals.entities} 
-                onClose={() => setModals({ ...modals, entities: false })} 
-                title="Entity Management"
-            >
-                <AdminUserTableWidget 
-                    users={users} 
-                    onTogglePremium={handleTogglePremium} 
-                />
-            </Modal>
-
-            <Modal 
-                isOpen={modals.reports} 
-                onClose={() => setModals({ ...modals, reports: false })} 
-                title="Financial Reports"
-            >
-                <UnifiedCorporateLedgerWidget 
-                    transactions={premiums} 
-                    brandName="FiamBond Admin"
-                />
-            </Modal>
-
-            <Modal 
-                isOpen={modals.manageTeam} 
-                onClose={() => setModals({ ...modals, manageTeam: false })} 
-                title="Admin Directory"
-            >
-                <UnifiedManagerWidget type="admin" onUpdate={refresh} />
-            </Modal>
-        </SafeAreaView>
+                    {modals.manageTeam && (
+                        <Modal isOpen={modals.manageTeam} onClose={() => toggleModal('manageTeam', false)} title="Admin Team Directory">
+                            <UnifiedManagerWidget 
+                                type="admin" 
+                                mode="directory" 
+                                onUpdate={refresh} 
+                            />
+                        </Modal>
+                    )}
+                </Suspense>
+            </SafeAreaView>
+        </RouteGuard>
     );
 }
+
+// --- SHARED SUB-COMPONENTS (Exact replica of UserRealm UI) ---
+
+const ActionBtn = ({ label, icon, onPress, color, textColor = "text-white" }) => (
+    <TouchableOpacity 
+        onPress={onPress} 
+        activeOpacity={0.8}
+        className={`${color} flex-row items-center justify-center px-4 py-4 rounded-2xl active:scale-95 shadow-sm w-[48.5%] md:w-auto md:px-6 md:py-3.5`}
+    >
+        {icon && <View className="mr-2">{icon}</View>}
+        <Text className={`${textColor} font-black text-[11px] md:text-[12px] tracking-tight`}>
+            {label}
+        </Text>
+    </TouchableOpacity>
+);
+
+const DashboardCard = ({ title, value, subtext, linkText, color, icon: IconComponent, iconColor, onPress }) => (
+    <TouchableOpacity 
+        onPress={onPress} 
+        activeOpacity={0.9} 
+        className="flex-1 bg-white p-7 rounded-[30px] border border-slate-100 shadow-sm min-w-[280px]"
+    >
+        <View className="flex-row justify-between items-start mb-4">
+            <Text className="text-slate-500 font-bold text-xs tracking-widest uppercase">{title}</Text>
+            {IconComponent && <IconComponent size={24} color={iconColor} />}
+        </View>
+
+        <Text className={`text-4xl font-black tracking-tighter ${color} mb-1`}>
+            {value}
+        </Text>
+        
+        <Text className="text-slate-400 text-[11px] font-medium mb-6">
+            {subtext}
+        </Text>
+
+        <Text className="text-indigo-500 font-bold text-xs">
+            {linkText}
+        </Text>
+    </TouchableOpacity>
+);

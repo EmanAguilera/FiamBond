@@ -65,7 +65,7 @@ export function useRealmData(user, realmType, entityId = null) {
                 const queryParam = realmType === 'personal' ? `user_id=${user.uid}` : `${realmType}_id=${entityId}`;
                 
                 const [txRes, gRes, lRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/transactions?${queryParam}`),
+                    fetch(`${API_BASE_URL}/transactions?${queryParam}&period=${period}`),
                     fetch(`${API_BASE_URL}/goals?${queryParam}`),
                     fetch(`${API_BASE_URL}/loans?${queryParam}`)
                 ]);
@@ -104,7 +104,7 @@ export function useRealmData(user, realmType, entityId = null) {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [user, realmType, entityId]);
+    }, [user, realmType, entityId, period]);
 
     const generateReport = useCallback(() => {
         if (realmType === 'admin') {
@@ -146,11 +146,20 @@ export function useRealmData(user, realmType, entityId = null) {
             if (transactions.length === 0) return;
             const chartGroups = {};
             let inflow = 0, outflow = 0;
+            const now = new Date();
+            const startDate = new Date();
+            if (period === 'weekly') startDate.setDate(now.getDate() - 7);
+            else if (period === 'yearly') startDate.setFullYear(now.getFullYear() - 1);
+            else startDate.setMonth(now.getMonth() - 1);
+
             transactions.forEach(tx => {
-                const date = new Date(tx.created_at).toLocaleDateString();
-                if (!chartGroups[date]) chartGroups[date] = { income: 0, expense: 0 };
-                if (tx.type === 'income') { chartGroups[date].income += tx.amount; inflow += tx.amount; }
-                else { chartGroups[date].expense += tx.amount; outflow += tx.amount; }
+                const txDate = new Date(tx.created_at);
+                if (txDate >= startDate && txDate <= now) { 
+                    const date = txDate.toLocaleDateString();
+                    if (!chartGroups[date]) chartGroups[date] = { income: 0, expense: 0 };
+                    if (tx.type === 'income') { chartGroups[date].income += tx.amount; inflow += tx.amount; }
+                    else { chartGroups[date].expense += tx.amount; outflow += tx.amount; }
+                }
             });
             const labels = Object.keys(chartGroups).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
             setReport({
@@ -168,7 +177,7 @@ export function useRealmData(user, realmType, entityId = null) {
     }, [realmType, premiums, transactions, period]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
-    useEffect(() => { generateReport(); }, [generateReport, period]);
+    useEffect(() => { generateReport(); }, [generateReport, period, transactions, premiums]);
 
     return { 
         loading, refreshing, error, period, setPeriod, refresh: () => fetchData(true),

@@ -3,7 +3,6 @@ import {
   getAuth, 
   initializeAuth, 
   getReactNativePersistence, 
-  browserLocalPersistence,
   GoogleAuthProvider 
 } from "firebase/auth";
 import { initializeFirestore } from "firebase/firestore";
@@ -23,22 +22,19 @@ const firebaseConfig = {
 // 1. Initialize App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// 2. Initialize Firestore (Consistent with your Next.js setup)
+// 2. Initialize Firestore
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });
 
 // 3. Initialize Auth (Platform Sensitive)
-let auth;
-if (Platform.OS === 'web') {
-  // For Web: Use standard browser persistence (like your Next.js app)
-  auth = getAuth(app);
-} else {
-  // For Mobile: Use AsyncStorage persistence
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage)
-  });
-}
+// We use a ternary operator here so the variable is assigned immediately.
+// This prevents the "implicitly has type any" error in VS Code.
+const auth = Platform.OS === 'web' 
+  ? getAuth(app) 
+  : initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
 
 export const googleProvider = new GoogleAuthProvider();
 export { auth };

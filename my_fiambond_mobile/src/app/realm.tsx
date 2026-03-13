@@ -62,7 +62,12 @@ export default function RealmPage() {
           */}
           
           {(!params.view || params.view === 'personal') && (
-            <UserDashboard user={user} params={params} router={router} />
+            <UserDashboard 
+              user={user} 
+              params={params} 
+              router={router} 
+              onEnterAdmin={() => router.push('/realm?view=admin')}
+            />
           )}
 
           {params.view === 'family' && (
