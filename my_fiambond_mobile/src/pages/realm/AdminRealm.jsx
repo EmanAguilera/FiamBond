@@ -155,11 +155,11 @@ export default function AdminRealm({ onBack }) {
                         
                         {/* --- BACK NAVIGATION --- */}
                         <TouchableOpacity 
-                            onPress={onBack}
-                            className="flex-row items-center mb-6 bg-white self-start px-3 py-2 rounded-xl border border-slate-200 shadow-sm"
+                            onPress={() => onBack && onBack()} 
+                            className="flex-row items-center px-3 py-1.5 rounded-lg bg-white border border-slate-200 mb-6 self-start shadow-sm active:scale-95"
                         >
-                            <ArrowLeft size={16} color="#475569" />
-                            <Text className="ml-2 text-slate-600 font-bold text-xs">Back to Personal</Text>
+                            <ArrowLeft size={16} color="#64748b" strokeWidth={2} />
+                             <Text className="ml-2 text-slate-500 text-sm font-medium">Back to Personal</Text>
                         </TouchableOpacity>
 
                         {/* --- HEADER --- */}
@@ -167,12 +167,12 @@ export default function AdminRealm({ onBack }) {
                             
                             <View className="flex-row items-center">
                                 {/* Purple Accent for Admin */}
-                                <View className="w-1.5 h-12 bg-purple-600 rounded-full mr-4 opacity-80 shadow-sm" />
+                                <View className="w-1 h-12 bg-indigo-600 rounded-full mr-4 opacity-80 shadow-sm" />
                                 <View>
-                                    <Text className="text-4xl font-black text-slate-800 tracking-tighter">
+                                   <Text className="text-3xl font-black text-slate-800 tracking-tighter">
                                         {adminDisplayName}
                                     </Text>
-                                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[3px] mt-1">
+                                   <Text className="text-slate-500 font-bold text-xs uppercase tracking-[3px] mt-1">
                                         ADMIN REALM
                                     </Text>
                                 </View>
@@ -307,11 +307,18 @@ export default function AdminRealm({ onBack }) {
 const ActionBtn = ({ label, icon, onPress, color, textColor = "text-white" }) => (
     <TouchableOpacity 
         onPress={onPress} 
-        activeOpacity={0.8}
-        className={`${color} flex-row items-center justify-center px-4 py-4 rounded-2xl active:scale-95 shadow-sm w-[48.5%] md:w-auto md:px-6 md:py-3.5`}
+        activeOpacity={0.7}
+        // h-[40px] gives you the exact "Admin" button height from the web
+        // rounded-xl (12px) matches the modern Next.js look
+        className={`${color} h-[40px] flex-row items-center justify-center px-4 rounded-xl active:scale-95 shadow-sm w-[48.5%] md:w-auto md:px-5`}
     >
         {icon && <View className="mr-2">{icon}</View>}
-        <Text className={`${textColor} font-black text-[11px] md:text-[12px] tracking-tight`}>
+        
+        <Text 
+            // Using a fixed line-height ensures the text doesn't 
+            // shift up or down based on the font family
+            className={`${textColor} font-medium text-[14px] leading-[20px] tracking-tight`}
+        >
             {label}
         </Text>
     </TouchableOpacity>
@@ -319,24 +326,46 @@ const ActionBtn = ({ label, icon, onPress, color, textColor = "text-white" }) =>
 
 const DashboardCard = ({ title, value, subtext, linkText, color, icon: IconComponent, iconColor, onPress }) => (
     <TouchableOpacity 
-        onPress={onPress} 
-        activeOpacity={0.9} 
-        className="flex-1 bg-white p-7 rounded-[30px] border border-slate-100 shadow-sm min-w-[280px]"
-    >
-        <View className="flex-row justify-between items-start mb-4">
-            <Text className="text-slate-500 font-bold text-xs tracking-widest uppercase">{title}</Text>
-            {IconComponent && <IconComponent size={24} color={iconColor} />}
+    onPress={onPress} 
+    activeOpacity={0.9} 
+    className="flex-1 bg-white border border-slate-100 rounded-2xl p-6 min-w-[280px]"
+    style={{
+        // iOS Shadow (The deep spread in your screenshot)
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        
+        // Android Shadow (The "lift")
+        elevation: 10,
+    }}
+>
+        {/* HTML: <div class="flex justify-between items-start"> */}
+        <View className="flex-row justify-between items-start">
+            {/* HTML: <h4 class="font-bold pr-4 text-gray-600"> */}
+            <Text className="font-bold text-gray-600 flex-1 pr-4">{title}</Text>
+            
+            {/* HTML: <div class="flex-shrink-0 text-emerald-600"> */}
+            <View className="flex-shrink-0">
+                {IconComponent && <IconComponent size={32} color={iconColor} />}
+            </View>
         </View>
 
-        <Text className={`text-4xl font-black tracking-tighter ${color} mb-1`}>
-            {value}
-        </Text>
-        
-        <Text className="text-slate-400 text-[11px] font-medium mb-6">
-            {subtext}
-        </Text>
+        {/* HTML: <div class="flex-grow"> */}
+        <View className="flex-1">
+            {/* HTML: <p class="text-4xl font-bold mt-2 text-emerald-600"> */}
+            <Text className={`text-4xl font-bold mt-2 ${color}`}>
+                {value}
+            </Text>
+            
+            {/* HTML: <p class="text-xs mt-1 font-bold text-slate-400"> */}
+            <Text className="text-xs mt-1 font-bold text-slate-400">
+                {subtext}
+            </Text>
+        </View>
 
-        <Text className="text-indigo-500 font-bold text-xs">
+        {/* HTML: <span class="text-indigo-600 text-sm mt-3 inline-block"> */}
+        <Text className="text-indigo-600 text-sm mt-3 font-medium">
             {linkText}
         </Text>
     </TouchableOpacity>

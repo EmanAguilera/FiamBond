@@ -79,7 +79,7 @@ export default function RealmPage() {
           )}
 
           {params.view === 'admin' && (
-            <AdminRealm user={user} params={params} router={router} />
+            <AdminRealm user={user} params={params} router={router} onBack={() => router.replace('/realm')} />
           )}
 
         </View>

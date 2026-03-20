@@ -11,7 +11,6 @@ import {
   Dimensions,
   TouchableWithoutFeedback
 } from 'react-native';
-import { X } from 'lucide-react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -22,6 +21,7 @@ export default function Modal({ isOpen, onClose, title, children }) {
       transparent={true}
       animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent={true}
     >
       <TouchableOpacity 
         style={styles.overlay} 
@@ -29,30 +29,46 @@ export default function Modal({ isOpen, onClose, title, children }) {
         onPress={onClose}
       >
         <TouchableWithoutFeedback>
+            {/* 
+               Wrapper: matches "bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+               Note: rounded-lg in Tailwind is roughly 8px 
+            */}
             <View 
-              className="bg-white rounded-3xl shadow-2xl w-[90%] max-w-2xl overflow-hidden"
-              style={{ maxHeight: SCREEN_HEIGHT * 0.8 }}
+              className="bg-white rounded-lg shadow-2xl w-[92%] max-w-2xl overflow-hidden flex-col"
+              style={{ maxHeight: SCREEN_HEIGHT * 0.9 }}
             >
-              {/* Modal Header */}
-              <View className="flex-row justify-between items-center p-5 border-b border-gray-100">
-                <Text className="text-xl font-black text-slate-800 tracking-tight">
+              
+              {/* 
+                 Modal Header: matches "flex justify-between items-center p-4 border-b border-gray-200"
+              */}
+              <View className="flex-row justify-between items-center p-4 border-b border-gray-200">
+                <Text className="text-xl font-bold text-gray-800">
                   {title}
                 </Text>
+                
+                {/* 
+                   Close Button: matches "text-gray-400 hover:text-gray-600 text-2xl font-bold px-2"
+                */}
                 <TouchableOpacity 
                   onPress={onClose} 
-                  className="p-1 bg-slate-50 rounded-full"
+                  activeOpacity={0.6}
+                  className="px-2"
                 >
-                  <X size={24} color="#94a3b8" />
+                  <Text className="text-gray-400 text-2xl font-bold">×</Text>
                 </TouchableOpacity>
               </View>
               
-              {/* Modal Body */}
+              {/* 
+                 Modal Body: matches "p-6 overflow-y-auto text-gray-700"
+              */}
               <ScrollView 
                 className="p-6" 
                 showsVerticalScrollIndicator={true}
-                contentContainerStyle={{ paddingBottom: 20 }}
+                indicatorStyle="black"
               >
-                {children}
+                <View className="text-gray-700">
+                    {children}
+                </View>
               </ScrollView>
             </View>
         </TouchableWithoutFeedback>
@@ -64,8 +80,9 @@ export default function Modal({ isOpen, onClose, title, children }) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
+    // Slightly darker backdrop to emphasize the shadow-2xl of the modal
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center', // Centers the modal vertically
-    alignItems: 'center',     // Centers the modal horizontally
+    justifyContent: 'center', 
+    alignItems: 'center',    
   },
 });

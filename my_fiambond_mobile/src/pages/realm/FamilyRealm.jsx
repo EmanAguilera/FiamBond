@@ -11,7 +11,6 @@ import {
     useWindowDimensions
 } from "react-native";
 import { 
-    Shield, 
     Plus, 
     Users, 
     ArrowLeft, 
@@ -52,7 +51,7 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
     const [familyMembers, setFamilyMembers] = useState([]);
     const [membersLoading, setMembersLoading] = useState(false);
 
-    // Modal State - Replicating UserRealm pattern
+    // Modal State
     const [modals, setModals] = useState({
         transactions: false, 
         goals: false, 
@@ -65,7 +64,7 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
 
     const toggleModal = (key, val) => setModals(prev => ({ ...prev, [key]: val }));
 
-    // Data Hook - Scoped to Family
+    // Data Hook
     const {
         summaryData = { netPosition: 0 },
         activeGoalsCount = 0,
@@ -78,7 +77,6 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
 
     useEffect(() => { setMounted(true); }, []);
 
-    // Fetch Members (logic from web version)
     const getFamilyMembers = useCallback(async () => {
         if (!family?.member_ids?.length) return;
         setMembersLoading(true);
@@ -116,40 +114,39 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
         <RouteGuard require="premium">
             <SafeAreaView className="flex-1 bg-slate-50">
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-                    <View className="w-full px-6 md:px-10 pt-6">
+                    <View className="w-full px-6 md:px-10 pt-16">
                         
-                        {/* --- BACK NAVIGATION --- */}
+                        {/* --- BACK NAVIGATION (1:1 NEXT.JS REPLICATION) --- */}
                         <TouchableOpacity 
                             onPress={onBack}
-                            className="flex-row items-center mb-6 bg-white self-start px-3 py-2 rounded-xl border border-slate-200 shadow-sm"
+                            activeOpacity={0.7}
+                            className="flex-row items-center px-3 py-1.5 rounded-lg bg-white border border-slate-200 mb-6 self-start shadow-sm active:scale-95"
                         >
-                            <ArrowLeft size={16} color="#475569" />
-                            <Text className="ml-2 text-slate-600 font-bold text-xs">Back to Personal</Text>
+                            <ArrowLeft size={16} color="#64748b" strokeWidth={2} />
+                            <Text className="ml-2 text-slate-500 text-sm font-medium">Back to Personal</Text>
                         </TouchableOpacity>
 
-                        {/* --- HEADER (Matches UserRealm Face) --- */}
+                        {/* --- HEADER --- */}
                         <View className="flex-col md:flex-row md:justify-between md:items-end mb-10 gap-y-8">
-                            
-                            {/* Left Side: Title */}
                             <View className="flex-row items-center">
-                                <View className="w-1.5 h-12 bg-indigo-600 rounded-full mr-4 opacity-80 shadow-sm" />
+                                <View className="w-1 h-12 bg-indigo-600 rounded-full mr-4 opacity-80 shadow-sm" />
                                 <View>
-                                    <Text className="text-4xl font-black text-slate-800 tracking-tighter">
+                                    <Text className="text-3xl font-black text-slate-800 tracking-tighter">
                                         {family.family_name}
                                     </Text>
-                                    <Text className="text-slate-400 font-bold text-[10px] uppercase tracking-[3px] mt-1">
+                                    <Text className="text-slate-500 font-bold text-xs uppercase tracking-[3px] mt-1">
                                         FAMILY REALM
                                     </Text>
                                 </View>
                             </View>
 
-                            {/* Right Side: Action Buttons Grid (Matches UserRealm 2x2 on Mobile) */}
+                            {/* Action Buttons Grid */}
                             <View className="w-full md:w-auto">
-                                <View className="flex-row flex-wrap justify-between md:justify-end items-center gap-y-3 md:gap-x-3">
+                                <View className="flex-row flex-wrap justify-between md:justify-end items-center gap-y-2 md:gap-x-3">
                                     <ActionBtn 
                                         label="Transaction" 
                                         icon={<Plus size={16} color="white" />} 
-                                        color="bg-indigo-600" 
+                                        color="bg-indigo-600 border border-transparent" 
                                         onPress={() => toggleModal('createTx', true)} 
                                     />
                                     <ActionBtn 
@@ -167,7 +164,6 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                                         onPress={() => toggleModal('createLoan', true)} 
                                     />
 
-                                    {/* Vertical Divider (Desktop Only) */}
                                     {!isMobile && <View className="w-[1px] h-10 bg-slate-200 mx-1" />}
 
                                     <ActionBtn 
@@ -181,8 +177,8 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                             </View>
                         </View>
 
-                        {/* --- DASHBOARD CARDS (Matches UserRealm Face) --- */}
-                        <View className="flex-col md:flex-row gap-6 mb-10">
+                        {/* --- DASHBOARD CARDS (WITH SHADOW LOGIC) --- */}
+                        <View className="flex-col md:flex-row md:flex-wrap justify-between gap-4 mb-8">
                             <DashboardCard
                                 title="Family Funds"
                                 value={`₱${(summaryData?.netPosition || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
@@ -228,7 +224,7 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                     </View>
                 </ScrollView>
 
-                {/* MODALS (Lazy Loaded - Matches UserRealm structure) */}
+                {/* MODALS */}
                 <Suspense fallback={null}>
                     {modals.transactions && (
                         <Modal isOpen={modals.transactions} onClose={() => toggleModal('transactions', false)} title="Family History">
@@ -257,23 +253,12 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                     )}
                     {modals.createLoan && (
                         <Modal isOpen={modals.createLoan} onClose={() => toggleModal('createLoan', false)} title="Record Family Loan">
-                            <CreateUnifiedLoanWidget 
-                                mode="family" 
-                                family={family} 
-                                members={familyMembers} 
-                                onSuccess={() => { toggleModal('createLoan', false); handleRealmRefresh(); }} 
-                            />
+                            <CreateUnifiedLoanWidget mode="family" family={family} members={familyMembers} onSuccess={() => { toggleModal('createLoan', false); handleRealmRefresh(); }} />
                         </Modal>
                     )}
                     {modals.members && (
                         <Modal isOpen={modals.members} onClose={() => toggleModal('members', false)} title="Family Access Control">
-                            <UnifiedManagerWidget 
-                                type="family" 
-                                mode="members" 
-                                realmData={family} 
-                                members={familyMembers} 
-                                onUpdate={handleMembersUpdate} 
-                            />
+                            <UnifiedManagerWidget type="family" mode="members" realmData={family} members={familyMembers} onUpdate={handleMembersUpdate} />
                         </Modal>
                     )}
                 </Suspense>
@@ -282,16 +267,16 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
     );
 }
 
-// --- SUB-COMPONENTS (Exact Replicas from UserRealm for UI Consistency) ---
+// --- SUB-COMPONENTS (1:1 with UserRealm) ---
 
 const ActionBtn = ({ label, icon, onPress, color, textColor = "text-white" }) => (
     <TouchableOpacity 
         onPress={onPress} 
-        activeOpacity={0.8}
-        className={`${color} flex-row items-center justify-center px-4 py-4 rounded-2xl active:scale-95 shadow-sm w-[48.5%] md:w-auto md:px-6 md:py-3.5`}
+        activeOpacity={0.7}
+        className={`${color} h-[40px] flex-row items-center justify-center px-4 rounded-xl active:scale-95 shadow-sm w-[48.5%] md:w-auto md:px-5`}
     >
         {icon && <View className="mr-2">{icon}</View>}
-        <Text className={`${textColor} font-black text-[11px] md:text-[12px] tracking-tight`}>
+        <Text className={`${textColor} font-medium text-[14px] leading-[20px] tracking-tight`}>
             {label}
         </Text>
     </TouchableOpacity>
@@ -301,22 +286,32 @@ const DashboardCard = ({ title, value, subtext, linkText, color, icon: IconCompo
     <TouchableOpacity 
         onPress={onPress} 
         activeOpacity={0.9} 
-        className="flex-1 bg-white p-7 rounded-[30px] border border-slate-100 shadow-sm min-w-[280px]"
+        className="flex-1 bg-white border border-slate-100 rounded-2xl p-6 min-w-[280px]"
+        style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 5 },
+            shadowOpacity: 0.1,
+            shadowRadius: 20,
+            elevation: 10,
+        }}
     >
-        <View className="flex-row justify-between items-start mb-4">
-            <Text className="text-slate-500 font-bold text-xs tracking-widest uppercase">{title}</Text>
-            {IconComponent && <IconComponent size={24} color={iconColor} />}
+        <View className="flex-row justify-between items-start">
+            <Text className="font-bold text-gray-600 flex-1 pr-4">{title}</Text>
+            <View className="flex-shrink-0">
+                {IconComponent && <IconComponent size={32} color={iconColor} />}
+            </View>
         </View>
 
-        <Text className={`text-4xl font-black tracking-tighter ${color} mb-1`}>
-            {value}
-        </Text>
-        
-        <Text className="text-slate-400 text-[11px] font-medium mb-6">
-            {subtext}
-        </Text>
+        <View className="flex-1">
+            <Text className={`text-4xl font-bold mt-2 ${color}`}>
+                {value}
+            </Text>
+            <Text className="text-xs mt-1 font-bold text-slate-400">
+                {subtext}
+            </Text>
+        </View>
 
-        <Text className="text-indigo-500 font-bold text-xs">
+        <Text className="text-indigo-600 text-sm mt-3 font-medium">
             {linkText}
         </Text>
     </TouchableOpacity>

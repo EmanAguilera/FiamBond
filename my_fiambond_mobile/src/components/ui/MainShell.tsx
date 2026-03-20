@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useContext, useState, useMemo } from "react";
 import { 
@@ -9,7 +9,8 @@ import {
   ScrollView, 
   SafeAreaView, 
   Dimensions,
-  Platform
+  Pressable,
+  StyleSheet
 } from "react-native";
 import { useRouter } from "expo-router";
 import { AppContext } from "../../context/AppContext";
@@ -18,229 +19,176 @@ import {
   Settings as CogIcon, 
   Menu, 
   X, 
-  Clock, 
-  BadgeCheck 
+  ChevronDown 
 } from "lucide-react-native";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const HEADER_HEIGHT = 80;
-
-const formatExpirationDate = (grantedAt: any, planCycle: string | null) => {
-  if (!grantedAt) return 'N/A';
-  const startDate = grantedAt.seconds ? new Date(grantedAt.seconds * 1000) : new Date(grantedAt);
-  if (isNaN(startDate.getTime())) return 'Invalid date';
-  
-  const endDate = new Date(startDate);
-  if (planCycle === 'yearly') {
-    endDate.setFullYear(endDate.getFullYear() + 1);
-  } else {
-    endDate.setMonth(endDate.getMonth() + 1);
-  }
-  return endDate.toLocaleDateString();
-};
-
-export const AppFooter = () => {
-  const router = useRouter();
-  return (
-    <View className="bg-white py-12 border-t border-slate-100 px-6 items-center w-full">
-      <Image 
-        source={require("../../../assets/images/FiamBond_Logo.png")} 
-        style={{ width: 60, height: 60, marginBottom: 16 }}
-        resizeMode="contain" 
-      />
-      <View className="flex-row items-center gap-2 mb-8">
-        <Text className="text-xl font-black text-indigo-600 tracking-tighter">FiamBond</Text>
-      </View>
-      <View className="flex-row gap-8 mb-8">
-        <TouchableOpacity onPress={() => router.push("/about-us")}>
-          <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">About Us</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/privacy")}>
-          <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">Privacy</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push("/terms")}>
-          <Text className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">Terms</Text>
-        </TouchableOpacity>
-      </View>
-      <Text className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">
-        &copy; {new Date().getFullYear()} FiamBond Realm.
-      </Text>
-    </View>
-  );
-};
+const HEADER_HEIGHT = 70;
 
 const AdminBadge = () => (
   <View className="bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full ml-2">
-    <Text className="text-[9px] font-black text-purple-700 uppercase tracking-widest">Admin</Text>
+    <Text className="text-[10px] font-extrabold text-purple-700 uppercase tracking-wider">Admin</Text>
   </View>
 );
 
 export default function MainShell({ children }: { children: React.ReactNode }) {
   const { user, handleLogout }: any = useContext(AppContext);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopDropdownOpen, setIsDesktopDropdownOpen] = useState(false);
   const router = useRouter();
 
-  // 1. IMPROVED ADMIN CHECK: ensures we catch 'admin' even if metadata is slow
   const isAdmin = user?.role?.toLowerCase() === 'admin';
 
-  // 2. NAME RESOLUTION: prevents "undefined undefined"
   const displayName = useMemo(() => {
-    if (!user) return "Guest User";
-    if (user.full_name) return user.full_name;
-    if (user.first_name || user.last_name) {
-        return `${user.first_name || ''} ${user.last_name || ''}`.trim();
-    }
-    return user.email?.split('@')[0] || "User"; // Fallback to email name if profile not loaded
-  }, [user]);
-
-  const currentPremiumDetails = useMemo(() => {
-    if (!user) return null;
-    const details: any = {};
-    if (user.is_premium) details.company = { granted_at: user.premium_granted_at, plan_cycle: user.premium_plan_cycle || 'monthly' };
-    if (user.is_family_premium) details.family = { granted_at: user.family_premium_granted_at, plan_cycle: user.family_premium_plan_cycle || 'monthly' };
-    return Object.keys(details).length > 0 ? details : null;
+    if (!user) return "Guest";
+    return user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email?.split('@')[0] || "User";
   }, [user]);
 
   const navigateTo = (path: string) => {
     setIsMobileMenuOpen(false);
+    setIsDesktopDropdownOpen(false);
     router.push(path as any);
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
+    <SafeAreaView className="flex-1 bg-white">
       
+      {/* HEADER */}
       <View 
         style={{ height: HEADER_HEIGHT }}
-        className="bg-white border-b border-slate-200 px-4 flex-row items-center justify-between z-[60]"
+        className="bg-white border-b border-slate-100 px-4 flex-row items-center justify-between z-[60]"
       >
+        {/* LOGO SECTION */}
         <TouchableOpacity 
           onPress={() => navigateTo(user ? "/realm" : "/")} 
-          className="flex-row items-center gap-2"
+          className="flex-row items-center"
         >
           <Image 
             source={require("../../../assets/images/FiamBond_Logo.png")} 
-            style={{ width: 38, height: 38 }}
+            style={{ width: 34, height: 34 }}
             resizeMode="contain" 
           />
-          <View className="flex-row items-center">
-            <Text className="text-xl font-black text-indigo-600 tracking-tighter">FiamBond</Text>
+          <View className="flex-row items-center ml-3">
+            <Text className="text-xl font-bold text-indigo-600 tracking-tight">FiamBond</Text>
+            
+            {/* UPDATED: "Realm" is now hidden on mobile and only flex (visible) on md screens */}
             {user && (
-              <>
-                <View className="h-4 w-[1px] bg-slate-300 mx-2" />
-                <Text className="text-slate-500 font-bold">Realm</Text>
-              </>
+              <View className="hidden md:flex flex-row items-center">
+                <View className="h-5 w-[1px] bg-gray-300 mx-3" />
+                <Text className="text-lg text-gray-500 font-medium">Realm</Text>
+              </View>
             )}
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          onPress={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 bg-slate-50 rounded-xl border border-slate-100"
-        >
-          {isMobileMenuOpen ? <X size={24} color="#64748b" /> : <Menu size={24} color="#64748b" />}
-        </TouchableOpacity>
+        {/* RIGHT SIDE */}
+        <View className="flex-row items-center">
+          {user ? (
+            <>
+              {/* DESKTOP PROFILE TRIGGER */}
+              <View className="hidden md:flex">
+                <TouchableOpacity 
+                  onPress={() => setIsDesktopDropdownOpen(!isDesktopDropdownOpen)}
+                  className="flex-row items-center gap-3 p-1 rounded-lg"
+                >
+                  <View className="items-end mr-1">
+                    <View className="flex-row items-center justify-end">
+                      <p className="text-sm font-bold text-gray-800 capitalize tracking-wide">{displayName}</p>
+                      {isAdmin && <AdminBadge />}
+                    </View>
+                  </View>
+                  <View className="h-9 w-9 bg-indigo-100 rounded-full flex items-center justify-center border border-indigo-200 shadow-sm">
+                    <Text className="text-indigo-700 font-bold">{displayName.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <ChevronDown size={14} color="#9ca3af" />
+                </TouchableOpacity>
+              </View>
+
+              {/* MOBILE HAMBURGER */}
+              <TouchableOpacity 
+                onPress={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="md:hidden p-2 bg-gray-50 rounded-lg border border-gray-100"
+              >
+                {isMobileMenuOpen ? <X size={22} color="#475569" /> : <Menu size={22} color="#475569" />}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity onPress={() => navigateTo("/login")} className="bg-indigo-600 px-4 py-2 rounded-lg">
+              <Text className="text-white font-bold">Log In</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
+      {/* DESKTOP DROPDOWN */}
+      {isDesktopDropdownOpen && (
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsDesktopDropdownOpen(false)} />
+          <View 
+            style={{ top: HEADER_HEIGHT - 5, right: 16 }}
+            className="absolute w-56 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-[100]"
+          >
+            <TouchableOpacity onPress={() => navigateTo("/settings")} className="flex-row items-center px-4 py-2">
+              <CogIcon size={16} color="#374151" className="mr-2" />
+              <Text className="text-sm text-gray-700 font-medium">Settings</Text>
+            </TouchableOpacity>
+            <View className="border-t border-gray-100 my-1" />
+            <TouchableOpacity onPress={() => { setIsDesktopDropdownOpen(false); handleLogout(); }} className="flex-row items-center px-4 py-2">
+              <LogOut size={16} color="#ef4444" className="mr-2" />
+              <Text className="text-sm text-red-600 font-medium">Sign Out</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {/* MOBILE MENU OVERLAY */}
+      {isMobileMenuOpen && (
+        <View className="md:hidden border-t border-gray-200 bg-white shadow-lg absolute left-0 right-0 z-[100]" style={{ top: HEADER_HEIGHT }}>
+          <View className="px-4 py-6 space-y-6">
+            <View className="flex-row items-center gap-4 p-4 bg-gray-50 rounded-xl">
+              <View className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                <Text className="text-indigo-700 font-bold">{displayName.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View>
+                <View className="flex-row items-center">
+                  <Text className="font-bold text-gray-900">{displayName}</Text>
+                  {isAdmin && <AdminBadge />}
+                </View>
+                <Text className="text-xs text-gray-500">{user?.email}</Text>
+              </View>
+            </View>
+
+            <nav className="flex flex-col gap-2">
+              <TouchableOpacity 
+                onPress={() => navigateTo("/settings")}
+                className="flex-row items-center gap-3 p-3 rounded-lg"
+              >
+                <CogIcon size={20} color="#374151" />
+                <Text className="font-medium text-gray-700">Settings</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => { setIsMobileMenuOpen(false); handleLogout(); }}
+                className="flex-row items-center gap-3 p-3 rounded-lg"
+              >
+                <LogOut size={20} color="#ef4444" />
+                <Text className="font-medium text-red-600">Sign Out</Text>
+              </TouchableOpacity>
+            </nav>
+          </View>
+        </View>
+      )}
+
+      {/* CONTENT */}
       <ScrollView 
-        className="flex-1"
+        className="flex-1 bg-slate-50"
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
         <View style={{ minHeight: SCREEN_HEIGHT - HEADER_HEIGHT }}>
           {children}
         </View>
-        <AppFooter />
       </ScrollView>
-
-      {isMobileMenuOpen && (
-        <View 
-          className="absolute left-0 right-0 bottom-0 bg-white z-[100] p-6"
-          style={{ top: HEADER_HEIGHT }}
-        >
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {user ? (
-              <View className="gap-y-6">
-                 <View className="flex-row items-center gap-4 p-5 bg-slate-50 rounded-[32px] border border-slate-100">
-                    <View className="h-14 w-14 bg-indigo-600 rounded-full items-center justify-center">
-                      <Text className="text-white font-black text-xl">
-                        {displayName[0].toUpperCase()}
-                      </Text>
-                    </View>
-                    <View className="flex-1">
-                      <View className="flex-row items-center">
-                        <Text className="text-lg font-black text-slate-900" numberOfLines={1}>
-                            {displayName}
-                        </Text>
-                        {isAdmin && <AdminBadge />}
-                      </View>
-                      <Text className="text-slate-500 text-xs font-medium" numberOfLines={1}>{user.email}</Text>
-                    </View>
-                 </View>
-
-                 <View className="gap-y-3">
-                    <Text className="text-[10px] font-black text-slate-400 uppercase tracking-[2px] ml-1">Subscribed Plans</Text>
-                    
-                    {isAdmin ? (
-                      <View className="bg-slate-900 p-4 rounded-2xl flex-row justify-between items-center">
-                        <Text className="text-white font-bold text-sm">Root Administrator</Text>
-                        <BadgeCheck size={16} color="#10b981" />
-                      </View>
-                    ) : (
-                      <>
-                        {currentPremiumDetails?.company && (
-                          <View className="bg-emerald-500 p-4 rounded-2xl flex-row justify-between items-center">
-                            <Text className="text-white font-bold text-sm">Company Plan</Text>
-                            <Text className="text-white text-[9px] font-black">
-                                Ends: {formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}
-                            </Text>
-                          </View>
-                        )}
-                        {currentPremiumDetails?.family && (
-                          <View className="bg-blue-500 p-4 rounded-2xl flex-row justify-between items-center">
-                            <Text className="text-white font-bold text-sm">Family Plan</Text>
-                            <Text className="text-white text-[9px] font-black">
-                                Ends: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}
-                            </Text>
-                          </View>
-                        )}
-                        {!currentPremiumDetails && (
-                           <View className="bg-white p-4 rounded-2xl flex-row justify-between items-center border border-slate-200">
-                              <Text className="text-slate-600 font-bold text-sm">Free Tier User</Text>
-                              <Clock size={16} color="#94a3b8" />
-                           </View>
-                        )}
-                      </>
-                    )}
-                 </View>
-
-                 <View className="h-[1px] bg-slate-100 w-full my-2" />
-
-                 <TouchableOpacity onPress={() => navigateTo("/settings")} className="flex-row items-center p-3 bg-slate-50 rounded-2xl">
-                   <CogIcon size={22} color="#64748b" />
-                   <Text className="ml-4 text-slate-700 font-bold text-base">Account Settings</Text>
-                 </TouchableOpacity>
-
-                 <TouchableOpacity 
-                    onPress={() => { setIsMobileMenuOpen(false); handleLogout(); }} 
-                    className="flex-row items-center p-3 bg-red-50 rounded-2xl"
-                 >
-                   <LogOut size={22} color="#ef4444" />
-                   <Text className="ml-4 text-red-600 font-bold text-base">Sign Out</Text>
-                 </TouchableOpacity>
-              </View>
-            ) : (
-              <View className="gap-y-4 pt-4">
-                 <TouchableOpacity onPress={() => navigateTo("/login")} className="w-full bg-slate-100 p-5 rounded-[24px] items-center border border-slate-200">
-                   <Text className="text-slate-900 font-black text-base">Log In</Text>
-                 </TouchableOpacity>
-                 <TouchableOpacity onPress={() => navigateTo("/register")} className="w-full bg-indigo-600 p-5 rounded-[24px] items-center">
-                   <Text className="text-white font-black text-base">Get Started</Text>
-                 </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      )}
 
     </SafeAreaView>
   );

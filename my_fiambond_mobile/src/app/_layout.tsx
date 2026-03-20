@@ -14,7 +14,7 @@ export default function RootLayout() {
   return (
     <AppProvider>
       <Head>
-        <title>FiamBond | The Ledger of Truth</title>
+        <title>FiamBond | Unified Financial Realm</title>
         <meta name="description" content="Secure financial tracking for individuals, families, and companies." />
       </Head>
       

@@ -8,22 +8,22 @@ import { ArrowUp, ArrowDown, Scale } from 'lucide-react-native';
 // 🏎️ Import your unified loader
 import UnifiedLoadingWidget from '../../components/ui/UnifiedLoadingWidget';
 
-// --- REUSABLE STAT CARD (MATCHES NEXT.JS FACE VALUE) ---
-const StatCard = ({ label, value, colorClass, icon: Icon, iconColor, textColor }) => (
-    <View className={`p-4 rounded-xl border flex-row items-center md:flex-1 ${colorClass}`}>
-        <View className="p-2 rounded-lg bg-white/50">
-            <Icon size={20} color={iconColor} />
+// --- STAT CARD (1:1 NEXT.JS REPLICATION) ---
+const StatCard = ({ label, value, colorClass, borderColor, icon: Icon, iconColor, textColor }) => (
+    <View className={`p-4 rounded-lg border flex-row items-center flex-none md:flex-1 ${colorClass} ${borderColor}`}>
+        <View className="p-2 rounded-lg opacity-80">
+            <Icon size={20} color={iconColor} strokeWidth={2.5} />
         </View>
         <View className="ml-3">
-            <Text className={`text-[10px] font-bold opacity-70 uppercase tracking-wider ${textColor}`}>{label}</Text>
-            <Text className={`text-xl font-black ${textColor}`}>
+            <Text className={`text-sm font-semibold opacity-70 ${textColor}`}>{label}</Text>
+            <Text className={`text-xl font-bold ${textColor}`}>
                 ₱{parseFloat(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </Text>
         </View>
     </View>
 );
 
-// --- DYNAMIC ANALYST SUMMARY (RESTORED FULL LOGIC) ---
+// --- DYNAMIC ANALYST SUMMARY ---
 const UnifiedAnalysis = ({ report, realm }) => {
     const { totalInflow, netPosition, transactionCount } = report;
     const netFormatted = `₱${Math.abs(netPosition || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -85,27 +85,23 @@ const ChartLegend = () => (
 // --- MAIN WIDGET ---
 function UnifiedReportChartWidget({ report, realm, period, setPeriod }) {
     
-    // ⭐️ DATA CONVERSION: Grouping Inflow and Outflow side-by-side
     const groupedData = useMemo(() => {
         if (!report?.chartData?.labels) return [];
-        
         const data = [];
         const labels = report.chartData.labels;
         const inflowData = report.chartData.datasets[0]?.data || [];
         const outflowData = report.chartData.datasets[1]?.data || [];
 
         labels.forEach((label, index) => {
-            // Pair 1: Inflow (Teal)
             data.push({
                 value: inflowData[index] || 0,
-                label: label.substring(0, 5), // Short date (MM/DD)
+                label: label.substring(0, 5), 
                 spacing: 2,
-                frontColor: '#99f6e4', // Teal-200
+                frontColor: '#99f6e4', 
             });
-            // Pair 2: Outflow (Pink)
             data.push({
                 value: outflowData[index] || 0,
-                frontColor: '#fecdd3', // Rose-200
+                frontColor: '#fecdd3', 
             });
         });
         return data;
@@ -128,55 +124,66 @@ function UnifiedReportChartWidget({ report, realm, period, setPeriod }) {
 
     return (
         <View className="mb-10">
-            {/* Period Selector */}
+            {/* 
+               --- PERIOD SELECTOR (REPLICATED 1:1 FROM HTML) ---
+               bg-slate-100, border-slate-200, rounded-xl, self-center (for mx-auto)
+            */}
             {setPeriod && (
-                <View className="flex-row self-center bg-slate-100 p-1 rounded-xl mb-6">
-                    {['weekly', 'monthly', 'yearly'].map((p) => (
-                        <TouchableOpacity
-                            key={p}
-                            onPress={() => setPeriod(p)}
-                            className={`px-4 py-1.5 rounded-lg ${period === p ? 'bg-white shadow-sm' : ''}`}
-                        >
-                            <Text className={`text-xs font-bold capitalize ${period === p ? 'text-slate-800' : 'text-slate-400'}`}>
-                                {p}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                <View className="flex-row self-center bg-slate-100 p-1 rounded-xl mb-6 border border-slate-200 gap-x-2">
+                    {['weekly', 'monthly', 'yearly'].map((p) => {
+                        const isActive = period === p;
+                        return (
+                            <TouchableOpacity
+                                key={p}
+                                onPress={() => setPeriod(p)}
+                                activeOpacity={0.8}
+                                // Active: bg-white shadow-md text-indigo-600
+                                // Inactive: text-slate-500
+                                className={`px-4 py-1.5 rounded-lg ${isActive ? 'bg-white shadow-md' : ''}`}
+                            >
+                                <Text className={`text-sm capitalize font-bold ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}>
+                                    {p}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
             )}
 
-            {/* Dashboard Container (Visual Match to Next.js) */}
             <View className="bg-white rounded-[32px] p-5 shadow-sm border border-slate-100">
                 <View className="mb-6">
                     <Text className="text-xl font-bold text-slate-800 capitalize">{realm} Financial Overview</Text>
                     <Text className="text-xs text-slate-400">{report.reportTitle}</Text>
                 </View>
 
-                {/* Stat Cards Grid (Matching the Background Tints) */}
-                <View className="flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-2 mb-4">
+                {/* Stat Cards Grid (Responsive: 1 column on mobile, 3 columns on wide screens) */}
+                <View className="flex-col md:flex-row gap-3 mb-4">
                     <StatCard 
                         label={labels.inflow} 
                         value={report.totalInflow} 
                         icon={ArrowUp} 
                         iconColor="#059669" 
-                        colorClass="bg-emerald-50 border-emerald-100" 
-                        textColor="text-emerald-700"
+                        colorClass="bg-emerald-50" 
+                        borderColor="border-emerald-200"
+                        textColor="text-emerald-600"
                     />
                     <StatCard 
                         label={labels.outflow} 
                         value={report.totalOutflow} 
                         icon={ArrowDown} 
                         iconColor="#e11d48" 
-                        colorClass="bg-rose-50 border-rose-100" 
-                        textColor="text-rose-700"
+                        colorClass="bg-rose-50" 
+                        borderColor="border-rose-200"
+                        textColor="text-rose-600"
                     />
                     <StatCard 
                         label="Net Position" 
                         value={report.netPosition} 
                         icon={Scale} 
                         iconColor="#4f46e5" 
-                        colorClass="bg-indigo-50 border-indigo-100" 
-                        textColor="text-indigo-700"
+                        colorClass="bg-indigo-50" 
+                        borderColor="border-indigo-200"
+                        textColor="text-indigo-600"
                     />
                 </View>
 
@@ -205,7 +212,6 @@ function UnifiedReportChartWidget({ report, realm, period, setPeriod }) {
                     </View>
                 </View>
 
-                {/* Restored Analysis Summary */}
                 <UnifiedAnalysis report={report} realm={realm} />
             </View>
         </View>
