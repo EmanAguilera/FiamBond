@@ -182,18 +182,12 @@ export default function AdminRealm({ onBack }) {
                                 <View className="flex-row flex-wrap justify-between md:justify-end items-center gap-y-3 md:gap-x-3">
                                     <ActionBtn 
                                         label="Manage Team" 
-                                        icon={<Users size={16} color="white" />} 
+                                        icon={<Plus size={16} color="#ffffff" />} 
                                         color="bg-purple-600" 
                                         onPress={() => toggleModal('manageTeam', true)} 
                                     />
                                     {/* Placeholder for future admin quick actions to maintain 2x2 grid if needed */}
-                                    <ActionBtn 
-                                        label="System Log" 
-                                        icon={<Activity size={16} color="#475569" />} 
-                                        color="bg-white border border-slate-200" 
-                                        textColor="text-slate-600"
-                                        onPress={() => Alert.alert("Logs", "System activity is stable.")} 
-                                    />
+                                   
                                 </View>
                             </View>
                         </View>

@@ -70,7 +70,7 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
         if (!company) return "";
         const isGeneric = company.name?.toLowerCase() === 'company' || company.name?.toLowerCase() === 'my company';
         const userLastName = user?.full_name ? user.full_name.trim().split(' ').pop() : '';
-        return isGeneric && userLastName ? `${userLastName} Corporate` : (company.name || "Company");
+        return isGeneric && userLastName ? `${userLastName} ` : (company.name || "Company");
     }, [company, user]);
 
     // Data Hook - Scoped to Company
@@ -155,10 +155,11 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                         {/* --- BACK NAVIGATION --- */}
                         <TouchableOpacity 
                             onPress={onBack}
-                            className="flex-row items-center mb-6 bg-white self-start px-3 py-2 rounded-xl border border-slate-200 shadow-sm"
+                            activeOpacity={0.7}
+                            className="flex-row items-center px-3 py-1.5 rounded-lg bg-white border border-slate-200 mb-6 self-start shadow-sm active:scale-95"
                         >
                             <ArrowLeft size={16} color="#475569" />
-                            <Text className="ml-2 text-slate-600 font-bold text-xs">Back to Personal</Text>
+                             <Text className="ml-2 text-slate-500 text-sm font-medium">Back to Personal</Text>
                         </TouchableOpacity>
 
                         {/* --- HEADER (Matches UserRealm Face) --- */}
@@ -295,7 +296,7 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                     )}
 
                     {modals.payrollHistory && (
-                        <Modal isOpen={modals.payrollHistory} onClose={() => toggleModal('payrollHistory', false)} title="Payroll Ledger">
+                        <Modal isOpen={modals.payrollHistory} onClose={() => toggleModal('payrollHistory', false)} title="Disbursement & Payroll Reports">
                             <UnifiedCorporateLedgerWidget 
                                 transactions={transactions}
                                 config={companyPayrollConfig}

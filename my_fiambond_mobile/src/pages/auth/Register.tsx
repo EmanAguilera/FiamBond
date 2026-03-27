@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   View, 
   Text, 
@@ -11,7 +11,10 @@ import {
   Platform,
   ScrollView,
   Image,
-  Alert 
+  Alert,
+  useWindowDimensions,
+  Pressable,
+  Animated
 } from "react-native";
 import { useRouter } from "expo-router";
 import { auth, db } from "@/config/firebase-config";
@@ -23,6 +26,9 @@ import {
   signInWithPopup 
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+
+// --- UPDATED IMPORT ---
+import { GOOGLE_AUTH_CONFIG } from "@/config/apiConfig";
 
 // Custom components
 import UnifiedLoadingWidget from "@/components/ui/UnifiedLoadingWidget";
@@ -40,6 +46,8 @@ interface RegisterFormData {
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  
   const [formData, setFormData] = useState<RegisterFormData>({
     first_name: "", 
     last_name: "", 
@@ -47,17 +55,26 @@ export default function RegisterScreen() {
     password: "", 
     password_confirmation: "",
   });
+  
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
-  // --- CONFIG: Google Sign In ---
+  // Animations for buttons
+  const googleScale = useRef(new Animated.Value(1)).current;
+  const submitScale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = (anim: Animated.Value) => {
+    Animated.spring(anim, { toValue: 0.98, useNativeDriver: true }).start();
+  };
+  const handlePressOut = (anim: Animated.Value) => {
+    Animated.spring(anim, { toValue: 1, useNativeDriver: true }).start();
+  };
+
+  // --- CONFIG: Google Sign In (Updated to use apiconfig) ---
   useEffect(() => {
     if (Platform.OS !== 'web' && GoogleSignin) {
-      GoogleSignin.configure({
-        webClientId: "818608486797-pujgl59qscfvqpek8o4m6vebnb7cbfs2.apps.googleusercontent.com",
-        iosClientId: "818608486797-c2rrbocuvhu54jiiu3lnp28hn6hdlade.apps.googleusercontent.com",
-        offlineAccess: true,
-      });
+      GoogleSignin.configure(GOOGLE_AUTH_CONFIG);
     }
   }, []);
 
@@ -66,7 +83,6 @@ export default function RegisterScreen() {
     setGeneralError(null);
   };
 
-  // --- LOGIC: Sync User to Firestore ---
   const saveUserToFirestore = async (user: any, customData?: Partial<RegisterFormData>) => {
     const userDocRef = doc(db, "users", user.uid);
     const userDocSnap = await getDoc(userDocRef);
@@ -84,46 +100,30 @@ export default function RegisterScreen() {
     }
   };
 
-  // --- LOGIC: Email/Password Registration ---
   async function handleRegisterSubmit() {
     setGeneralError(null);
-    
     if (!formData.email || !formData.password || !formData.first_name || !formData.last_name) {
       setGeneralError("Please fill in all required fields.");
       return;
     }
-
     if (formData.password !== formData.password_confirmation) {
       setGeneralError("Passwords do not match.");
       return;
     }
 
     setIsSubmitting(true);
-
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = userCredential.user;
-
-      await saveUserToFirestore(user, formData);
-      
-      // Sign out after registration (matches Next.js flow)
+      await saveUserToFirestore(userCredential.user, formData);
       await signOut(auth);
-      
-      // Navigate to Login with success message
       router.push('/(auth)/login');
-
     } catch (error: any) {
-      if (error.code === 'auth/email-already-in-use') {
-        setGeneralError('This email is already registered.');
-      } else {
-        setGeneralError('Registration failed. Please try again.');
-      }
+      setGeneralError(error.code === 'auth/email-already-in-use' ? 'Email already registered.' : 'Registration failed.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  // --- LOGIC: Google Sign Up (Native & Web) ---
   const handleGoogleSignUp = async () => {
     setGeneralError(null);
     setIsSubmitting(true);
@@ -133,25 +133,30 @@ export default function RegisterScreen() {
         const result = await signInWithPopup(auth, provider);
         await saveUserToFirestore(result.user);
       } else {
-        if (!GoogleSignin) throw new Error("Google Sign-In is not available.");
         await GoogleSignin.hasPlayServices();
         const response = await GoogleSignin.signIn();
-        
         const idToken = response.data?.idToken || response.idToken;
-        if (!idToken) throw new Error("No ID Token found");
-
         const credential = GoogleAuthProvider.credential(idToken);
         const result = await signInWithCredential(auth, credential);
         await saveUserToFirestore(result.user);
       }
-      // Note: Google sign-up usually stays logged in, so navigation handles it via App listener
     } catch (error: any) {
-      console.error('Google registration error:', error);
       setGeneralError("Google sign-up failed.");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Helper for Input Styling to replicate focus:ring-2
+  const getInputStyle = (id: string) => ({
+    borderWidth: 1,
+    borderColor: focusedInput === id ? '#6366f1' : '#e5e7eb', // focus:ring-indigo-500
+    backgroundColor: focusedInput === id ? '#ffffff' : '#f9fafb',
+    elevation: focusedInput === id ? 2 : 0,
+    shadowColor: '#6366f1',
+    shadowOpacity: focusedInput === id ? 0.1 : 0,
+    shadowRadius: 4,
+  });
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
@@ -159,20 +164,20 @@ export default function RegisterScreen() {
         <UnifiedLoadingWidget type="fullscreen" message="Creating your account..." variant="indigo" />
       )}
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1"
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
         <ScrollView 
-          contentContainerStyle={{ flexGrow: 1 }} 
-          className="px-4 justify-center"
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }} 
+          className="px-4"
           showsVerticalScrollIndicator={false}
         >
-          
-          <View className="bg-white p-8 rounded-[40px] shadow-xl shadow-gray-200 border border-gray-100 my-10">
+          {/* Main Card Container (max-w-md = 448px) */}
+          <View 
+            style={{ width: '100%', maxWidth: 448 }}
+            className="bg-white p-8 sm:p-10 rounded-[32px] shadow-2xl shadow-gray-200 border border-gray-100"
+          >
             {/* Header */}
             <View className="mb-8 items-center">
-                <Text className="text-3xl font-black text-gray-900 tracking-tight text-center">
+                <Text className="text-3xl font-extrabold text-gray-900 tracking-tight text-center">
                   Create Account
                 </Text>
                 <Text className="text-gray-500 mt-2 font-medium">
@@ -181,20 +186,24 @@ export default function RegisterScreen() {
             </View>
 
             {/* Google Sign Up */}
-            <TouchableOpacity 
-              onPress={handleGoogleSignUp} 
-              disabled={isSubmitting}
-              className="flex-row items-center justify-center bg-white border border-gray-300 py-3.5 rounded-xl shadow-sm active:opacity-70"
-            > 
-              <Image 
-                source={{ uri: 'https://www.svgrepo.com/show/475656/google-color.svg' }} 
-                className="w-5 h-5 mr-3"
-              />
-              <Text className="font-bold text-gray-700 text-sm">Sign Up With Google</Text>
-            </TouchableOpacity>
+            <Animated.View style={{ transform: [{ scale: googleScale }] }}>
+              <Pressable 
+                onPressIn={() => handlePressIn(googleScale)}
+                onPressOut={() => handlePressOut(googleScale)}
+                onPress={handleGoogleSignUp} 
+                disabled={isSubmitting}
+                className="flex-row items-center justify-center bg-white border border-gray-300 py-3.5 rounded-xl shadow-sm"
+              > 
+                <Image 
+                  source={{ uri: 'https://www.svgrepo.com/show/475656/google-color.svg' }} 
+                  style={{ width: 20, height: 20, marginRight: 12 }}
+                />
+                <Text className="font-bold text-gray-700 text-sm">Sign Up With Google</Text>
+              </Pressable>
+            </Animated.View>
 
             {/* Separator */}
-            <View className="flex-row items-center py-6">
+            <View className="flex-row items-center py-8">
               <View className="flex-1 h-[1px] bg-gray-200" />
               <Text className="mx-4 text-[10px] font-bold text-gray-400 tracking-widest uppercase">
                 Or use email
@@ -205,22 +214,28 @@ export default function RegisterScreen() {
             {/* Form */}
             <View className="space-y-5">
               
-              {/* Name Row */}
-              <View className="flex-row space-x-3">
-                <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1.5 ml-1 text-sm">First Name</Text>
+              {/* Name Row (Grid replication) */}
+              <View className="flex-row" style={{ gap: 16 }}>
+                <View className="flex-1 space-y-1">
+                  <Text className="text-sm font-bold text-gray-700 ml-1">First Name</Text>
                   <TextInput 
-                    className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900 text-sm"
+                    onFocus={() => setFocusedInput('first')}
+                    onBlur={() => setFocusedInput(null)}
+                    style={[getInputStyle('first'), { padding: 14, borderRadius: 12 }]}
+                    className="text-gray-900 text-sm transition-all"
                     placeholder="John"
                     placeholderTextColor="#9ca3af"
                     value={formData.first_name}
                     onChangeText={(val) => handleInputChange('first_name', val)}
                   />
                 </View>
-                <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1.5 ml-1 text-sm">Last Name</Text>
+                <View className="flex-1 space-y-1">
+                  <Text className="text-sm font-bold text-gray-700 ml-1">Last Name</Text>
                   <TextInput 
-                    className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900 text-sm"
+                    onFocus={() => setFocusedInput('last')}
+                    onBlur={() => setFocusedInput(null)}
+                    style={[getInputStyle('last'), { padding: 14, borderRadius: 12 }]}
+                    className="text-gray-900 text-sm transition-all"
                     placeholder="Doe"
                     placeholderTextColor="#9ca3af"
                     value={formData.last_name}
@@ -230,10 +245,13 @@ export default function RegisterScreen() {
               </View>
 
               {/* Email */}
-              <View>
-                <Text className="text-gray-700 font-bold mb-1.5 ml-1 text-sm">Email address</Text>
+              <View className="space-y-1">
+                <Text className="text-sm font-bold text-gray-700 ml-1">Email address</Text>
                 <TextInput 
-                  className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900 text-sm"
+                  onFocus={() => setFocusedInput('email')}
+                  onBlur={() => setFocusedInput(null)}
+                  style={[getInputStyle('email'), { padding: 14, borderRadius: 12 }]}
+                  className="text-gray-900 text-sm transition-all"
                   placeholder="name@example.com"
                   placeholderTextColor="#9ca3af"
                   keyboardType="email-address"
@@ -244,10 +262,13 @@ export default function RegisterScreen() {
               </View>
 
               {/* Password */}
-              <View>
-                <Text className="text-gray-700 font-bold mb-1.5 ml-1 text-sm">Password</Text>
+              <View className="space-y-1">
+                <Text className="text-sm font-bold text-gray-700 ml-1">Password</Text>
                 <TextInput 
-                  className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900 text-sm"
+                  onFocus={() => setFocusedInput('pass')}
+                  onBlur={() => setFocusedInput(null)}
+                  style={[getInputStyle('pass'), { padding: 14, borderRadius: 12 }]}
+                  className="text-gray-900 text-sm transition-all"
                   placeholder="••••••••"
                   placeholderTextColor="#9ca3af"
                   secureTextEntry
@@ -257,10 +278,13 @@ export default function RegisterScreen() {
               </View>
 
               {/* Confirm Password */}
-              <View>
-                <Text className="text-gray-700 font-bold mb-1.5 ml-1 text-sm">Confirm Password</Text>
+              <View className="space-y-1">
+                <Text className="text-sm font-bold text-gray-700 ml-1">Confirm Password</Text>
                 <TextInput 
-                  className="bg-gray-50 border border-gray-200 p-4 rounded-xl text-gray-900 text-sm"
+                  onFocus={() => setFocusedInput('confirm')}
+                  onBlur={() => setFocusedInput(null)}
+                  style={[getInputStyle('confirm'), { padding: 14, borderRadius: 12 }]}
+                  className="text-gray-900 text-sm transition-all"
                   placeholder="••••••••"
                   placeholderTextColor="#9ca3af"
                   secureTextEntry
@@ -269,9 +293,9 @@ export default function RegisterScreen() {
                 />
               </View>
               
-              {/* Error Box */}
+              {/* Error Message */}
               {generalError && (
-                <View className="bg-red-50 border border-red-100 p-3 rounded-lg mt-2">
+                <View className="bg-red-50 border border-red-100 p-3 rounded-xl mt-2">
                   <Text className="text-red-600 text-center font-bold text-xs">
                     {generalError}
                   </Text>
@@ -279,18 +303,21 @@ export default function RegisterScreen() {
               )}
 
               {/* Submit Button */}
-              <TouchableOpacity 
-                onPress={handleRegisterSubmit}
-                disabled={isSubmitting}
-                activeOpacity={0.8}
-                className={`bg-indigo-600 py-4 rounded-xl items-center mt-4 shadow-lg shadow-indigo-200 ${isSubmitting ? 'opacity-70' : ''}`}
-              >
-                <Text className="text-white font-bold text-base">Create Account</Text>
-              </TouchableOpacity>
+              <Animated.View style={{ transform: [{ scale: submitScale }] }}>
+                <Pressable 
+                  onPressIn={() => handlePressIn(submitScale)}
+                  onPressOut={() => handlePressOut(submitScale)}
+                  onPress={handleRegisterSubmit}
+                  disabled={isSubmitting}
+                  className={`bg-indigo-600 py-4 rounded-xl items-center mt-4 shadow-lg shadow-indigo-100 ${isSubmitting ? 'opacity-70' : ''}`}
+                >
+                  <Text className="text-white font-bold text-base">Create Account</Text>
+                </Pressable>
+              </Animated.View>
             </View>
 
             {/* Footer Link */}
-            <View className="flex-row justify-center mt-8">
+            <View className="flex-row justify-center mt-10">
               <Text className="text-gray-500 font-medium text-sm">Already have an account? </Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
                 <Text className="text-indigo-600 font-bold text-sm">Sign in here</Text>

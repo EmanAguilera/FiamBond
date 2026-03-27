@@ -1,155 +1,175 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { 
   View, 
   Text, 
   ScrollView, 
   TouchableOpacity, 
-  SafeAreaView 
+  SafeAreaView,
+  useWindowDimensions,
+  Platform
 } from "react-native";
-import { ArrowLeft, Target, TrendingUp, Shield, Layers } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 import UnifiedLoadingWidget from "@/components/ui/UnifiedLoadingWidget";
 
 export default function AboutUs({ onBack }) {
   const [mounted, setMounted] = useState(false);
+  const { width } = useWindowDimensions();
+
+  // Desktop/Tablet breakpoints (Matching Next.js 'md' breakpoint)
+  const isDesktop = width >= 768;
 
   useEffect(() => {
-    // Simulating the mounting logic from your Next.js file
-    const timer = setTimeout(() => setMounted(true), 800);
+    const timer = setTimeout(() => setMounted(true), 600);
     return () => clearTimeout(timer);
   }, []);
 
-  // 🛡️ Loader Guard
   if (!mounted) {
     return (
       <UnifiedLoadingWidget 
         type="fullscreen" 
-        message="Loading the Archive..." 
+        message="Initializing Archive..." 
         variant="indigo" 
       />
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
+    <SafeAreaView className="flex-1 bg-gray-50">
       <ScrollView 
-        className="flex-1 px-4"
-        contentContainerStyle={{ paddingVertical: 24, paddingBottom: 60 }}
+        className="flex-1"
+        contentContainerStyle={{ 
+          paddingVertical: isDesktop ? 60 : 24, 
+          paddingHorizontal: isDesktop ? 40 : 16,
+          alignItems: 'center' 
+        }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="max-w-4xl mx-auto w-full">
+        {/* Max-width container to replicate the 'max-w-4xl' desktop look */}
+        <View style={{ width: '100%', maxWidth: 896 }}>
           
-          {/* Back Button - Styled like a Web Link */}
+          {/* Back Button */}
           <TouchableOpacity 
             onPress={onBack}
-            className="flex-row items-center mb-8"
+            className="flex-row items-center mb-6 self-start"
           >
-            <ArrowLeft size={20} color="#4f46e5" />
-            <Text className="ml-2 text-indigo-600 font-bold text-base">Back to Home</Text>
+            <ArrowLeft size={18} color="#4f46e5" strokeWidth={3} />
+            <Text className="ml-2 text-indigo-600 font-bold text-sm">Back to Home</Text>
           </TouchableOpacity>
 
-          {/* Main Content Card (The "Next.js" Paper Look) */}
-          <View className="bg-white rounded-[40px] shadow-2xl shadow-slate-200 p-8 border border-slate-100">
+          {/* Main Content Card - Replicating Next.js 1:1 Shadow/Border/Padding */}
+          <View 
+            className="bg-white border border-gray-100 shadow-xl"
+            style={{ 
+              borderRadius: 24, // rounded-3xl
+              padding: isDesktop ? 48 : 32, // p-8 md:p-12
+              ...Platform.select({
+                ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20 },
+                android: { elevation: 10 }
+              })
+            }}
+          >
             
             {/* Header Section */}
-            <View className="border-b border-slate-100 pb-8 mb-8">
-              <View className="flex-row items-center gap-3 mb-2">
-                <View className="bg-indigo-600 p-2 rounded-xl">
-                  <Shield size={20} color="white" />
-                </View>
-                <Text className="text-3xl font-black text-slate-900 tracking-tighter">About Us</Text>
-              </View>
-              <Text className="text-slate-400 text-[10px] font-black uppercase tracking-[2px]">
+            <View className="border-b border-gray-100 pb-8 mb-8">
+              <Text className="text-gray-900 font-extrabold tracking-tight" style={{ fontSize: isDesktop ? 36 : 30 }}>
+                About Us
+              </Text>
+              <Text className="text-gray-500 text-sm font-medium uppercase tracking-wider mt-1">
                 The Story of the Ledger of Truth
               </Text>
             </View>
 
+            {/* Body Sections - space-y-8 */}
             <View className="gap-y-8">
+              
               {/* 1. WHY SECTION */}
               <View>
-                <View className="flex-row items-center gap-2 mb-3">
-                  <Target size={18} color="#1e293b" />
-                  <Text className="text-xl font-black text-slate-900">1. Why FiamBond?</Text>
-                </View>
-                <Text className="text-slate-600 leading-6 text-base">
-                  FiamBond was created to solve a fundamental problem: <Text className="font-bold text-slate-900">Financial Fragmentation.</Text> 
-                  Most people track their personal money in one place, their family expenses in another, 
-                  and their business records in a third. 
+                <Text className="text-xl font-bold text-gray-900 mb-3">1. Why FiamBond?</Text>
+                <Text className="text-gray-600 leading-7 text-base">
+                  FiamBond was created to solve a fundamental problem: <Text className="font-bold text-gray-900">Financial Fragmentation.</Text> Most people track their personal money in one place, their family expenses in another, and their business records in a third.
                 </Text>
-                <Text className="text-slate-600 leading-6 text-base mt-3 italic">
-                  "Why not have one 'Ledger of Truth' that handles everything?"
+                <Text className="text-gray-600 leading-7 text-base mt-3">
+                  We asked, <Text className="italic">"Why not have one 'Ledger of Truth' that handles everything?"</Text> FiamBond provides a unified ecosystem where different financial "Realms" co-exist securely.
                 </Text>
               </View>
 
               {/* 2. PROGRESS SECTION */}
               <View>
-                <View className="flex-row items-center gap-2 mb-3">
-                  <TrendingUp size={18} color="#1e293b" />
-                  <Text className="text-xl font-black text-slate-900">2. Our Progress</Text>
-                </View>
-                <Text className="text-slate-600 leading-6 text-base mb-4">
-                  We have evolved from a simple transaction tracker into a comprehensive financial engine:
+                <Text className="text-xl font-bold text-gray-900 mb-3">2. Our Progress</Text>
+                <Text className="text-gray-600 leading-7 text-base">
+                  This platform is a result of constant iteration and development. We have evolved from a simple transaction tracker into a comprehensive financial engine. Our current progress includes:
                 </Text>
                 
-                <View className="gap-y-3">
+                {/* Custom List Items (list-disc replication) */}
+                <View className="mt-4 gap-y-3 pl-2">
                   {[
-                    { label: "The Realm System", desc: "Specialized Personal, Family, and Corporate environments." },
-                    { label: "Automated Insights", desc: "Real-time analytics and growth visualization." },
-                    { label: "Strategic Goals", desc: "Tools to achieve specific financial targets." },
-                    { label: "Corporate Integrity", desc: "Full-scale payroll and disbursement systems." }
+                    { label: "The Realm System", desc: "Specialized environments for Personal, Family, and Corporate accounting." },
+                    { label: "Automated Insights", desc: "Real-time analytics that visualize growth and spending habits." },
+                    { label: "Strategic Goals", desc: "Tools that help users achieve specific financial targets." },
+                    { label: "Corporate Integrity", desc: "A full-scale payroll and disbursement system for small businesses." }
                   ].map((item, idx) => (
-                    <View key={idx} className="flex-row gap-3">
-                      <View className="h-1.5 w-1.5 rounded-full bg-indigo-500 mt-2" />
-                      <Text className="flex-1 text-slate-600 leading-5">
-                        <Text className="font-bold text-slate-900">{item.label}:</Text> {item.desc}
+                    <View key={idx} className="flex-row items-start">
+                      <Text className="text-gray-400 mr-3 text-lg">•</Text>
+                      <Text className="flex-1 text-gray-600 leading-6 text-base">
+                        <Text className="font-bold text-gray-800">{item.label}: </Text>
+                        {item.desc}
                       </Text>
                     </View>
                   ))}
                 </View>
               </View>
 
-              {/* 3. THREE REALMS (Converted from Grid to List for Mobile) */}
+              {/* 3. THREE REALMS (Responsive Grid - Columns on Mobile, Row on Desktop) */}
               <View>
-                <View className="flex-row items-center gap-2 mb-4">
-                  <Layers size={18} color="#1e293b" />
-                  <Text className="text-xl font-black text-slate-900">3. The Three Realms</Text>
-                </View>
+                <Text className="text-xl font-bold text-gray-900 mb-3">3. The Three Realms</Text>
+                <Text className="text-gray-600 leading-7 text-base mb-4">
+                  We believe financial management happens at three distinct levels:
+                </Text>
                 
-                <View className="gap-y-3">
-                  <View className="p-5 bg-slate-50 rounded-[24px] border border-slate-100">
-                    <Text className="font-black text-indigo-600 text-sm mb-1 uppercase tracking-widest">Personal</Text>
-                    <Text className="text-slate-600 text-sm leading-5">Your private daily financial habits and security.</Text>
-                  </View>
-                  
-                  <View className="p-5 bg-slate-50 rounded-[24px] border border-slate-100">
-                    <Text className="font-black text-indigo-600 text-sm mb-1 uppercase tracking-widest">Family</Text>
-                    <Text className="text-slate-600 text-sm leading-5">Shared accountability and collective growth.</Text>
-                  </View>
-
-                  <View className="p-5 bg-slate-50 rounded-[24px] border border-slate-100">
-                    <Text className="font-black text-indigo-600 text-sm mb-1 uppercase tracking-widest">Corporate</Text>
-                    <Text className="text-slate-600 text-sm leading-5">Professional payroll and business transparency.</Text>
-                  </View>
+                <View 
+                  style={{ 
+                    flexDirection: isDesktop ? 'row' : 'column', 
+                    gap: 16 
+                  }}
+                >
+                  {[
+                    { title: "Personal", desc: "Your private daily financial habits and security." },
+                    { title: "Family", desc: "Shared accountability and collective growth." },
+                    { title: "Corporate", desc: "Professional payroll and business-grade transparency." }
+                  ].map((realm, idx) => (
+                    <View 
+                      key={idx} 
+                      className="p-4 bg-slate-50 border border-slate-100 rounded-2xl"
+                      style={{ flex: isDesktop ? 1 : 0 }}
+                    >
+                      <Text className="font-bold text-indigo-600 text-sm mb-1">{realm.title}</Text>
+                      <Text className="text-gray-500 text-xs leading-5">{realm.desc}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
 
               {/* 4. LOOKING AHEAD */}
-              <View className="bg-indigo-50 p-6 rounded-[32px] border border-indigo-100">
-                <Text className="text-lg font-black text-indigo-900 mb-2">4. Looking Ahead</Text>
-                <Text className="text-indigo-800/80 leading-6 text-base">
-                  Our journey is far from over. We are expanding automated reporting, 
-                  enhancing loan tracking algorithms, and ensuring the "Ledger of Truth" 
-                  remains your most reliable tool.
+              <View>
+                <Text className="text-xl font-bold text-gray-900 mb-3">4. Looking Ahead</Text>
+                <Text className="text-gray-600 leading-7 text-base">
+                  Our journey is far from over. We are currently working on expanding our automated reporting features, enhancing loan tracking algorithms, and streamlining the user experience to ensure that the "Ledger of Truth" remains the most reliable financial tool in your arsenal.
                 </Text>
               </View>
+
             </View>
           </View>
 
-          {/* Footer Quote */}
-          <View className="mt-12 items-center">
-            <Text className="text-slate-400 text-[10px] font-black uppercase tracking-[4px]">
-              Precision • Transparency • Growth
+          {/* Footer Decoration */}
+          <View className="py-12 items-center">
+            <View className="h-[1px] w-12 bg-gray-200 mb-4" />
+            <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-[4px]">
+              Transparency • Integrity • Growth
             </Text>
           </View>
+
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -30,3 +30,21 @@ export const getApiUrl = (endpoint, params = {}) => {
     
     return url.toString();
 };
+
+/**
+ * --- NEW: Unified Google Auth Configuration ---
+ * Used in Login.tsx and Register.tsx
+ */
+export const GOOGLE_AUTH_CONFIG = {
+    webClientId: "818608486797-pujgl59qscfvqpek8o4m6vebnb7cbfs2.apps.googleusercontent.com",
+    iosClientId: "818608486797-c2rrbocuvhu54jiiu3lnp28hn6hdlade.apps.googleusercontent.com",
+    offlineAccess: true,
+};
+
+/**
+ * --- NEW: Global Auth Settings ---
+ * Used in VerifyEmail.tsx for the cooldown timer
+ */
+export const AUTH_SETTINGS = {
+    emailCooldownSeconds: 60,
+};

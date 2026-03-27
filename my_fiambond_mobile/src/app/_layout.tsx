@@ -8,14 +8,21 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AppProvider from "@/context/AppContext";
 // 1. Import MainShell
-import MainShell from "@/components/ui/MainShell"; 
+import MainShell from "@/components/ui/MainShell";
+
+import { Platform } from "react-native";
 
 export default function RootLayout() {
   return (
     <AppProvider>
       <Head>
-        <title>FiamBond | Unified Financial Realm</title>
+        <title>Fiambond | Unified Financial Realm</title>
         <meta name="description" content="Secure financial tracking for individuals, families, and companies." />
+
+        {Platform.OS === 'web' && (
+          <link rel="icon" href="/assets/images/FiamBond_Logo.png" />
+        )}
+
       </Head>
       
       <SafeAreaProvider>

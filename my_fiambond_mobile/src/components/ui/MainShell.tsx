@@ -61,15 +61,15 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
         {/* LOGO SECTION */}
         <TouchableOpacity 
           onPress={() => navigateTo(user ? "/realm" : "/")} 
-          className="flex-row items-center"
+          className="flex-row items-center gap-3"
         >
           <Image 
             source={require("../../../assets/images/FiamBond_Logo.png")} 
-            style={{ width: 34, height: 34 }}
+            style={{ width: 36, height: 36 }}
             resizeMode="contain" 
           />
-          <View className="flex-row items-center ml-3">
-            <Text className="text-xl font-bold text-indigo-600 tracking-tight">FiamBond</Text>
+          <View className="flex-row items-center">
+            <Text className="text-2xl font-bold text-indigo-600 tracking-tight">FiamBond</Text>
             
             {/* UPDATED: "Realm" is now hidden on mobile and only flex (visible) on md screens */}
             {user && (
@@ -93,7 +93,7 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                 >
                   <View className="items-end mr-1">
                     <View className="flex-row items-center justify-end">
-                      <p className="text-sm font-bold text-gray-800 capitalize tracking-wide">{displayName}</p>
+                      <Text className="text-sm font-bold text-gray-800 capitalize tracking-wide">{displayName}</Text>
                       {isAdmin && <AdminBadge />}
                     </View>
                   </View>
@@ -113,9 +113,24 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity onPress={() => navigateTo("/login")} className="bg-indigo-600 px-4 py-2 rounded-lg">
-              <Text className="text-white font-bold">Log In</Text>
-            </TouchableOpacity>
+            <View className="flex-row items-center gap-4">
+              <TouchableOpacity
+                onPress={() => navigateTo("/login")}
+                className="hidden sm:flex px-4 py-2"
+              >
+                <Text className="text-gray-700 font-semibold">
+                  Log In
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigateTo("/register")}
+                className="bg-indigo-600 px-6 py-2.5 rounded-lg"
+              >
+                <Text className="text-white font-bold text-sm">
+                  Get Started
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </View>
