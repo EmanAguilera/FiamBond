@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, FormEvent, ChangeEvent, Suspense } from "react";
+import React, { useState, FormEvent, ChangeEvent, Suspense, useContext, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth, db, googleProvider } from "@/src/config/firebase-config"; 
 import { createUserWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import toast from 'react-hot-toast';
+import { AppContext } from "@/src/context/AppContext";
 
 // Custom components
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
@@ -21,6 +22,7 @@ interface RegisterFormData {
 
 function RegisterContent() {
   const router = useRouter();
+  const { user }: any = useContext(AppContext);
   const [formData, setFormData] = useState<RegisterFormData>({
     first_name: "", 
     last_name: "", 
@@ -30,6 +32,17 @@ function RegisterContent() {
   });
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- LOGIC: Redirect Already Logged-In Users ---
+  useEffect(() => {
+    if (user) {
+      if (!user.emailVerified) {
+        router.push("/verify-email");
+      } else {
+        router.push("/realm");
+      }
+    }
+  }, [user, router]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -51,19 +64,19 @@ function RegisterContent() {
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = userCredential.user;
+      const registeredUser = userCredential.user;
 
       // Save user profile to Firestore
-      await setDoc(doc(db, "users", user.uid), {
+      await setDoc(doc(db, "users", registeredUser.uid), {
         first_name: formData.first_name,
         last_name: formData.last_name,
         full_name: `${formData.first_name} ${formData.last_name}`,
-        email: user.email,
+        email: registeredUser.email,
         created_at: serverTimestamp(),
         role: 'user'
       });
       
-      // Optional: Sign out so they have to log in once to verify
+      // Sign out so they have to log in once to verify
       await signOut(auth);
       
       toast.success("Account created successfully!");
@@ -84,25 +97,31 @@ function RegisterContent() {
     setIsSubmitting(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      const loggedInUser = result.user;
       
-      const userDocRef = doc(db, "users", user.uid);
+      const userDocRef = doc(db, "users", loggedInUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       // Create doc if it's their first time
       if (!userDocSnap.exists()) {
-        const nameParts = user.displayName?.split(" ") || ["", ""];
+        const nameParts = loggedInUser.displayName?.split(" ") || ["", ""];
         await setDoc(userDocRef, {
           first_name: nameParts[0],
           last_name: nameParts.slice(1).join(" ") || "",
-          full_name: user.displayName,
-          email: user.email,
+          full_name: loggedInUser.displayName,
+          email: loggedInUser.email,
           created_at: serverTimestamp(),
           role: 'user'
         });
       }
       toast.success("Welcome to FiamBond!");
-      router.push("/realm");
+      
+      // Redirect based on verification status
+      if (!loggedInUser.emailVerified) {
+        router.push("/verify-email");
+      } else {
+        router.push("/realm");
+      }
     } catch (error) {
       setGeneralError("Google sign-up failed.");
     } finally {

@@ -2,7 +2,7 @@
 
 import React, { useContext, useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link"; 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AppContext } from "@/src/context/AppContext";
 import {
     ArrowLeftOnRectangleIcon,
@@ -62,10 +62,33 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null); 
     const pathname = usePathname() ?? '';
+    const router = useRouter();
 
     const publicLayoutPaths = ['/', '/login', '/register', '/verify-email', '/terms', '/privacy', '/welcome', '/about-us'];
-    const isPublicLayout = !user || publicLayoutPaths.includes(pathname);
 
+    // Normalize pathname to prevent trailing slash issues
+    const normalizedPathname = pathname.replace(/\/$/, '') || '/';
+
+    // A page is public if:
+    // 1. There is no authenticated user.
+    // 2. The user is logged in but their email is NOT verified yet (they shouldn't see the dashboard header).
+    // 3. The path is explicitly declared in the public routes list.
+    const isPublicLayout = !user || !user.emailVerified || publicLayoutPaths.includes(normalizedPathname);
+
+    // --- LOGIC: Private Route protection & Email Verification Redirects ---
+    useEffect(() => {
+        const isProtectedRoute = normalizedPathname.startsWith('/realm') || normalizedPathname.startsWith('/settings');
+        
+        if (isProtectedRoute) {
+            if (!user) {
+                router.push('/login');
+            } else if (!user.emailVerified) {
+                router.push('/verify-email');
+            }
+        }
+    }, [user, normalizedPathname, router]);
+
+    // Handle clicking outside the profile dropdown
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -91,7 +114,7 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
     const isAdmin = user?.role === 'admin';
 
     // --- VIEW A: PUBLIC LAYOUT ---
-    if (isPublicLayout && !pathname.startsWith('/realm') && !pathname.startsWith('/settings')) { 
+    if (isPublicLayout && !normalizedPathname.startsWith('/realm') && !normalizedPathname.startsWith('/settings')) { 
         return (
             <div className="flex flex-col min-h-screen font-sans bg-gray-50 text-gray-800 w-full overflow-x-hidden">
                 <nav className="fixed w-full z-50 top-0 start-0 border-b border-gray-200 bg-white/80 backdrop-blur-md h-20">
@@ -181,7 +204,6 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                                 <div className="h-9 w-9 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm">
                                     {(user?.full_name || user?.email || 'U')[0].toUpperCase()}
                                 </div>
-                                {/* ⭐️ FIXED: Changed from <button> to <div> to prevent nesting error */}
                                 <div className={`h-4 w-4 text-gray-400 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`}>
                                     <ChevronDownIcon />
                                 </div>

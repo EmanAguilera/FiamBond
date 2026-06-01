@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, FormEvent, ChangeEvent, useEffect, Suspense } from "react";
+import React, { useState, FormEvent, ChangeEvent, useEffect, Suspense, useContext } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { auth, db, googleProvider } from "@/src/config/firebase-config";
@@ -11,6 +11,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import toast from 'react-hot-toast';
+import { AppContext } from "@/src/context/AppContext";
 
 // Custom components
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
@@ -23,9 +24,21 @@ interface LoginFormData {
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user }: any = useContext(AppContext);
   const [formData, setFormData] = useState<LoginFormData>({ email: "", password: "" });
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- LOGIC: Redirect Already Logged-In Users ---
+  useEffect(() => {
+    if (user) {
+      if (!user.emailVerified) {
+        router.push("/verify-email");
+      } else {
+        router.push("/realm");
+      }
+    }
+  }, [user, router]);
 
   // Check for messages in URL (e.g., after registration)
   useEffect(() => {
@@ -71,9 +84,16 @@ function LoginFormContent() {
     setIsSubmitting(true);
     
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      const loggedInUser = userCredential.user;
       toast.success("Login successful!");
-      router.push("/realm"); 
+      
+      // Redirect based on verification status immediately
+      if (!loggedInUser.emailVerified) {
+        router.push("/verify-email");
+      } else {
+        router.push("/realm"); 
+      }
     } catch (error: any) {
       setGeneralError("Incorrect email or password. Please try again.");
     } finally {
@@ -86,22 +106,28 @@ function LoginFormContent() {
     setIsSubmitting(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      const userDocRef = doc(db, "users", user.uid);
+      const loggedInUser = result.user;
+      const userDocRef = doc(db, "users", loggedInUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
-        const nameParts = user.displayName?.split(" ") || ["", ""];
+        const nameParts = loggedInUser.displayName?.split(" ") || ["", ""];
         await setDoc(userDocRef, {
           first_name: nameParts[0],
           last_name: nameParts.slice(1).join(" ") || "",
-          full_name: user.displayName,
-          email: user.email,
+          full_name: loggedInUser.displayName,
+          email: loggedInUser.email,
           created_at: serverTimestamp(),
           role: 'user'
         });
       }
-      router.push("/realm");
+      
+      // Redirect based on verification status
+      if (!loggedInUser.emailVerified) {
+        router.push("/verify-email");
+      } else {
+        router.push("/realm");
+      }
     } catch (error) {
       toast.error("Google Authentication Failed");
     } finally {
