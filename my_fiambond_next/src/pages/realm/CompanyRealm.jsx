@@ -14,7 +14,7 @@ import RouteGuard from "@/src/components/auth/RouteGuard";
 import { Icons, Btn, DashboardCard } from "@/src/components/realm/RealmSharedUI.jsx";
 import { useRealmData } from "@/src/hooks/useRealmData.js";
 
-// ⭐️ INTEGRATION: Using UnifiedLoadingWidget
+// Integration: UnifiedLoadingWidget
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // Dynamic Widget Imports
@@ -37,20 +37,18 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
 
-    // ⭐️ FIXED LOGIC: Matches FamilyRealm "Lastname Family" style
     const corporateDisplayName = useMemo(() => {
         if (!company) return "";
         
-        // Check if the name is a generic placeholder
         const isGeneric = company.name?.toLowerCase() === 'company' || company.name?.toLowerCase() === 'my company';
         const userLastName = user?.full_name ? user.full_name.split(' ').pop() : '';
         
-        // If generic, produce "Aguilera Corporate", otherwise use the actual company name
         return isGeneric && userLastName ? `${userLastName} ` : company.name;
     }, [company, user]);
 
-    // Modal States
+    // Modal States (Includes actionHub bridge)
     const [modals, setModals] = useState({
+        actionHub: false, // Bridge modal state
         accounting: false, 
         addGoal: false, 
         manageEmp: false,
@@ -151,7 +149,6 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                         <div className="flex items-center gap-4">
                             <div className="w-1 h-12 bg-indigo-600 rounded-full opacity-80 shadow-[0_0_10px_rgba(79,70,229,0.3)]"></div>
                             <div>
-                                {/* ⭐️ FIXED: Removed 'uppercase' and used the same classes as FamilyRealm */}
                                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none">
                                     {corporateDisplayName}
                                 </h1>
@@ -162,16 +159,23 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-3">
-                        <Btn onClick={() => toggle('accounting', true)} type="pri" icon={Icons.Plus}>Accounting</Btn>
-                        <Btn onClick={() => toggle('addGoal', true)} icon={Icons.Plus}>Strategic Goal</Btn>
-                        <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
-                        <Btn onClick={() => toggle('manageEmp', true)} icon={Icons.Users}>Employees</Btn>
+                    <div className="w-full md:w-auto">
+                        <div className="flex flex-wrap md:flex-nowrap items-center gap-3">
+                            {/* 🚀 SINGLE BRIDGE BUTTON REPLACING SEPARATE CREATION BUTTONS */}
+                            <Btn onClick={() => toggle('actionHub', true)} type="pri" icon={Icons.Plus}>
+                                New Entry
+                            </Btn>
+
+                            <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
+
+                            {/* Employees Button */}
+                            <Btn onClick={() => toggle('manageEmp', true)} icon={Icons.Users}>Employees</Btn>
+                        </div>
                     </div>
                 </header>
 
                 {/* --- DASHBOARD CARDS --- */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-left">
                     <DashboardCard 
                         title="Company Funds" 
                         value={`₱${(summaryData?.netPosition || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
@@ -213,6 +217,36 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
 
                 {/* --- MODALS --- */}
                 <Suspense fallback={null}>
+                    {/* 🌉 ACTION BRIDGE MODAL */}
+                    {modals.actionHub && (
+                        <Modal isOpen={modals.actionHub} onClose={() => toggle('actionHub', false)} title="Corporate Quick Action">
+                            <div className="p-2 space-y-4 text-center">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    What would you like to record for {corporateDisplayName}?
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={() => { toggle('actionHub', false); toggle('accounting', true); }}
+                                        className="p-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">📊</span>
+                                        <span className="font-bold text-slate-800 group-hover:text-emerald-700 text-sm">Accounting & Payroll</span>
+                                        <span className="text-[10px] text-slate-400 font-semibold">Income, Expense & Payroll</span>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => { toggle('actionHub', false); toggle('addGoal', true); }}
+                                        className="p-5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">🎯</span>
+                                        <span className="font-bold text-slate-800 group-hover:text-indigo-700 text-sm">Strategic Target</span>
+                                        <span className="text-[10px] text-slate-400 font-semibold">Corporate Goal Target</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </Modal>
+                    )}
+
                     {modals.accounting && (
                         <Modal isOpen={modals.accounting} onClose={() => toggle('accounting', false)} title="Corporate Accounting">
                             <CreateUnifiedTransactionWidget 

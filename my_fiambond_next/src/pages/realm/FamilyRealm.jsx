@@ -13,7 +13,7 @@ import RouteGuard from "@/src/components/auth/RouteGuard";
 import { Icons, Btn, DashboardCard } from "@/src/components/realm/RealmSharedUI.jsx";
 import { useRealmData } from "@/src/hooks/useRealmData.js";
 
-// ⭐️ INTEGRATION: Using UnifiedLoadingWidget
+// Integration: UnifiedLoadingWidget
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // Dynamic Widget Imports
@@ -31,16 +31,17 @@ const UnifiedManagerWidget = dynamic(() => import('@/src/components/management/U
 const UnifiedReportChartWidget = dynamic(() => import("@/src/components/analytics/UnifiedReportChartWidget"), { ssr: false });
 
 export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpdate }) {
-    // ⭐️ FIX 1: Defensive Context Access
+    // Context Access
     const context = useContext(AppContext) || {};
     const { user } = context;
 
-    // ⭐️ FIX 2: Mounted Guard
+    // Mounted Guard
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
 
-    // Modal States
+    // Added actionHub modal state
     const [modals, setModals] = useState({
+        actionHub: false, // Bridge modal state
         loan: false, transaction: false, goal: false,
         listGoals: false, listTransactions: false, listLoans: false, members: false
     });
@@ -90,7 +91,6 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
         if (onFamilyUpdate) onFamilyUpdate(updatedFamily);
     };
 
-    // ⭐️ Updated Loading State using UnifiedLoadingWidget
     if (!mounted || !family?.id) {
         return (
             <UnifiedLoadingWidget 
@@ -130,17 +130,21 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
                     </div>
 
                     <div className="w-full md:w-auto">
-                        <div className="grid grid-cols-2 gap-3 md:flex md:items-center">
-                            <Btn onClick={() => toggle('transaction', true)} type="pri" icon={Icons.Plus} className="col-span-2 md:col-span-1">Transaction</Btn>
-                            <Btn onClick={() => toggle('goal', true)} icon={Icons.Plus}>Goal</Btn>
-                            <Btn onClick={() => toggle('loan', true)} icon={Icons.Plus}>Loan</Btn>
+                        <div className="flex flex-wrap md:flex-nowrap items-center gap-3">
+                            {/* 🚀 SINGLE BRIDGE BUTTON REPLACING 3 SEPARATE CREATION BUTTONS */}
+                            <Btn onClick={() => toggle('actionHub', true)} type="pri" icon={Icons.Plus}>
+                                New Entry
+                            </Btn>
+
                             <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
-                            <Btn onClick={() => toggle('members', true)} icon={Icons.Users} className="col-span-2 md:col-span-1">Members</Btn>
+
+                            {/* Members Management Button */}
+                            <Btn onClick={() => toggle('members', true)} icon={Icons.Users}>Members</Btn>
                         </div>
                     </div>
                 </header>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-left">
                     <DashboardCard 
                         title="Family Funds" 
                         value={`₱${(summaryData?.netPosition || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
@@ -181,6 +185,45 @@ export default function FamilyRealm({ family, onBack, onDataChange, onFamilyUpda
 
                 {/* Modals Section */}
                 <Suspense fallback={null}>
+                    {/* 🌉 ACTION BRIDGE MODAL */}
+                    {modals.actionHub && (
+                        <Modal isOpen={modals.actionHub} onClose={() => toggle('actionHub', false)} title="Family Quick Action">
+                            <div className="p-2 space-y-4 text-center">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    What would you like to record for {family.family_name}?
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <button 
+                                        onClick={() => { toggle('actionHub', false); toggle('transaction', true); }}
+                                        className="p-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">💸</span>
+                                        <span className="font-bold text-slate-800 group-hover:text-emerald-700 text-sm">Transaction</span>
+                                        <span className="text-[10px] text-slate-400 font-semibold">Income / Expense</span>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => { toggle('actionHub', false); toggle('goal', true); }}
+                                        className="p-5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">🎯</span>
+                                        <span className="font-bold text-slate-800 group-hover:text-indigo-700 text-sm">Family Goal</span>
+                                        <span className="text-[10px] text-slate-400 font-semibold">Shared Target</span>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => { toggle('actionHub', false); toggle('loan', true); }}
+                                        className="p-5 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">🤝</span>
+                                        <span className="font-bold text-slate-800 group-hover:text-amber-700 text-sm">Family Loan</span>
+                                        <span className="text-[10px] text-slate-400 font-semibold">Lending & Debts</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </Modal>
+                    )}
+
                     {modals.loan && (
                         <Modal isOpen={modals.loan} onClose={() => toggle('loan', false)} title="Record Family Loan">
                             <CreateUnifiedLoanWidget 

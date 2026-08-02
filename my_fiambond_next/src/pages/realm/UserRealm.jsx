@@ -14,9 +14,6 @@ import { useRealmData } from "@/src/hooks/useRealmData.js";
 // Widgets
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
-// Additional Icon for Admin
-const AdminIcon = <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>;
-
 // Dynamic Imports
 const Modal = dynamic(() => import("@/src/components/ui/Modal.jsx"), { ssr: false });
 const LoanTrackingWidget = dynamic(() => import("@/src/components/loan/LoanTrackingWidget.tsx"), { ssr: false });
@@ -31,10 +28,6 @@ const CreateUnifiedLoanWidget = dynamic(() => import("@/src/components/loan/Crea
 const RecordLoanChoiceWidget = dynamic(() => import("@/src/components/loan/RecordLoanChoiceWidget.tsx"), { ssr: false });
 const RecordLoanFlowWidget = dynamic(() => import("@/src/components/loan/RecordLoanFlowWidget.tsx"), { ssr: false });
 
-/**
- * UserDashboard Component
- * Fixed: Added onEnterFamily and onEnterCompany to props to resolve TypeScript build errors.
- */
 export default function UserDashboard({ onEnterAdmin, onEnterFamily, onEnterCompany }) {
     const context = useContext(AppContext);
     const { user, refreshUserData } = context || { user: null, refreshUserData: () => {} };
@@ -42,7 +35,10 @@ export default function UserDashboard({ onEnterAdmin, onEnterFamily, onEnterComp
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
 
+    // Added actionHub and realmHub bridge modal states
     const [modals, setModals] = useState({
+        actionHub: false, 
+        realmHub: false, // Bridge modal for Admin / Family / Company
         transactions: false, goals: false, families: false, lending: false,
         createTx: false, createGoal: false, applyCompany: false, applyFamily: false,
         recordLoanChoice: false, recordLoanPersonal: false, recordLoanFamily: false
@@ -119,33 +115,17 @@ export default function UserDashboard({ onEnterAdmin, onEnterFamily, onEnterComp
                     </div>
 
                     <div className="w-full md:w-auto">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:flex md:items-center">
-                            {/* Admin Link */}
-                            {isAdmin && <Btn onClick={onEnterAdmin} type="pri" icon={AdminIcon} className="bg-purple-600 hover:bg-purple-700 border-purple-500 shadow-purple-200">Admin Realm</Btn>}
-                            
-                            <Btn onClick={() => toggleModal('createTx', true)} type="pri" icon={Icons.Plus}>Transaction</Btn>
-                            <Btn onClick={() => toggleModal('createGoal', true)} icon={Icons.Plus}>Goal</Btn>
-                            <Btn onClick={() => toggleModal('recordLoanChoice', true)} icon={Icons.Plus}>Loan</Btn>
+                        {/* 🎯 EXACTLY 2 BUTTONS JUST LIKE FAMILY & COMPANY REALMS */}
+                        <div className="flex items-center gap-3">
+                            <Btn onClick={() => toggleModal('actionHub', true)} type="pri" icon={Icons.Plus}>
+                                New Entry
+                            </Btn>
                             
                             <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
                             
-                            {/* Family Link: Uses parent's onEnterFamily via the Manager Widget */}
-                            {isFamilyActive ? (
-                                <Btn onClick={() => toggleModal('families', true)} icon={Icons.Users}>Families</Btn>
-                            ) : isFamilyPending ? (
-                                <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
-                            ) : (
-                                <Btn onClick={() => toggleModal('applyFamily', true)} icon={Icons.Lock}>Apply Family</Btn>
-                            )}
-
-                            {/* Company Link: Calls parent's onEnterCompany */}
-                            {isCompanyActive ? (
-                                <Btn onClick={() => onEnterCompany({ id: user?.uid, name: "Company" })} type="comp" icon={Icons.Build}>Company</Btn>
-                            ) : isCompanyPending ? (
-                                <Btn type="pending" icon={Icons.Lock} disabled>Pending</Btn>
-                            ) : (
-                                <Btn onClick={() => toggleModal('applyCompany', true)} icon={Icons.Lock}>Apply Company</Btn>
-                            )}
+                            <Btn onClick={() => toggleModal('realmHub', true)} icon={Icons.Users}>
+                                Switch Realm
+                            </Btn>
                         </div>
                     </div>
                 </header>
@@ -162,10 +142,114 @@ export default function UserDashboard({ onEnterAdmin, onEnterFamily, onEnterComp
 
                 {/* Modals */}
                 <Suspense fallback={null}>
+                    {/* 🌉 1. ACTION BRIDGE MODAL */}
+                    {modals.actionHub && (
+                        <Modal isOpen={modals.actionHub} onClose={() => toggleModal('actionHub', false)} title="Quick Action Bridge">
+                            <div className="p-2 space-y-4 text-center">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    What record would you like to create?
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <button 
+                                        onClick={() => { toggleModal('actionHub', false); toggleModal('createTx', true); }}
+                                        className="p-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">💸</span>
+                                        <span className="font-bold text-slate-800 group-hover:text-emerald-700 text-sm">Transaction</span>
+                                        <span className="text-[10px] text-slate-400 font-semibold">Income / Expense</span>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => { toggleModal('actionHub', false); toggleModal('createGoal', true); }}
+                                        className="p-5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">🎯</span>
+                                        <span className="font-bold text-slate-800 group-hover:text-indigo-700 text-sm">Goal Target</span>
+                                        <span className="text-[10px] text-slate-400 font-semibold">Savings & Target</span>
+                                    </button>
+
+                                    <button 
+                                        onClick={() => { toggleModal('actionHub', false); toggleModal('recordLoanChoice', true); }}
+                                        className="p-5 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">🤝</span>
+                                        <span className="font-bold text-slate-800 group-hover:text-amber-700 text-sm">Loan Record</span>
+                                        <span className="text-[10px] text-slate-400 font-semibold">Lending & Debts</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </Modal>
+                    )}
+
+                    {/* 🏰 2. REALM SWITCHER BRIDGE MODAL */}
+                    {modals.realmHub && (
+                        <Modal isOpen={modals.realmHub} onClose={() => toggleModal('realmHub', false)} title="Select Portal Realm">
+                            <div className="p-2 space-y-4 text-center">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    Choose a realm portal to enter
+                                </p>
+                                <div className={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4`}>
+                                    {/* Admin Realm Option */}
+                                    {isAdmin && (
+                                        <button 
+                                            onClick={() => { toggleModal('realmHub', false); onEnterAdmin(); }}
+                                            className="p-5 bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                        >
+                                            <span className="text-3xl group-hover:scale-110 transition-transform">👑</span>
+                                            <span className="font-bold text-purple-900 text-sm">Admin Realm</span>
+                                            <span className="text-[10px] text-purple-600 font-semibold">System Dashboard</span>
+                                        </button>
+                                    )}
+
+                                    {/* Family Realm Option */}
+                                    <button 
+                                        onClick={() => {
+                                            toggleModal('realmHub', false);
+                                            if (isFamilyActive) toggleModal('families', true);
+                                            else if (!isFamilyPending) toggleModal('applyFamily', true);
+                                        }}
+                                        disabled={isFamilyPending}
+                                        className={`p-5 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95 border ${
+                                            isFamilyPending 
+                                                ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed' 
+                                                : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 hover:border-indigo-300'
+                                        }`}
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">👨‍👩‍👧‍👦</span>
+                                        <span className="font-bold text-indigo-900 text-sm">Family Realm</span>
+                                        <span className="text-[10px] text-indigo-600 font-semibold uppercase">
+                                            {isFamilyActive ? 'Enter Vault' : isFamilyPending ? 'Pending Approval' : 'Apply Premium'}
+                                        </span>
+                                    </button>
+
+                                    {/* Company Realm Option */}
+                                    <button 
+                                        onClick={() => {
+                                            toggleModal('realmHub', false);
+                                            if (isCompanyActive) onEnterCompany({ id: user?.uid, name: "Company" });
+                                            else if (!isCompanyPending) toggleModal('applyCompany', true);
+                                        }}
+                                        disabled={isCompanyPending}
+                                        className={`p-5 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95 border ${
+                                            isCompanyPending 
+                                                ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed' 
+                                                : 'bg-blue-50 hover:bg-blue-100 border-blue-200 hover:border-blue-300'
+                                        }`}
+                                    >
+                                        <span className="text-3xl group-hover:scale-110 transition-transform">🏢</span>
+                                        <span className="font-bold text-blue-900 text-sm">Company Realm</span>
+                                        <span className="text-[10px] text-blue-600 font-semibold uppercase">
+                                            {isCompanyActive ? 'Enter Corporate' : isCompanyPending ? 'Pending Approval' : 'Apply Premium'}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </Modal>
+                    )}
+
                     {modals.transactions && <Modal isOpen={modals.transactions} onClose={() => toggleModal('transactions', false)} title="Personal Transactions"><UnifiedTransactionsListWidget /></Modal>}
                     {modals.goals && <Modal isOpen={modals.goals} onClose={() => toggleModal('goals', false)} title="Personal Goals"><UnifiedGoalListWidget mode="personal" entityId={user?.uid} onDataChange={refresh} /></Modal>}
                     
-                    {/* Families Manager passes the data back to the parent via onEnterFamily */}
                     {modals.families && (
                         <Modal isOpen={modals.families} onClose={() => toggleModal('families', false)} title="Families Management">
                             <UnifiedManagerWidget type="family" onEnterRealm={(familyData) => {
