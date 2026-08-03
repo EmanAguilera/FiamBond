@@ -197,7 +197,7 @@ export default function UserDashboard({ onEnterAdmin, onEnterFamily, onEnterComp
                                         >
                                             <span className="text-3xl group-hover:scale-110 transition-transform">👑</span>
                                             <span className="font-bold text-purple-900 text-sm">Admin Realm</span>
-                                            <span className="text-[10px] text-purple-600 font-semibold">System Dashboard</span>
+                                            <span className="text-[10px] text-purple-600 font-semibold">ENTER ADMIN</span>
                                         </button>
                                     )}
 

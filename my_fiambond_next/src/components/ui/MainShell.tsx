@@ -9,7 +9,6 @@ import {
     Cog6ToothIcon,
     Bars3Icon,
     XMarkIcon,
-    ChevronDownIcon,
     ClockIcon,
     CheckBadgeIcon
 } from '@heroicons/react/24/outline';
@@ -29,7 +28,6 @@ const formatExpirationDate = (grantedAt: any, planCycle: string | null) => {
     return endDate.toLocaleDateString();
 };
 
-// --- REUSABLE FOOTER ---
 const AppFooter = () => (
     <footer className="bg-white py-12 border-t border-gray-200">
         <div className="max-w-screen-2xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
@@ -50,8 +48,7 @@ const AppFooter = () => (
 );
 
 const AdminBadge = () => (
-    <span className="text-[10px] font-extrabold border px-2 py-0.5 rounded-full uppercase tracking-wider
-        bg-purple-50 text-purple-700 border-purple-200 ml-2">
+    <span className="text-[9px] font-extrabold border px-2 py-0.5 rounded-full uppercase tracking-wider bg-purple-100 text-purple-700 border-purple-200">
         Admin
     </span>
 );
@@ -65,30 +62,17 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
     const router = useRouter();
 
     const publicLayoutPaths = ['/', '/login', '/register', '/verify-email', '/terms', '/privacy', '/welcome', '/about-us'];
-
-    // Normalize pathname to prevent trailing slash issues
     const normalizedPathname = pathname.replace(/\/$/, '') || '/';
-
-    // A page is public if:
-    // 1. There is no authenticated user.
-    // 2. The user is logged in but their email is NOT verified yet (they shouldn't see the dashboard header).
-    // 3. The path is explicitly declared in the public routes list.
     const isPublicLayout = !user || !user.emailVerified || publicLayoutPaths.includes(normalizedPathname);
 
-    // --- LOGIC: Private Route protection & Email Verification Redirects ---
     useEffect(() => {
         const isProtectedRoute = normalizedPathname.startsWith('/realm') || normalizedPathname.startsWith('/settings');
-        
         if (isProtectedRoute) {
-            if (!user) {
-                router.push('/login');
-            } else if (!user.emailVerified) {
-                router.push('/verify-email');
-            }
+            if (!user) router.push('/login');
+            else if (!user.emailVerified) router.push('/verify-email');
         }
     }, [user, normalizedPathname, router]);
 
-    // Handle clicking outside the profile dropdown
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -113,7 +97,6 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
 
     const isAdmin = user?.role === 'admin';
 
-    // --- VIEW A: PUBLIC LAYOUT ---
     if (isPublicLayout && !normalizedPathname.startsWith('/realm') && !normalizedPathname.startsWith('/settings')) { 
         return (
             <div className="flex flex-col min-h-screen font-sans bg-gray-50 text-gray-800 w-full overflow-x-hidden">
@@ -141,7 +124,6 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
         );
     }
 
-    // --- VIEW B: AUTHENTICATED LAYOUT ---
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
             <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md h-20">
@@ -157,67 +139,79 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                         </Link>
                     </div>
                     
-                    <div className="flex items-center gap-6">
-                        {user && !isAdmin && (
-                            <div className="hidden md:flex items-center gap-3 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm">
-                                <CheckBadgeIcon className="h-4 w-4 text-indigo-600" />
-                                {currentPremiumDetails ? (
-                                    <>
-                                        {currentPremiumDetails.company && (
-                                            <div className={`flex items-center gap-1.5 ${currentPremiumDetails.family ? 'border-r border-gray-200 pr-3' : ''}`}>
-                                                <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                                                <span className="text-[11px] text-emerald-700 font-bold uppercase tracking-tight">
-                                                    Co: {formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {currentPremiumDetails.family && (
-                                            <div className="flex items-center gap-1.5 pl-1">
-                                                <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                                <span className="text-[11px] text-blue-700 font-bold uppercase tracking-tight">
-                                                    Fam: {formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <ClockIcon className="h-3 w-3 text-gray-400" />
-                                        <span className="text-[11px] font-medium text-gray-400 uppercase">Free Tier</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        
-                        <div className="hidden md:block relative" ref={dropdownRef}>
-                            {/* Outer Trigger Button */}
+                    {/* ⭐️ ULTRA MINIMALIST RIGHT HEADER */}
+                    <div className="flex items-center gap-3">
+                        <div className="relative" ref={dropdownRef}>
+                            {/* Profile Avatar Button */}
                             <button 
                                 onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} 
-                                className="flex items-center gap-3 p-1 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none"
+                                className="flex items-center gap-2 p-1 rounded-full hover:ring-4 hover:ring-indigo-50 transition-all focus:outline-none active:scale-95"
+                                title="Account Profile"
                             >
-                                <div className="text-right mr-1">
-                                    <div className="flex items-center justify-end">
-                                        <p className="text-sm font-bold text-gray-800 capitalize tracking-wide">{user?.full_name || 'User'}</p>
-                                        {isAdmin && <AdminBadge />}
-                                    </div>
-                                </div>
-                                <div className="h-9 w-9 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm">
+                                <div className="h-10 w-10 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center font-black text-sm shadow-md border-2 border-white">
                                     {(user?.full_name || user?.email || 'U')[0].toUpperCase()}
-                                </div>
-                                <div className={`h-4 w-4 text-gray-400 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`}>
-                                    <ChevronDownIcon />
                                 </div>
                             </button>
 
+                            {/* Dropdown Menu */}
                             {isProfileMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-50">
-                                    <Link href="/settings" onClick={() => setIsProfileMenuOpen(false)} className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 font-medium">
-                                        <Cog6ToothIcon className="h-4 w-4 mr-2" /> Settings
-                                    </Link>
-                                    <div className="border-t border-gray-100 my-1"></div>
-                                    <button onClick={handleLogout} className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">
-                                        <ArrowLeftOnRectangleIcon className="h-4 w-4 mr-2" /> Sign Out
-                                    </button>
+                                <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 z-50 animate-in fade-in zoom-in-95 duration-150 text-left">
+                                    {/* Clean User Info Header (No Duplicate Circle Avatar) */}
+                                    <div className="pb-3 border-b border-gray-100">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <p className="text-sm font-extrabold text-gray-900 truncate capitalize">{user?.full_name || 'User'}</p>
+                                            {isAdmin && <AdminBadge />}
+                                        </div>
+                                        <p className="text-xs text-gray-400 truncate mt-0.5">{user?.email}</p>
+                                    </div>
+
+                                    {/* Subscription Tier Box */}
+                                    {!isAdmin && (
+                                        <div className="my-3 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-1.5 text-xs">
+                                            <div className="flex items-center justify-between text-gray-500 font-bold text-[10px] uppercase tracking-wider border-b border-gray-200 pb-1">
+                                                <span>Subscription Tier</span>
+                                                <CheckBadgeIcon className="h-3.5 w-3.5 text-indigo-600" />
+                                            </div>
+                                            {currentPremiumDetails ? (
+                                                <div className="space-y-1 pt-0.5">
+                                                    {currentPremiumDetails.company && (
+                                                        <div className="flex justify-between items-center text-[11px] text-emerald-700 font-bold">
+                                                            <span>Company Realm</span>
+                                                            <span className="font-mono text-[10px]">{formatExpirationDate(currentPremiumDetails.company.granted_at, currentPremiumDetails.company.plan_cycle)}</span>
+                                                        </div>
+                                                    )}
+                                                    {currentPremiumDetails.family && (
+                                                        <div className="flex justify-between items-center text-[11px] text-blue-700 font-bold">
+                                                            <span>Family Realm</span>
+                                                            <span className="font-mono text-[10px]">{formatExpirationDate(currentPremiumDetails.family.granted_at, currentPremiumDetails.family.plan_cycle)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-1.5 text-gray-400 pt-0.5">
+                                                    <ClockIcon className="h-3.5 w-3.5" />
+                                                    <span className="text-[11px] font-semibold">Standard Free Tier</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Dropdown Navigation Actions */}
+                                    <div className="space-y-1 pt-1">
+                                        <Link 
+                                            href="/settings" 
+                                            onClick={() => setIsProfileMenuOpen(false)} 
+                                            className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl transition-colors"
+                                        >
+                                            <Cog6ToothIcon className="h-4 w-4" /> Account Settings
+                                        </Link>
+                                        <button 
+                                            onClick={handleLogout} 
+                                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left"
+                                        >
+                                            <ArrowLeftOnRectangleIcon className="h-4 w-4" /> Sign Out
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -232,7 +226,6 @@ export default function MainShell({ children }: { children: React.ReactNode }) {
                 {isMobileMenuOpen && (
                     <div className="md:hidden border-t border-gray-200 bg-white shadow-lg">
                         <div className="px-4 py-6 space-y-6">
-                             {/* Mobile Profile Section */}
                              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
                                 <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold">
                                     {(user?.full_name || 'U')[0].toUpperCase()}

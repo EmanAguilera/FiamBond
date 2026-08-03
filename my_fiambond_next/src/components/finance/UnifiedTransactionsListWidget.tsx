@@ -118,25 +118,26 @@ export const UnifiedTransactionsListWidget = ({ companyData, familyData, adminMo
             const q = query(collection(db as Firestore, "premiums"), orderBy("granted_at", "desc"));
             const snap = await getDocs(q);
             const rawPremiums = snap.docs.filter(d => d.data().user_id !== user.uid);
-
+        
             if (rawPremiums.length > 0) {
                 const userIds = [...new Set(rawPremiums.map(d => d.data().user_id))];
                 const usersMap: Record<string, any> = {};
                 const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", userIds.slice(0, 10))));
                 uSnap.forEach(d => { usersMap[d.id] = d.data(); });
-
+        
                 results = rawPremiums.map(d => {
                     const data = d.data();
+                    const isTest = data.is_test || data.amount === 0 || data.payment_ref === 'TEST_EXPLORE';
                     return {
                         id: d.id,
                         user_id: data.user_id,
-                        description: `Premium Subscription Inflow`,
+                        description: isTest ? `Test / Exploration Access` : `Premium Subscription Inflow`,
                         amount: data.amount || 0,
                         type: 'income',
                         created_at: data.granted_at,
                         user: usersMap[data.user_id] || { full_name: "Unknown User" },
                         adminMeta: {
-                            plan: String(data.plan_cycle || 'Monthly').toUpperCase(),
+                            plan: `${String(data.plan_cycle || 'Monthly').toUpperCase()} • ${isTest ? 'TEST / FREE' : 'PAID'}`,
                             accessType: String(data.access_type || 'Company').toUpperCase()
                         }
                     };
