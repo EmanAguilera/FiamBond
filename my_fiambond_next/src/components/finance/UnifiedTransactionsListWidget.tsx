@@ -15,10 +15,8 @@ import {
 } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
-// Custom Loader
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
-// --- TYPES ---
 type Realm = 'personal' | 'company' | 'family' | 'admin';
 
 interface Transaction {
@@ -37,8 +35,8 @@ interface Transaction {
 }
 
 interface UnifiedProps {
-    companyData?: { id: string | number; name?: string };
-    familyData?: { id: string; family_name?: string };
+    companyData?: any;
+    familyData?: any;
     adminMode?: boolean; 
 }
 
@@ -57,9 +55,14 @@ const TransactionItem = ({ transaction, realm }: { transaction: Transaction, rea
 
     const dateObj = typeof transaction.created_at === 'string'
         ? new Date(transaction.created_at)
-        : transaction.created_at.toDate();
+        : (transaction.created_at && typeof transaction.created_at.toDate === 'function')
+            ? transaction.created_at.toDate()
+            : new Date(transaction.created_at as any);
     
-    const timeDisplay = dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    // 🟢 Timestamp formatter
+    const timeDisplay = isNaN(dateObj.getTime()) 
+        ? '' 
+        : dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
     return (
         <div className="flex items-center p-4 border-b last:border-b-0 border-slate-50 hover:bg-slate-50/50 transition-colors">
@@ -76,54 +79,64 @@ const TransactionItem = ({ transaction, realm }: { transaction: Transaction, rea
 
             <div className="ml-4 flex-grow min-w-0 text-left">
                 <p className="font-bold text-slate-700 truncate">{transaction.description}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                    {isShared && (
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                    {/* 🟢 ALWAYS SHOW TIMESTAMP AND USER NAME */}
+                    {isShared ? (
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                            {transaction.user?.full_name || 'System'} 
-                            {transaction.adminMeta && ` • ${transaction.adminMeta.accessType} • ${transaction.adminMeta.plan}`}
+                            {transaction.user?.full_name || 'System'} • <span className="text-slate-500 font-semibold">{timeDisplay}</span>
+                            {transaction.adminMeta && ` • ${transaction.adminMeta.accessType}`}
                         </p>
+                    ) : (
+                        <p className="text-xs text-slate-400">{timeDisplay}</p>
                     )}
-                    {!isShared && <p className="text-xs text-slate-400">{timeDisplay}</p>}
                     
                     {transaction.attachment_url && (
-                        <a href={transaction.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-indigo-500 uppercase hover:underline">Receipt</a>
+                        <a href={transaction.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-indigo-500 uppercase hover:underline ml-1">Receipt</a>
                     )}
                 </div>
             </div>
 
             <div className={`ml-4 font-black text-right ${realm === 'admin' || isIncome ? 'text-emerald-600' : 'text-rose-500'}`}>
-                {isIncome || realm === 'admin' ? '+' : '-'} ₱{transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {isIncome || realm === 'admin' ? '+' : '-'} ₱{Number(transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
         </div>
     );
 };
-
-// --- MAIN WIDGET ---
 
 export const UnifiedTransactionsListWidget = ({ companyData, familyData, adminMode }: UnifiedProps) => {
   const { user } = useContext(AppContext) as any;
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const realm: Realm = adminMode ? 'admin' : companyData ? 'company' : familyData ? 'family' : 'personal';
+  const companyId = companyData?.id || companyData?._id || (typeof companyData === 'string' ? companyData : null);
+  const familyId = familyData?.id || familyData?._id || (typeof familyData === 'string' ? familyData : null);
+
+  const realm: Realm = adminMode ? 'admin' : companyId ? 'company' : familyId ? 'family' : 'personal';
 
   const fetchData = useCallback(async () => {
-    if (!user || !db) return;
+    if (!user) return;
     setLoading(true);
     
     try {
         let results: Transaction[] = [];
 
         if (realm === 'admin') {
+            if (!db) return;
             const q = query(collection(db as Firestore, "premiums"), orderBy("granted_at", "desc"));
             const snap = await getDocs(q);
             const rawPremiums = snap.docs.filter(d => d.data().user_id !== user.uid);
         
             if (rawPremiums.length > 0) {
-                const userIds = [...new Set(rawPremiums.map(d => d.data().user_id))];
+                const userIds = [...new Set(rawPremiums.map(d => d.data().user_id))].filter(Boolean);
                 const usersMap: Record<string, any> = {};
-                const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", userIds.slice(0, 10))));
-                uSnap.forEach(d => { usersMap[d.id] = d.data(); });
+                if (userIds.length > 0) {
+                    try {
+                        const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", userIds.slice(0, 10))));
+                        uSnap.forEach(d => { usersMap[d.id] = d.data(); });
+                    } catch (e) {
+                        console.error("Firebase user profile fetch failed:", e);
+                    }
+                }
         
                 results = rawPremiums.map(d => {
                     const data = d.data();
@@ -145,38 +158,48 @@ export const UnifiedTransactionsListWidget = ({ companyData, familyData, adminMo
             }
         } else {
             let apiUrl = `${API_BASE_URL}/transactions?user_id=${user.uid}`;
-            if (realm === 'company') apiUrl = `${API_BASE_URL}/transactions?company_id=${companyData?.id}`;
-            if (realm === 'family') apiUrl = `${API_BASE_URL}/transactions?family_id=${familyData?.id}`;
+            if (realm === 'company' && companyId) {
+                apiUrl = `${API_BASE_URL}/transactions?company_id=${companyId}`;
+            } else if (realm === 'family' && familyId) {
+                apiUrl = `${API_BASE_URL}/transactions?family_id=${familyId}`;
+            }
 
             const res = await fetch(apiUrl);
-            if (!res.ok) throw new Error();
+            if (!res.ok) throw new Error("Failed to fetch API transactions");
             const raw = await res.json();
             
             let mapped = raw.map((tx: any) => ({
                 ...tx,
-                id: tx._id,
-                created_at: { toDate: () => new Date(tx.created_at) }
+                id: tx._id || tx.id,
+                created_at: tx.created_at ? (typeof tx.created_at === 'string' ? tx.created_at : tx.created_at) : new Date().toISOString()
             }));
 
             if (realm === 'personal') mapped = mapped.filter((tx: any) => !tx.family_id && !tx.company_id);
 
-            if (realm !== 'personal' && mapped.length > 0) {
-                const uIds = [...new Set(mapped.map((tx: any) => tx.user_id))];
-                const usersMap: Record<string, any> = {};
-                const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", uIds.slice(0, 10))));
-                uSnap.forEach(d => { usersMap[d.id] = d.data(); });
-                mapped = mapped.map((tx: any) => ({ ...tx, user: usersMap[tx.user_id] }));
+            if (realm !== 'personal' && mapped.length > 0 && db) {
+                const uIds = [...new Set(mapped.map((tx: any) => tx.user_id))].filter(Boolean);
+                if (uIds.length > 0) {
+                    try {
+                        const usersMap: Record<string, any> = {};
+                        const uSnap = await getDocs(query(collection(db as Firestore, "users"), where(documentId(), "in", uIds.slice(0, 10))));
+                        uSnap.forEach(d => { usersMap[d.id] = d.data(); });
+                        mapped = mapped.map((tx: any) => ({ ...tx, user: usersMap[tx.user_id] }));
+                    } catch (e) {
+                        console.error("Firebase member profile enrichment error:", e);
+                    }
+                }
             }
             results = mapped;
         }
         
         setTransactions(results);
-    } catch (err) {
+    } catch (err: any) {
+        console.error("Transactions fetch error:", err);
         toast.error("Failed to load transactions.");
     } finally {
         setLoading(false);
     }
-  }, [user, realm, companyData?.id, familyData?.id]);
+  }, [user, realm, companyId, familyId]);
 
   useEffect(() => {
     fetchData();
@@ -184,15 +207,23 @@ export const UnifiedTransactionsListWidget = ({ companyData, familyData, adminMo
 
   const grouped = useMemo(() => {
     return transactions.reduce((acc, tx) => {
-      const dateKey = (tx.created_at as any).toDate ? (tx.created_at as any).toDate().toDateString() : new Date(tx.created_at as any).toDateString();
+      let dateKey = 'Unknown Date';
+      if (tx.created_at) {
+        const d = typeof tx.created_at === 'string' 
+            ? new Date(tx.created_at) 
+            : (tx.created_at as any).toDate 
+                ? (tx.created_at as any).toDate() 
+                : new Date(tx.created_at as any);
+        if (!isNaN(d.getTime())) {
+            dateKey = d.toDateString();
+        }
+      }
       if (!acc[dateKey]) acc[dateKey] = [];
       acc[dateKey].push(tx);
       return acc;
     }, {} as Record<string, Transaction[]>);
   }, [transactions]);
-  
-  // ⭐️ PRINCIPLE: LOOK AND FEEL
-  // Matches the GoalListWidget loading exactly (No box, Indigo variant, same message)
+
   if (loading && transactions.length === 0) {
     return <UnifiedLoadingWidget type="section" message="Syncing Ledger..." variant="indigo" />;
   }

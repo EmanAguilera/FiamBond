@@ -10,17 +10,15 @@ import { API_BASE_URL } from "@/src/config/apiConfig.js";
 // Auth & Security
 import RouteGuard from "@/src/components/auth/RouteGuard";
 
-// DRY Shared Resources
+// Shared Resources
 import { Icons, Btn, DashboardCard } from "@/src/components/realm/RealmSharedUI.jsx";
 import { useRealmData } from "@/src/hooks/useRealmData.js";
-
-// Integration: UnifiedLoadingWidget
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
 // Dynamic Widget Imports
 const Modal = dynamic(() => import('@/src/components/ui/Modal.jsx'), { 
     ssr: false,
-    loading: () => <UnifiedLoadingWidget type="section" message="Opening Corporate Portal..." />
+    loading: () => <UnifiedLoadingWidget type="section" message="Opening Portal..." />
 });
 const UnifiedCorporateLedgerWidget = dynamic(() => import('@/src/components/management/UnifiedCorporateLedgerWidget'), { ssr: false });
 const CreateUnifiedTransactionWidget = dynamic(() => import('@/src/components/finance/CreateUnifiedTransactionWidget'), { ssr: false });
@@ -39,16 +37,14 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
 
     const corporateDisplayName = useMemo(() => {
         if (!company) return "";
-        
         const isGeneric = company.name?.toLowerCase() === 'company' || company.name?.toLowerCase() === 'my company';
         const userLastName = user?.full_name ? user.full_name.split(' ').pop() : '';
-        
         return isGeneric && userLastName ? `${userLastName} ` : company.name;
     }, [company, user]);
 
-    // Modal States (Includes actionHub bridge)
+    // Modal States
     const [modals, setModals] = useState({
-        actionHub: false, // Bridge modal state
+        actionHub: false, 
         accounting: false, 
         addGoal: false, 
         manageEmp: false,
@@ -75,7 +71,7 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
     const companyPayrollConfig = useMemo(() => ({
         filterFn: (tx) => 
             (tx.category === 'Payroll' || tx.category === 'Cash Advance') || 
-            (tx.description && (tx.description.toLowerCase().includes('salary') || tx.description.toLowerCase().includes('advance'))),
+            (tx.description && (tx.description.toLowerCase().includes('salary') || tx.description.toLowerCase().includes('advance') || tx.description.toLowerCase().includes('payroll'))),
         columnLabels: ["Employee / Description", "Category"],
         getMainLabel: (tx) => tx.description || "Unnamed Disbursement",
         getSubLabel: (tx) => tx.category || "General Payroll",
@@ -85,15 +81,6 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
         if (!company?.id || !mounted) return;
         try {
             let compRes = await fetch(`${API_BASE_URL}/companies/${company.id}`);
-            if (!compRes.ok && compRes.status === 404) {
-                await fetch(`${API_BASE_URL}/companies`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ owner_id: company.id, name: company.name })
-                });
-                compRes = await fetch(`${API_BASE_URL}/companies/${company.id}`);
-            }
-
             if (compRes.ok) {
                 const companyData = await compRes.json();
                 const memberIds = companyData.member_ids || [];
@@ -112,7 +99,7 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                 }
             }
         } catch (e) { console.error("Company Init Error:", e); }
-    }, [company?.id, company?.name, companyPayrollConfig, mounted]);
+    }, [company?.id, companyPayrollConfig, mounted]);
 
     useEffect(() => { initCompanyData(); }, [initCompanyData]);
 
@@ -129,25 +116,19 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
     return (
         <RouteGuard require="premium">
             <div className="w-full">
-                {error && (
-                    <div className="mb-4 p-3 bg-rose-100 text-rose-700 rounded-xl text-xs font-bold text-center border border-rose-200">
-                        ⚠️ Connection Error: Corporate API Offline
-                    </div>
-                )}
-
                 {/* --- HEADER --- */}
                 <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div className="flex flex-col gap-1 text-left">
                         <button 
                             onClick={onBack} 
-                            className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-sm font-medium hover:border-indigo-300 hover:text-indigo-600 transition-all mb-4 w-fit shadow-sm active:scale-95"
+                            className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 text-sm font-medium hover:border-indigo-300 hover:text-indigo-600 transition-all mb-4 w-fit shadow-sm"
                         >
-                            <span className="group-hover:-translate-x-0.5 transition-transform">{Icons.Back}</span>
+                            <span>{Icons.Back}</span>
                             <span>Back to Personal</span>
                         </button>
                         
                         <div className="flex items-center gap-4">
-                            <div className="w-1 h-12 bg-indigo-600 rounded-full opacity-80 shadow-[0_0_10px_rgba(79,70,229,0.3)]"></div>
+                            <div className="w-1 h-12 bg-indigo-600 rounded-full opacity-80"></div>
                             <div>
                                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none">
                                     {corporateDisplayName}
@@ -159,18 +140,11 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                         </div>
                     </div>
 
-                    <div className="w-full md:w-auto">
-                        <div className="flex flex-wrap md:flex-nowrap items-center gap-3">
-                            {/* 🚀 SINGLE BRIDGE BUTTON REPLACING SEPARATE CREATION BUTTONS */}
-                            <Btn onClick={() => toggle('actionHub', true)} type="pri" icon={Icons.Plus}>
-                                New Entry
-                            </Btn>
-
-                            <div className="hidden md:block w-px h-10 bg-slate-200 mx-1"></div>
-
-                            {/* Employees Button */}
-                            <Btn onClick={() => toggle('manageEmp', true)} icon={Icons.Users}>Employees</Btn>
-                        </div>
+                    <div className="flex items-center gap-3">
+                        <Btn onClick={() => toggle('actionHub', true)} type="pri" icon={Icons.Plus}>
+                            New Entry
+                        </Btn>
+                        <Btn onClick={() => toggle('manageEmp', true)} icon={Icons.Users}>Employees</Btn>
                     </div>
                 </header>
 
@@ -205,64 +179,62 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                     />
                 </div>
 
-                {/* --- ANALYTICS --- */}
+                {/* --- ANALYTICS CHART --- */}
                 <Suspense fallback={<UnifiedLoadingWidget type="section" message="Analyzing Corporate Data..." />}>
-                    <UnifiedReportChartWidget 
-                        report={report} 
-                        realm="company" 
-                        period={period} 
-                        setPeriod={setPeriod} 
-                    />
+                    <UnifiedReportChartWidget report={report} realm="company" period={period} setPeriod={setPeriod} />
                 </Suspense>
 
                 {/* --- MODALS --- */}
                 <Suspense fallback={null}>
-                    {/* 🌉 ACTION BRIDGE MODAL */}
+                    {/* Action Hub Modal */}
                     {modals.actionHub && (
                         <Modal isOpen={modals.actionHub} onClose={() => toggle('actionHub', false)} title="Corporate Quick Action">
-                            <div className="p-2 space-y-4 text-center">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            <div className="p-2 space-y-3">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider text-center">
                                     What would you like to record for {corporateDisplayName}?
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <button 
                                         onClick={() => { toggle('actionHub', false); toggle('accounting', true); }}
-                                        className="p-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                        className="p-5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-2xl flex flex-col items-center text-center gap-2 transition-all active:scale-95"
                                     >
-                                        <span className="text-3xl group-hover:scale-110 transition-transform">📊</span>
-                                        <span className="font-bold text-slate-800 group-hover:text-emerald-700 text-sm">Accounting & Payroll</span>
-                                        <span className="text-[10px] text-slate-400 font-semibold">Income, Expense & Payroll</span>
+                                        <span className="text-3xl">📊</span>
+                                        <span className="font-bold text-slate-800 text-xs">Accounting & Payroll</span>
+                                        <span className="text-[10px] text-slate-400">Income, Expense & PH Payroll</span>
                                     </button>
 
                                     <button 
                                         onClick={() => { toggle('actionHub', false); toggle('addGoal', true); }}
-                                        className="p-5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl flex flex-col items-center gap-2 transition-all group active:scale-95"
+                                        className="p-5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl flex flex-col items-center text-center gap-2 transition-all active:scale-95"
                                     >
-                                        <span className="text-3xl group-hover:scale-110 transition-transform">🎯</span>
-                                        <span className="font-bold text-slate-800 group-hover:text-indigo-700 text-sm">Strategic Target</span>
-                                        <span className="text-[10px] text-slate-400 font-semibold">Corporate Goal Target</span>
+                                        <span className="text-3xl">🎯</span>
+                                        <span className="font-bold text-slate-800 text-xs">Strategic Target</span>
+                                        <span className="text-[10px] text-slate-400">Corporate Goal Target</span>
                                     </button>
                                 </div>
                             </div>
                         </Modal>
                     )}
 
+                    {/* Unified Accounting & Payroll Modal */}
                     {modals.accounting && (
-                        <Modal isOpen={modals.accounting} onClose={() => toggle('accounting', false)} title="Corporate Accounting">
+                        <Modal isOpen={modals.accounting} onClose={() => toggle('accounting', false)} title="Corporate Financial Record">
                             <CreateUnifiedTransactionWidget 
-                                companyData={company.id} 
+                                companyData={company} 
                                 members={members} 
                                 onSuccess={() => { toggle('accounting', false); handleRefresh(); }} 
                             />
                         </Modal>
                     )}
-                    
+
+                    {/* Strategic Goal Modal */}
                     {modals.addGoal && (
                         <Modal isOpen={modals.addGoal} onClose={() => toggle('addGoal', false)} title="Set Strategic Target">
-                            <CreateUnifiedGoalWidget mode="company" entityId={company.id} onSuccess={handleRefresh} />
+                            <CreateUnifiedGoalWidget mode="company" entityId={company.id} onSuccess={() => { toggle('addGoal', false); handleRefresh(); }} />
                         </Modal>
                     )}
 
+                    {/* Manage Employees Modal */}
                     {modals.manageEmp && (
                         <Modal isOpen={modals.manageEmp} onClose={() => toggle('manageEmp', false)} title="Manage Employee Access">
                             <UnifiedManagerWidget 
@@ -275,18 +247,21 @@ export default function CompanyRealm({ company, onBack, onDataChange }) {
                         </Modal>
                     )}
                     
+                    {/* View Transactions Modal */}
                     {modals.viewTx && (
                         <Modal isOpen={modals.viewTx} onClose={() => toggle('viewTx', false)} title="Corporate Ledger">
-                            <UnifiedTransactionsListWidget companyData={company} onDataChange={handleRefresh} />
+                            <UnifiedTransactionsListWidget companyData={company} />
                         </Modal>
                     )}
                     
+                    {/* View Goals Modal */}
                     {modals.viewGoals && (
                         <Modal isOpen={modals.viewGoals} onClose={() => toggle('viewGoals', false)} title="Strategic Goals">
                             <UnifiedGoalListWidget mode="company" entityId={company.id} onDataChange={handleRefresh} />
                         </Modal>
                     )}
 
+                    {/* Payroll Ledger Reports Modal */}
                     {modals.payrollHistory && (
                         <Modal isOpen={modals.payrollHistory} onClose={() => toggle('payrollHistory', false)} title="Disbursement & Payroll Reports">
                             <UnifiedCorporateLedgerWidget 

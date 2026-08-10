@@ -252,8 +252,12 @@ const UnifiedManagerWidget = ({ type = "family", mode = "directory", realmData =
     };
 
     const handleAction = async (id: string, action: string, name: string = "") => {
-        if (!db) return;
+        if (!db || !user?.uid) return;
         if (type === 'admin' && action === 'delete') {
+            if (id === user.uid) {
+                toast.error("Operation denied: Admins cannot revoke their own privileges.");
+                return;
+            }
             if (!confirm(`Remove admin privileges from ${name}?`)) return;
             setIsProcessing(true);
             try {
@@ -283,12 +287,12 @@ const UnifiedManagerWidget = ({ type = "family", mode = "directory", realmData =
         <div className="space-y-4 relative">
             {/* 🟢 Transparent Loading Overlay - Keeps UI intact */}
             {isProcessing && (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/40 backdrop-blur-[1px]">
-        {/* Changed type="full" to type="fullscreen" to satisfy TypeScript */}
-        <UnifiedLoadingWidget type="fullscreen" message="Processing Matrix..." />
-    </div>
-)}
-
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/40 backdrop-blur-[1px]">
+            {/* Changed type="full" to type="fullscreen" to satisfy TypeScript */}
+            <UnifiedLoadingWidget type="fullscreen" message="Processing Matrix..." />
+        </div>
+    )}
+    
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 {!showForm ? (
                     <div className="flex items-center justify-between">
@@ -338,7 +342,7 @@ const UnifiedManagerWidget = ({ type = "family", mode = "directory", realmData =
 
                                 <div className="flex items-center gap-1">
                                     {type === 'admin' ? (
-                                        <button onClick={() => handleAction(item.id, 'delete', item.full_name)} className="p-2 text-slate-300 hover:text-rose-600 transition-colors">{Icons.Trash}</button>
+                                        user?.uid !== item.id && <button onClick={() => handleAction(item.id, 'delete', item.full_name)} className="p-2 text-slate-300 hover:text-rose-600 transition-colors">{Icons.Trash}</button>
                                     ) : mode === 'directory' ? (
                                         <>
                                             <button onClick={() => onEnterRealm?.(item)} className={`flex items-center gap-1 bg-white ${accentTextClass} text-[10px] font-black uppercase px-3 py-1.5 rounded-lg border border-slate-200 hover:border-current transition-all`}>
