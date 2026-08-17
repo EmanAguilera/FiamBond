@@ -3,9 +3,52 @@
 import { memo, useEffect, useState, useMemo } from 'react';
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
-const parseDate = (d: any) => d?.seconds ? new Date(d.seconds * 1000) : (d ? new Date(d) : null);
+export interface FirestoreTimestamp {
+    seconds: number;
+    nanoseconds?: number;
+    toDate?: () => Date;
+}
 
-const getExpiry = (startRaw, plan) => {
+export type RawDateType = FirestoreTimestamp | Date | string | number | null | undefined;
+
+export interface AdminUser {
+    id: string;
+    full_name?: string;
+    first_name?: string;
+    email?: string;
+    role?: string;
+    is_premium?: boolean;
+    is_family_premium?: boolean;
+    premium_granted_at?: RawDateType;
+    family_premium_granted_at?: RawDateType;
+    premium_plan?: string;
+    family_premium_plan?: string;
+    subscription_status?: string;
+    family_subscription_status?: string;
+    payment_ref?: string;
+    family_payment_ref?: string;
+    request_date?: RawDateType;
+    family_request_date?: RawDateType;
+    receipt_url?: string;
+    family_receipt_url?: string;
+}
+
+type RealmType = 'company' | 'family';
+type ActionType = 'grant' | 'revoke' | 'approve';
+
+const parseDate = (d: RawDateType): Date | null => {
+    if (!d) return null;
+    if (typeof (d as FirestoreTimestamp)?.toDate === 'function') {
+        return (d as FirestoreTimestamp).toDate!();
+    }
+    if (typeof (d as FirestoreTimestamp)?.seconds === 'number') {
+        return new Date((d as FirestoreTimestamp).seconds * 1000);
+    }
+    const parsed = new Date(d as string | number | Date);
+    return isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getExpiry = (startRaw: RawDateType, plan?: string): Date | null => {
     const start = parseDate(startRaw);
     if (!start || isNaN(start.getTime())) return null;
     const end = new Date(start);
@@ -14,14 +57,21 @@ const getExpiry = (startRaw, plan) => {
 };
 
 // --- SUBSCRIPTION TICKER ---
-const SubscriptionTicker = ({ label, type, user, onRevoke }) => {
+interface SubscriptionTickerProps {
+    label: string;
+    type: RealmType;
+    user: AdminUser;
+    onRevoke: (userId: string, action: ActionType, type: RealmType) => void;
+}
+
+const SubscriptionTicker = ({ label, type, user, onRevoke }: SubscriptionTickerProps) => {
     const isPremium = type === 'company' ? user.is_premium : user.is_family_premium;
     const grantedAt = type === 'company' ? user.premium_granted_at : user.family_premium_granted_at;
     const plan = type === 'company' ? user.premium_plan : user.family_premium_plan;
     
     const endDate = getExpiry(grantedAt, plan || 'monthly');
     const startDate = parseDate(grantedAt);
-    const [timeLeft, setTimeLeft] = useState('');
+    const [timeLeft, setTimeLeft] = useState<string>('');
 
     useEffect(() => {
         if (!isPremium || !endDate) return;
@@ -59,11 +109,17 @@ const SubscriptionTicker = ({ label, type, user, onRevoke }) => {
 };
 
 // --- USER ROW COMPONENT ---
-const AdminUserRow = memo(({ user, onTogglePremium, onDeleteUser }) => {
+interface AdminUserRowProps {
+    user: AdminUser;
+    onTogglePremium: (userId: string, action: ActionType, type: RealmType) => void;
+    onDeleteUser: (userId: string) => void;
+}
+
+const AdminUserRow = memo(({ user, onTogglePremium, onDeleteUser }: AdminUserRowProps) => {
     const initials = (user.full_name || user.first_name || "?").substring(0, 2).toUpperCase();
     const isAdmin = user.role === 'admin';
-    const isCoPre = user.is_premium;
-    const isFaPre = user.is_family_premium;
+    const isCoPre = !!user.is_premium;
+    const isFaPre = !!user.is_family_premium;
     const isPending = user.subscription_status === 'pending_approval' || user.family_subscription_status === 'pending_approval';
 
     const borderClass = isAdmin ? "border-purple-500 bg-purple-50/20" : 
@@ -71,11 +127,17 @@ const AdminUserRow = memo(({ user, onTogglePremium, onDeleteUser }) => {
                         (isCoPre || isFaPre) ? "border-emerald-500" : "border-transparent";
 
     const isPendingCompany = user.subscription_status === 'pending_approval';
-    const pendingType = isPendingCompany ? 'Company' : 'Family';
+    const pendingType: RealmType = isPendingCompany ? 'company' : 'family';
+    const pendingLabel = isPendingCompany ? 'Company' : 'Family';
     const pendingRef = isPendingCompany ? user.payment_ref : user.family_payment_ref;
     const pendingPlan = (isPendingCompany ? user.premium_plan : user.family_premium_plan) || 'monthly';
     const pendingDate = isPendingCompany ? user.request_date : user.family_request_date;
     const pendingReceipt = isPendingCompany ? user.receipt_url : user.family_receipt_url;
+
+    const formattedPendingDate = useMemo(() => {
+        const parsed = parseDate(pendingDate);
+        return parsed ? parsed.toLocaleString() : 'Recently';
+    }, [pendingDate]);
 
     return (
         <div className={`flex flex-col sm:flex-row sm:items-center p-4 border-b border-gray-100 last:border-0 border-l-[4px] transition-all ${borderClass} hover:bg-gray-50/50`}>
@@ -98,7 +160,7 @@ const AdminUserRow = memo(({ user, onTogglePremium, onDeleteUser }) => {
                     {isPending && (
                         <div className="mt-2 p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-xs space-y-1.5 text-left shadow-sm">
                             <div className="flex justify-between items-center font-extrabold text-amber-800 text-[10px] uppercase tracking-wider">
-                                <span>⚠️ Pending {pendingType} Access</span>
+                                <span>⚠️ Pending {pendingLabel} Access</span>
                                 <span className="font-mono text-[10px] bg-amber-100 px-2 py-0.5 rounded text-amber-800">{pendingPlan}</span>
                             </div>
                             
@@ -112,7 +174,7 @@ const AdminUserRow = memo(({ user, onTogglePremium, onDeleteUser }) => {
                             {pendingDate && (
                                 <div className="flex justify-between items-center text-[10px] text-slate-400">
                                     <span>Submitted:</span>
-                                    <span>{pendingDate?.toDate ? pendingDate.toDate().toLocaleString() : 'Recently'}</span>
+                                    <span>{formattedPendingDate}</span>
                                 </div>
                             )}
 
@@ -137,7 +199,7 @@ const AdminUserRow = memo(({ user, onTogglePremium, onDeleteUser }) => {
             <div className="mt-4 sm:mt-0 sm:ml-4 flex flex-wrap sm:flex-col gap-2 items-end">
                 {isPending ? (
                     <button 
-                        onClick={() => onTogglePremium(user.id, 'approve', isPendingCompany ? 'company' : 'family')} 
+                        onClick={() => onTogglePremium(user.id, 'approve', pendingType)} 
                         className="bg-emerald-600 text-white text-xs font-extrabold uppercase px-4 py-2 rounded-xl shadow-md hover:bg-emerald-700 transition-all active:scale-95"
                     >
                         Approve Payment
@@ -182,8 +244,24 @@ const AdminUserRow = memo(({ user, onTogglePremium, onDeleteUser }) => {
     );
 });
 
+AdminUserRow.displayName = 'AdminUserRow';
+
 // --- MAIN WIDGET ---
-const AdminUserTableWidget = ({ users = [], onTogglePremium, onDeleteUser, headerText, loading = false }) => {
+interface AdminUserTableWidgetProps {
+    users?: AdminUser[];
+    onTogglePremium: (userId: string, action: ActionType, type: RealmType) => void;
+    onDeleteUser: (userId: string) => void;
+    headerText?: string;
+    loading?: boolean;
+}
+
+const AdminUserTableWidget = ({ 
+    users = [], 
+    onTogglePremium, 
+    onDeleteUser, 
+    headerText, 
+    loading = false 
+}: AdminUserTableWidgetProps) => {
     const sorted = useMemo(() => {
         return [...users].sort((a, b) => {
             const aP = a.subscription_status === 'pending_approval' || a.family_subscription_status === 'pending_approval' ? 1 : 0;
