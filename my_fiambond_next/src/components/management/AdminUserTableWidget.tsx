@@ -3,7 +3,7 @@
 import { memo, useEffect, useState, useMemo } from 'react';
 import UnifiedLoadingWidget from "@/src/components/ui/UnifiedLoadingWidget";
 
-const parseDate = (d) => d?.seconds ? new Date(d.seconds * 1000) : (d ? new Date(d) : null);
+const parseDate = (d: any) => d?.seconds ? new Date(d.seconds * 1000) : (d ? new Date(d) : null);
 
 const getExpiry = (startRaw, plan) => {
     const start = parseDate(startRaw);
